@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Animated, Easing,
-  TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform,
-} from 'react-native';
+TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform, Image,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, UserRole } from '@/navigation/types';
@@ -26,43 +25,43 @@ const ROLE_THEME = {
     sub: 'Your mental wellness journey continues',
     divEmoji: '💚',
     btnColor: colors.coral,
-    shadowColor: '#8B5CF6',
+    shadowColor: '#3D7A5C',
     orbs: [
-      { color: '#FF8A7A', size: 180, left: -60,    top: -40 },
-      { color: '#C4B5FD', size: 140, left: SW - 80, top: 60 },
-      { color: '#86EFAC', size: 120, left: 20,      top: SH * 0.45 },
-      { color: '#FDE68A', size: 100, left: SW - 60, top: SH * 0.7 },
-      { color: '#93C5FD', size: 80,  left: SW * 0.4, top: SH * 0.15 },
+      { color: '#A8D4BC', size: 180, left: -60,    top: -40 },
+      { color: '#C4E8D4', size: 140, left: SW - 80, top: 60 },
+      { color: '#7DC4A0', size: 120, left: 20,      top: SH * 0.45 },
+      { color: '#D9EFE2', size: 100, left: SW - 60, top: SH * 0.7 },
+      { color: '#9ECBB4', size: 80,  left: SW * 0.4, top: SH * 0.15 },
     ],
   },
   COUNSELLOR: {
-    bg: '#F0F7FF',
+    bg: '#F0F7F3',
     heading: 'Counsellor Portal 💙',
     sub: 'Support your students with care',
     divEmoji: '💙',
-    btnColor: '#1B6CA8',
-    shadowColor: '#1B4F72',
+    btnColor: '#2A5C45',
+    shadowColor: '#1E4433',
     orbs: [
-      { color: '#5DBCFF', size: 200, left: -70,    top: -50 },
-      { color: '#2980B9', size: 140, left: SW - 70, top: 80 },
-      { color: '#A8D8F0', size: 120, left: 10,      top: SH * 0.45 },
-      { color: '#C4E8FF', size: 100, left: SW - 50, top: SH * 0.65 },
-      { color: '#74B9E8', size: 80,  left: SW * 0.3, top: SH * 0.2 },
+      { color: '#7DC4A0', size: 200, left: -70,    top: -50 },
+      { color: '#3D7A5C', size: 140, left: SW - 70, top: 80 },
+      { color: '#C4E8D4', size: 120, left: 10,      top: SH * 0.45 },
+      { color: '#D9EFE2', size: 100, left: SW - 50, top: SH * 0.65 },
+      { color: '#A8D4BC', size: 80,  left: SW * 0.3, top: SH * 0.2 },
     ],
   },
   ADMIN: {
-    bg: '#F5F3FF',
+    bg: '#F4F7F5',
     heading: 'Admin Access 🔑',
     sub: 'Platform management & oversight',
     divEmoji: '🔑',
-    btnColor: '#4A1C96',
-    shadowColor: '#2D1B69',
+    btnColor: '#2A5C45',
+    shadowColor: '#1E4433',
     orbs: [
-      { color: '#C4A5FF', size: 200, left: -70,     top: -50 },
-      { color: '#7C3AED', size: 140, left: SW - 70,  top: 80 },
-      { color: '#DDD6FE', size: 110, left: 10,       top: SH * 0.45 },
-      { color: '#8B5CF6', size: 90,  left: SW - 50,  top: SH * 0.65 },
-      { color: '#A78BFA', size: 75,  left: SW * 0.3, top: SH * 0.2 },
+      { color: '#A8D4BC', size: 200, left: -70,     top: -50 },
+      { color: '#2A5C45', size: 140, left: SW - 70,  top: 80 },
+      { color: '#D9EFE2', size: 110, left: 10,       top: SH * 0.45 },
+      { color: '#3D7A5C', size: 90,  left: SW - 50,  top: SH * 0.65 },
+      { color: '#9ECBB4', size: 75,  left: SW * 0.3, top: SH * 0.2 },
     ],
   },
 } satisfies Record<UserRole, {
@@ -261,7 +260,7 @@ export function LoginScreen({ navigation, route }: Props) {
         {/* Logo */}
         <Animated.View style={[s.logoWrap, slide(logoAnim, 40)]}>
           <Animated.View style={[s.logoCircle, { transform: [{ scale: breathe }] }]}>
-            <Text style={s.logoEmoji}>{roleEmojis[role]}</Text>
+            <Image source={require('../../../assets/logo.png')} resizeMode="contain" style={{ width: 46, height: 46 }} />
           </Animated.View>
           <Text style={s.brand}>MoodMate</Text>
           {role !== 'STUDENT' && (
@@ -417,7 +416,7 @@ const s = StyleSheet.create({
   cardAnim: {
     width: SW - spacing.xl * 2,
     marginBottom: spacing.lg,
-    shadowColor: '#8B5CF6',
+    shadowColor: '#3D7A5C',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 20,

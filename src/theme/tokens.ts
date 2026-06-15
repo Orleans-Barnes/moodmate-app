@@ -39,7 +39,19 @@ export const colors = {
   sun: '#D4A017',
   sunSoft: '#FEF3C7',
   sunText: '#1A2E25',
+  // ── Warm accents (sand / gold / clay) ─────────────────────────────────────
+  sand: '#F7F1E4',
+  sandLine: '#E8DCC4',
+  sandInk: '#6B5426',
+  sandInkDark: '#3A2E18',
 
+  gold: '#C9A227',
+  goldSoft: '#F0E4CB',
+
+  clay: '#8F4A32',
+  claySoft: '#F7E7E0',
+
+  hair: '#DCE8E1',
   // ── Accent ────────────────────────────────────────────────────────────────
   accent: '#1B8C6E',
   accentSoft: '#D6EFE8',
@@ -67,7 +79,7 @@ export const gradients = {
   header:     ['#1E3D2F', '#2A5C45', '#3D7A5C'] as const,
   dark:       ['#0D1B12', '#1B3A2B', '#2A5C45'] as const,
   darkRich:   ['#0A1F15', '#152E22', '#1B3A2B'] as const,
-  signup:     ['#2A5C45', '#3D7A5C', '#F4F7F5'] as const,
+  signup:     ['#1E3D2F', '#2A5C45', '#3D7A5C'] as const,
   onboard1:   ['#0D1B12', '#1B3A2B', '#2A5C45'] as const,
   onboard2:   ['#152E22', '#2A5C45', '#3D7A5C'] as const,
   onboard3:   ['#0A1F15', '#1A3D2A', '#2E6B4F'] as const,

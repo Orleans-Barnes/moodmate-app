@@ -336,11 +336,11 @@ export function DynamicTabBar({
                   <Ionicons
                     name={focused ? 'analytics' : 'analytics-outline'}
                     size={ICON_SIZE}
-                    color={focused ? '#7B3CC9' : colors.inkFaint}
+                    color={focused ? '#2A5C45' : colors.inkFaint}
                   />
                 </View>
                 <Text
-                  style={[styles.label, { color: focused ? '#7B3CC9' : colors.inkFaint }]}
+                  style={[styles.label, { color: focused ? '#2A5C45' : colors.inkFaint }]}
                   numberOfLines={1}
                 >
                   Insights
@@ -419,8 +419,8 @@ const styles = StyleSheet.create({
     elevation:      3,
   },
   iconWrapInsights: {
-    backgroundColor: 'rgba(123,60,201,0.12)',
-    shadowColor:    'rgba(123,60,201,0.4)',
+    backgroundColor: 'rgba(42,92,69,0.12)',
+    shadowColor:    'rgba(42,92,69,0.4)',
     shadowOffset:   { width: 0, height: 2 },
     shadowOpacity:  0.5,
     shadowRadius:   6,

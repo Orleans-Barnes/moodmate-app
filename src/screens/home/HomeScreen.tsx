@@ -42,10 +42,10 @@ type Props = CompositeScreenProps<
 >;
 
 const QUICK_ACTIONS = [
-  { key: 'breathe', icon: 'leaf-outline',    label: 'Breathe',  from: '#2A5C45', to: '#3D7A5C', shadowColor: glow.blue },
-  { key: 'journal', icon: 'book-outline',    label: 'Journal',  from: '#3D7A5C', to: '#5F9E7C', shadowColor: glow.sage },
-  { key: 'explore', icon: 'compass-outline', label: 'Explore',  from: '#1B8C6E', to: '#2A5C45', shadowColor: glow.lavender },
-  { key: 'checkin', icon: 'heart-outline',   label: 'Check in', from: '#5F9E7C', to: '#3D7A5C', shadowColor: glow.coral },
+  { key: 'breathe', icon: 'leaf-outline',    label: 'Breathe',  chipBg: '#E4EFE9', chipInk: '#2A5C45', solid: false, from: '#FFFFFF', to: '#FFFFFF', shadowColor: 'rgba(26,46,37,0.10)' },
+  { key: 'journal', icon: 'book-outline',    label: 'Journal',  chipBg: '#F7F1E4', chipInk: '#8A6D1F', solid: false, from: '#FFFFFF', to: '#FFFFFF', shadowColor: 'rgba(26,46,37,0.10)' },
+  { key: 'explore', icon: 'compass-outline', label: 'Explore',  chipBg: '#F7E7E0', chipInk: '#8F4A32', solid: false, from: '#FFFFFF', to: '#FFFFFF', shadowColor: 'rgba(26,46,37,0.10)' },
+  { key: 'checkin', icon: 'heart-outline',   label: 'Check in', chipBg: '#3D7A5C', chipInk: '#FFFFFF', solid: true,  from: '#2A5C45', to: '#2A5C45', shadowColor: 'rgba(42,92,69,0.28)' },
 ] as const;
 
 const JOURNEY_STAGES = ['Roots', 'Sprout', 'Bloom', 'Canopy'];
@@ -85,15 +85,22 @@ function QuickActionCard({ action, onPress }: {
   return (
     <Animated.View style={[s.quickCard, { transform: [{ scale }], shadowColor: action.shadowColor }]}>
       <Pressable onPressIn={pressIn} onPressOut={pressOut} onPress={onPress}>
-        <LinearGradient
-          colors={[action.from, action.to]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.quickGrad}
-        >
-          <Ionicons name={action.icon as any} size={30} color="#FFFFFF" />
-          <Text style={s.quickLabel}>{action.label}</Text>
-        </LinearGradient>
+        <View style={[s.quickGrad, {
+          backgroundColor: action.solid ? '#2A5C45' : '#FFFFFF',
+          borderWidth: 1,
+          borderColor: action.solid ? '#2A5C45' : '#DCE8E1',
+        }]}>
+          <View style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: action.chipBg,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name={action.icon as any} size={21} color={action.chipInk} />
+          </View>
+          <Text style={[s.quickLabel, { color: action.solid ? '#FFFFFF' : '#152A20' }]}>
+            {action.label}
+          </Text>
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -465,7 +472,7 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={s.root}>
-      <LiquidBackground preset="wellness" opacityScale={0.55} />
+      <LiquidBackground preset="wellness" colors={['#A8D4BC', '#F0E4CB', '#C9A227', '#CFE6D9', '#E8DCC4', '#A8D4BC']} opacityScale={1.4} />
       {/* ── Brand gradient header ── */}
       <LinearGradient
         colors={gradients.header}
@@ -473,9 +480,13 @@ export function HomeScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + spacing.md }]}
       >
+        <View style={[s.ring, s.ring1]} pointerEvents="none" />
+        <View style={[s.ring, s.ring2]} pointerEvents="none" />
+        <View style={[s.ring, s.ring3]} pointerEvents="none" />
+
         <View style={s.headerTop}>
           <View>
-            <Text style={s.greeting}>{getGreeting()}, {firstName} 👋</Text>
+            <Text style={s.greeting}>{getGreeting()}, {firstName}</Text>
             <Text style={s.date}>{TODAY_LABEL}</Text>
           </View>
           {/* Avatar with coral glow ring */}
@@ -489,23 +500,23 @@ export function HomeScreen({ navigation }: Props) {
 
         {/* Stats pills - glassmorphism */}
         <View style={s.statsRow}>
-          <DarkGlassView style={s.statPill} borderRadius={14} overlayColor='rgba(255,255,255,0.13)' borderColor='rgba(255,255,255,0.22)'>
+          <DarkGlassView style={s.statPill} borderRadius={14} overlayColor='rgba(247,241,228,0.97)' borderColor='rgba(232,220,196,0.9)'>
             <Animated.View style={{ transform: [{ scale: streakPulse }] }}>
               <Ionicons
                 name={streakCount > 0 ? 'flame' : 'water-outline'}
                 size={18}
-                color={streakCount > 0 ? '#FFC857' : 'rgba(255,255,255,0.8)'}
+                color={streakCount > 0 ? '#B5654A' : '#8A6D1F'}
               />
             </Animated.View>
-            <Text style={s.statPillVal}>{streakCount}</Text>
-            <Text style={s.statPillLabel}>day streak</Text>
+            <Text style={[s.statPillVal, { color: '#3A2E18' }]}>{streakCount}</Text>
+            <Text style={[s.statPillLabel, { color: '#6B5426' }]}>day streak</Text>
           </DarkGlassView>
-          <DarkGlassView style={s.statPill} borderRadius={14} overlayColor='rgba(255,255,255,0.13)' borderColor='rgba(255,255,255,0.22)'>
+          <DarkGlassView style={s.statPill} borderRadius={14} overlayColor='rgba(42,86,65,0.92)' borderColor='rgba(168,212,188,0.28)'>
             <Text style={s.statPillIcon}>{treeSkinEmoji}</Text>
             <Text style={s.statPillVal}>{treeStage}</Text>
             <Text style={s.statPillLabel}>tree stage</Text>
           </DarkGlassView>
-          <DarkGlassView style={s.statPill} borderRadius={14} overlayColor='rgba(255,255,255,0.13)' borderColor='rgba(255,255,255,0.22)'>
+          <DarkGlassView style={s.statPill} borderRadius={14} overlayColor='rgba(42,86,65,0.92)' borderColor='rgba(168,212,188,0.28)'>
             <Ionicons name="checkmark-circle-outline" size={18} color="rgba(255,255,255,0.9)" />
             <Text style={s.statPillVal}>{doneCount}/{goals.length}</Text>
             <Text style={s.statPillLabel}>goals done</Text>
@@ -564,11 +575,11 @@ export function HomeScreen({ navigation }: Props) {
             </View>
             <View style={s.activitiesCard}>
               {([
-                { key: 'checkin',   icon: 'heart-outline',         iconColor: '#FF6F4D', bg: '#FFE8E4', name: 'Check in mood',     hint: 'How are you feeling today?',    done: actDone.checkin,   onTap: () => navigation.navigate('CheckIn') },
-                { key: 'mission',   icon: 'flag-outline',          iconColor: '#8E7BC0', bg: '#EDE9FA', name: 'Daily mission',      hint: "Complete today's challenge",   done: actDone.mission,   onTap: handleMissionTap },
-                { key: 'journal',   icon: 'book-outline',          iconColor: '#5F9E7C', bg: '#E8F5EE', name: 'Write in journal',   hint: 'Reflect on your thoughts',     done: actDone.journal,   onTap: () => navigation.navigate('Journal') },
-                { key: 'breathing', icon: 'leaf-outline',          iconColor: '#5C8AE6', bg: '#E8EEFF', name: 'Breathing session',  hint: '2 min to reset your mind',     done: actDone.breathing, onTap: () => navigation.navigate('BreathingSession', { session: 'Breathing Reset', duration: 120 }) },
-                { key: 'gratitude', icon: 'flower-outline',        iconColor: '#F59E0B', bg: '#FEF9E7', name: 'Add gratitude note', hint: 'What are you grateful for?',  done: actDone.gratitude, onTap: () => navigation.navigate('GratitudeJar') },
+                { key: 'checkin',   icon: 'heart-outline',         iconColor: '#2A5C45', bg: '#E4EFE9', name: 'Check in mood',     hint: 'How are you feeling today?',    done: actDone.checkin,   onTap: () => navigation.navigate('CheckIn') },
+                { key: 'mission',   icon: 'flag-outline',          iconColor: '#8A6D1F', bg: '#F7F1E4A', name: 'Daily mission',      hint: "Complete today's challenge",   done: actDone.mission,   onTap: handleMissionTap },
+                { key: 'journal',   icon: 'book-outline',          iconColor: '#3D7A5C', bg: '#E4EFE9E', name: 'Write in journal',   hint: 'Reflect on your thoughts',     done: actDone.journal,   onTap: () => navigation.navigate('Journal') },
+                { key: 'breathing', icon: 'leaf-outline',          iconColor: '#8F4A32', bg: '#F7E7E0F', name: 'Breathing session',  hint: '2 min to reset your mind',     done: actDone.breathing, onTap: () => navigation.navigate('BreathingSession', { session: 'Breathing Reset', duration: 120 }) },
+                { key: 'gratitude', icon: 'flower-outline',        iconColor: '#C9A227', bg: '#F0E4CB7', name: 'Add gratitude note', hint: 'What are you grateful for?',  done: actDone.gratitude, onTap: () => navigation.navigate('GratitudeJar') },
               ] as const).map((act, idx, arr) => (
                 <Pressable
                   key={act.key}
@@ -667,20 +678,15 @@ export function HomeScreen({ navigation }: Props) {
 
         {/* ── AI Insight (Pro teaser) ── */}
         <Pressable onPress={() => navigation.navigate('Pro')}>
-          <LinearGradient
-            colors={['#8E7BC0', '#A491D3']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.insightCard}
-          >
+          <View style={[s.insightCard, { backgroundColor: '#1E3D2F' }]}>
             <View style={s.insightTop}>
-              <View style={s.insightTitleRow}><Ionicons name="sparkles" size={15} color="#FFFFFF" /><Text style={s.insightTitle}>  AI Insight</Text></View>
+              <View style={s.insightTitleRow}><Ionicons name="sparkles" size={15} color="#C9A227" /><Text style={s.insightTitle}>  AI Insight</Text></View>
               <View style={s.proChip}><Text style={s.proChipText}>PRO</Text></View>
             </View>
             <Text style={s.insightText}>
               Your stress tends to dip on Wednesday afternoons. Want a 5-minute breathing reminder?
             </Text>
-          </LinearGradient>
+          </View>
         </Pressable>
       </ScrollView>
 
@@ -700,6 +706,7 @@ const s = StyleSheet.create({
 
   // ── Header ── brand purple gradient
   header: {
+    overflow: 'hidden',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
   },
@@ -709,8 +716,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  ring: {
+    position: 'absolute',
+    borderWidth: 1.5,
+    borderColor: 'rgba(168,212,188,0.22)',
+  },
+  ring1: { width: 230, height: 230, borderRadius: 115, top: -96, right: -72 },
+  ring2: { width: 158, height: 158, borderRadius: 79,  top: -58, right: -34 },
+  ring3: { width: 86,  height: 86,  borderRadius: 43,  top: -20, right: 4 },
+
   greeting: {
-    fontFamily: fonts.display,
+    fontFamily: fonts.bodyMedium,
     fontSize: fontSizes.xl,
     color: '#FFFFFF',
   },
@@ -835,9 +851,10 @@ const s = StyleSheet.create({
   },
   quickGrad: {
     padding: spacing.lg,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.lg,
     alignItems: 'flex-start',
-    gap: spacing.sm,
+    gap: spacing.md,
+    borderRadius: 16,
   },
   quickLabel: { fontFamily: fonts.bodyBold, fontSize: fontSizes.md, color: '#FFFFFF' },
 
@@ -945,7 +962,7 @@ const s = StyleSheet.create({
   insightText: {
     fontFamily: fonts.bodyMedium,
     fontSize: fontSizes.sm,
-    color: 'rgba(255,255,255,0.9)',
+    color: '#BDD6C8',
     lineHeight: 20,
   },
 });

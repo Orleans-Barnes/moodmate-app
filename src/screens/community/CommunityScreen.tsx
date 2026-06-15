@@ -9,6 +9,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '@/navigation/types';
 import { Screen } from '@/components/Screen';
 import { Skeleton } from '@/components/Skeleton';
+import { LiquidBackground } from '@/components/LiquidBackground';
 import { EmojiBurst, EmojiBurstHandle } from '@/components/EmojiBurst';
 import { useCommunityStore } from '@/state/useCommunityStore';
 import { useGamificationStore } from '@/state/useGamificationStore';
@@ -293,6 +294,7 @@ export function CommunityScreen(_props: Props) {
 
   return (
     <View style={s.root}>
+      <LiquidBackground preset="wellness" colors={['#A8D4BC', '#F0E4CB', '#C9A227', '#CFE6D9', '#E8DCC4', '#A8D4BC']} opacityScale={1.4} />
       {/* ── Header ── */}
       <LinearGradient
         colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
@@ -322,7 +324,7 @@ export function CommunityScreen(_props: Props) {
       </LinearGradient>
 
       <Screen
-        backgroundColor={colors.bg}
+        backgroundColor="transparent"
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
         edges={{ top: false, bottom: false }}
         refreshing={mode === 'voices' && loading && posts.length > 0}

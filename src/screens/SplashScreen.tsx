@@ -10,7 +10,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, Animated, Easing, Dimensions,
+  View, Text, Image, Pressable, StyleSheet, Animated, Easing, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -146,7 +146,7 @@ export function SplashScreen({ navigation }: Props) {
     <Pressable style={s.root} onPress={goNext}>
       {/* Background */}
       <LinearGradient
-        colors={['#1E1040', '#2D1478', '#4A1E8A']}
+        colors={['#0D1B12', '#1B3A2B', '#2A5C45']}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -172,12 +172,12 @@ export function SplashScreen({ navigation }: Props) {
 
           {/* Core orb */}
           <LinearGradient
-            colors={['#FF6F4D', '#C050A0', '#8E7BC0']}
+            colors={['#3D7A5C', '#5F9E7C', '#2A5C45']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.orb}
           >
-            <Text style={s.orbEmoji}>🌿</Text>
+            <Image source={require('../../assets/logo-white.png')} resizeMode="contain" style={{ width: 64, height: 64 }} />
           </LinearGradient>
         </Animated.View>
 
@@ -316,7 +316,7 @@ const s = StyleSheet.create({
   barFill: {
     height: 5,
     borderRadius: 99,
-    backgroundColor: '#FF6F4D',
+    backgroundColor: '#3D7A5C',
   },
   hint: {
     fontFamily: fonts.bodyMedium,

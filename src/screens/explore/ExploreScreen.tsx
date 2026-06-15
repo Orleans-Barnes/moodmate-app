@@ -17,6 +17,7 @@ import { useMusicStore } from '@/state/useMusicStore';
 import { MUSIC_TRACKS } from '@/data/musicTracks';
 import { hapticLight } from '@/utils/haptics';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
+import { LiquidBackground } from '@/components/LiquidBackground';
 
 const { width: SW } = Dimensions.get('window');
 const TOOL_W = SW * 0.58;
@@ -179,6 +180,7 @@ export function ExploreScreen({ navigation }: Props) {
 
   return (
     <View style={s.root}>
+      <LiquidBackground preset="wellness" colors={['#A8D4BC', '#F0E4CB', '#C9A227', '#CFE6D9', '#E8DCC4', '#A8D4BC']} opacityScale={1.4} />
       {/* ── Header ── */}
       <LinearGradient
         colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}

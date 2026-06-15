@@ -18,6 +18,7 @@ import { useToast } from '@/state/useToast';
 import { ApiRequestError } from '@/api/client';
 import type { ConversationView, CounsellorView, MentorView } from '@/api/types';
 import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
+import { LiquidBackground } from '@/components/LiquidBackground';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Support'>,
@@ -165,6 +166,7 @@ export function SupportScreen({ navigation }: Props) {
 
   return (
     <View style={styles.rootWrap}>
+      <LiquidBackground preset="wellness" colors={['#A8D4BC', '#F0E4CB', '#C9A227', '#CFE6D9', '#E8DCC4', '#A8D4BC']} opacityScale={1.4} />
       <LinearGradient
         colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
         start={{ x: 0, y: 0 }}
@@ -175,7 +177,7 @@ export function SupportScreen({ navigation }: Props) {
         <Text style={styles.gradSub}>Counsellors · Mentors · Messages</Text>
       </LinearGradient>
       <Screen
-        backgroundColor={colors.bg}
+        backgroundColor="transparent"
         contentContainerStyle={styles.content}
         edges={{ top: false, bottom: false }}
         refreshing={loading && roster.length > 0}

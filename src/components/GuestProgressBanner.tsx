@@ -40,7 +40,7 @@ export function GuestProgressBanner({ onCreateAccount }: Props) {
   return (
     <View style={s.wrapper}>
       <LinearGradient
-        colors={['#1C1C2E', '#252540']}
+        colors={['#1E3D2F', '#25493A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={s.card}

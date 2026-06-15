@@ -12,6 +12,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 import { Skeleton } from '@/components/Skeleton';
+import { LiquidBackground } from '@/components/LiquidBackground';
 import { useJournalStore } from '@/state/useJournalStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
@@ -164,9 +165,10 @@ export function JournalScreen({ navigation }: Props) {
 
   return (
     <View style={s.root}>
+      <LiquidBackground preset="wellness" colors={['#A8D4BC', '#F0E4CB', '#C9A227', '#CFE6D9', '#E8DCC4', '#A8D4BC']} opacityScale={1.4} />
       {/* ── Header ── */}
       <LinearGradient
-        colors={['#2B2D42', '#3D405B', '#5C6378']}
+        colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + spacing.md }]}

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, Animated, Easing, Dimensions,
+  View, Text, Image, Pressable, StyleSheet, Animated, Easing, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,7 +33,7 @@ const ROLES: {
     title: 'Student',
     subtitle: 'Track moods, journal daily, access wellness tools & connect with a counsellor',
     badge: 'Most common',
-    gradient: ['#1A1A2E', '#16213E'],
+    gradient: ['#12291F', '#1A3A2B'],
     iconBg: 'rgba(149,213,178,0.2)',
     badgeBg: 'rgba(149,213,178,0.25)',
     badgeColor: '#95D5B2',
@@ -46,11 +46,11 @@ const ROLES: {
     title: 'Counsellor · Peer Mentor',
     subtitle: 'Manage sessions, support students & track appointment history',
     badge: 'Provider',
-    gradient: ['#0D1B35', '#163257'],
-    iconBg: 'rgba(93,188,255,0.2)',
-    badgeBg: 'rgba(93,188,255,0.2)',
-    badgeColor: '#5DBCFF',
-    accentColor: '#5C8AE6',
+    gradient: [	'#0F2A1F', '#15402F'],
+    iconBg: 'rgba(125,196,160,0.2)',
+    badgeBg: 'rgba(125,196,160,0.2)',
+    badgeColor: '#7DC4A0',
+    accentColor: '#3D7A5C',
     glowColor: 'rgba(92,138,230,0.35)',
   },
   {
@@ -59,12 +59,12 @@ const ROLES: {
     title: 'Administrator',
     subtitle: 'Manage platform, approve counsellors & monitor campus wellbeing',
     badge: 'Restricted',
-    gradient: ['#1A0D30', '#2D1469'],
-    iconBg: 'rgba(196,165,255,0.2)',
-    badgeBg: 'rgba(196,165,255,0.2)',
-    badgeColor: '#C4A5FF',
-    accentColor: '#8E7BC0',
-    glowColor: 'rgba(142,123,192,0.35)',
+    gradient: ['#0B1F16', '#123527'],
+    iconBg: 'rgba(61,122,92,0.35)0.2)',
+    badgeBg: 'rgba(61,122,92,0.35)0.2)',
+    badgeColor: '#A8D4BC',
+    accentColor: '#2A5C45',
+    glowColor: 'rgba(27,140,110,0.35)',
   },
 ];
 
@@ -191,7 +191,7 @@ export function RoleSelectScreen({ navigation }: Props) {
     <View style={s.root}>
       {/* Background */}
       <LinearGradient
-        colors={['#0D0D1A', '#0F1F2E', '#130A2E']}
+        colors={[	'#0D1B12', '#152E22', '#1B3A2B']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -208,12 +208,12 @@ export function RoleSelectScreen({ navigation }: Props) {
         {/* Logo */}
         <Animated.View style={[s.logoWrap, slide(logoAnim, 30)]}>
           <LinearGradient
-            colors={['#FF6F4D', '#8E7BC0']}
+            colors={['#5F9E7C', '#2A5C45']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.logoCircle}
           >
-            <Text style={s.logoEmoji}>🌿</Text>
+            <Image source={require('../../../assets/logo-white.png')} resizeMode="contain" style={{ width: 42, height: 42 }} />
           </LinearGradient>
           <Text style={s.brand}>MoodMate</Text>
         </Animated.View>
