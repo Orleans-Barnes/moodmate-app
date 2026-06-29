@@ -4,7 +4,7 @@ _Last updated: 2026-06-29_
 
 ## Where things stand right now
 
-**Phase 0 and Phase 1 are both done and committed**, backend and frontend. Login and Signup now call the real API, store the token securely on-device, and Splash auto-resumes a saved session. Profile shows the real logged-in user and logout actually clears the session. Not yet done: testing signup/login/guest on the actual phone against the real backend — do this before starting Phase 2 (see guardrail: "each phase gets verified on your actual device before the next one starts").
+**Phase 0 and Phase 1 are both done, committed, and verified on-device.** Login and Signup call the real API, store the token securely on-device, and Splash auto-resumes a saved session. Profile shows the real logged-in user and logout actually clears the session. Signup, login, and guest login were all confirmed working against the real backend on an actual phone (2026-06-29). Phase 2 can now start.
 
 Most domain screens beyond auth (journal entries, tree XP, streaks) still run on local mock state (`useAppState`), not persisted data — that's Phase 3.
 
@@ -31,7 +31,7 @@ This is Task #10 in the tracker. Nothing in Phase 1 should start until step 2 ab
 This is the foundation everything else depends on, so it should ship as one paired piece of work, not "backend now, frontend later":
 
 - **Backend — done, verified, committed.** `V3__add_user_role.sql` adds `role` (VARCHAR + CHECK, defaults `STUDENT`) to `users`. New `Role` enum (`STUDENT`/`COUNSELLOR`/`ADMIN`). `User` entity carries the field. The JWT now embeds the role as a claim and `JwtAuthenticationFilter` turns it into a Spring Security authority (`ROLE_STUDENT`, etc.) so Phase 2 can gate endpoints with `hasRole(...)` later without touching the filter again. Signup and guest-login always force `STUDENT` server-side — a client can never request a different role. `UserProfileResponse` now includes `role`. Migration applied and `mvnw.cmd spring-boot:run` started clean.
-- **Frontend — done, type-checked, committed.** Login and Signup screens call the real API (replacing the old toast-only stubs). Token + user profile are persisted via `expo-secure-store` (`src/state/useAuthStore.ts`). Splash checks for a saved session on launch and skips straight to the app if one exists. Every role currently lands on the same `Main` experience — that's the intentional seam for role-based routing once counsellor/admin screens exist in Phase 2. **Still to do:** verify signup/login/guest actually work end-to-end on your phone against the real backend (the `expo export` bundle smoke test couldn't complete in the dev sandbox, so a real device run is the verification step here).
+- **Frontend — done, type-checked, committed, verified on-device.** Login and Signup screens call the real API (replacing the old toast-only stubs). Token + user profile are persisted via `expo-secure-store` (`src/state/useAuthStore.ts`). Splash checks for a saved session on launch and skips straight to the app if one exists. Every role currently lands on the same `Main` experience — that's the intentional seam for role-based routing once counsellor/admin screens exist in Phase 2. Signup, login, and guest login were confirmed working end-to-end on a real phone against the real backend.
 
 Building these together is what prevents the two repos from drifting on what a "user" object even looks like — that drift is the most common source of integration bugs in apps like this.
 
@@ -41,7 +41,7 @@ Two related items deliberately deferred, not forgotten:
 
 ## Phase 2 — Counsellor / mentor feature set (Task #6)
 
-Depends on Phase 1 being real and verified — a counsellor account has to genuinely exist and authenticate before features can be gated to it.
+Depends on Phase 1 being real and verified — a counsellor account has to genuinely exist and authenticate before features can be gated to it. **Phase 1 is now verified, so this phase is unblocked.**
 
 ## Phase 3 — Remaining student-facing domains (Task #7)
 
