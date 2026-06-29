@@ -45,6 +45,6 @@ public class UserController {
 
     private UserProfileResponse toProfile(User user) {
         return new UserProfileResponse(user.getId(), user.getEmail(), user.getFullName(),
-                user.getInstitution(), user.getAvatarEmoji(), user.isGuest());
+                user.getInstitution(), user.getAvatarEmoji(), user.isGuest(), user.getRole());
     }
 }

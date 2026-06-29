@@ -38,12 +38,13 @@ public class AuthService {
                 .fullName(request.fullName().trim())
                 .institution(request.institution())
                 .guest(false)
+                .role(Role.STUDENT) // public signup can never request a different role
                 .build();
 
         user = userRepository.save(user);
         eventPublisher.publishEvent(new UserRegisteredEvent(user.getId()));
 
-        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail()), toProfile(user));
+        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail(), user.getRole()), toProfile(user));
     }
 
     /** Frontend's "continue as guest" flow - creates a throwaway, password-less account. */
@@ -55,12 +56,13 @@ public class AuthService {
                 .passwordHash(null)
                 .fullName("Guest")
                 .guest(true)
+                .role(Role.STUDENT)
                 .build();
 
         user = userRepository.save(user);
         eventPublisher.publishEvent(new UserRegisteredEvent(user.getId()));
 
-        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail()), toProfile(user));
+        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail(), user.getRole()), toProfile(user));
     }
 
     @Transactional(readOnly = true)
@@ -77,11 +79,11 @@ public class AuthService {
             throw new BadCredentialsException("Invalid email or password");
         }
 
-        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail()), toProfile(user));
+        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail(), user.getRole()), toProfile(user));
     }
 
     private UserProfileResponse toProfile(User user) {
         return new UserProfileResponse(user.getId(), user.getEmail(), user.getFullName(),
-                user.getInstitution(), user.getAvatarEmoji(), user.isGuest());
+                user.getInstitution(), user.getAvatarEmoji(), user.isGuest(), user.getRole());
     }
 }

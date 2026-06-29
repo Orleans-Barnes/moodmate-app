@@ -1,5 +1,6 @@
 package com.moodmate.backend.security;
 
+import com.moodmate.backend.auth.Role;
 import com.moodmate.backend.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -30,12 +31,13 @@ public class JwtService {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(Long userId, String email) {
+    public String generateToken(Long userId, String email, Role role) {
         Instant now = Instant.now();
         Instant expiry = now.plusSeconds(properties.expirationMinutes() * 60);
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("email", email)
+                .claim("role", role.name())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(key)
@@ -44,6 +46,10 @@ public class JwtService {
 
     public Long extractUserId(String token) {
         return Long.valueOf(parseClaims(token).getSubject());
+    }
+
+    public Role extractRole(String token) {
+        return Role.valueOf(parseClaims(token).get("role", String.class));
     }
 
     public boolean isValid(String token) {
