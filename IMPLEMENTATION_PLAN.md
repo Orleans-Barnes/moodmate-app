@@ -43,6 +43,11 @@ Two related items deliberately deferred, not forgotten:
 
 Depends on Phase 1 being real and verified — a counsellor account has to genuinely exist and authenticate before features can be gated to it. **Phase 1 is now verified, so this phase is unblocked.**
 
+Phase 2 has two parts, deliberately split:
+
+- **Part A — onboarding: done, verified, committed.** Any logged-in user can submit a self-serve "become a counsellor" request (`POST /api/support/counsellor-requests`). An admin reviews pending requests and approves or rejects them (`GET /api/support/counsellor-requests/pending`, `.../{id}/approve`, `.../{id}/reject`). Approval automatically promotes the user's account to the `COUNSELLOR` role and makes them appear in the public counsellor list. `V4__add_counsellor_account_link.sql` links the existing `counsellors` table to real accounts via `user_id` + `status`; the existing seeded roster was backfilled to `APPROVED` so it kept showing up unchanged. `@EnableMethodSecurity` was added so the new admin-only checks actually enforce. Verified: backend started clean on-device (2026-06-29).
+- **Part B — counsellor-facing screens/endpoints: not started.** Every existing `/api/support/*` endpoint (appointments, conversations) is still student-perspective only — there's no counsellor-side view yet for managing their own appointments or messages. This is its own slice of work, to be scoped once Part A's flow has been tried end-to-end (i.e. someone actually requests, gets approved, and is now a counsellor account).
+
 ## Phase 3 — Remaining student-facing domains (Task #7)
 
 **Journal first.** It already has the most complete frontend (entries, templates, the calendar strip fixed today) and anchors the tree-growth/streak system, so wiring it to a real, persisted backend validates the entire auth pipeline against a meaningful feature rather than a toy one. Community, Explore, and Support follow after, in that rough order.
