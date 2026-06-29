@@ -4,9 +4,9 @@ _Last updated: 2026-06-29_
 
 ## Where things stand right now
 
-**Backend.** Phase 0 fixes are written (actuator dependency added, the 404-vs-500 exception handling bug fixed). The port 8080 conflict that blocked every restart attempt is now resolved (a stray `java.exe`, PID 12792, was holding the port — killed, and `mvnw.cmd spring-boot:run` started cleanly). Still need to confirm `/actuator/health` returns 200 from the phone before calling Phase 0 fully closed out.
+**Phase 0 and Phase 1 are both done and committed**, backend and frontend. Login and Signup now call the real API, store the token securely on-device, and Splash auto-resumes a saved session. Profile shows the real logged-in user and logout actually clears the session. Not yet done: testing signup/login/guest on the actual phone against the real backend — do this before starting Phase 2 (see guardrail: "each phase gets verified on your actual device before the next one starts").
 
-**Frontend.** The UI layer is now polished (this session fixed the Journal date strip, the tab-bar active/inactive states, the institution dropdown, and added logout), but the app is **not actually talking to the backend yet**. Login and Signup simulate success locally and never call an API or store a token. Most domain screens (journal entries, tree XP, streaks) run on local mock state (`useAppState`), not persisted data.
+Most domain screens beyond auth (journal entries, tree XP, streaks) still run on local mock state (`useAppState`), not persisted data — that's Phase 3.
 
 ## Why the order matters
 
@@ -30,8 +30,8 @@ This is Task #10 in the tracker. Nothing in Phase 1 should start until step 2 ab
 
 This is the foundation everything else depends on, so it should ship as one paired piece of work, not "backend now, frontend later":
 
-- **Backend — done and verified.** `V3__add_user_role.sql` adds `role` (VARCHAR + CHECK, defaults `STUDENT`) to `users`. New `Role` enum (`STUDENT`/`COUNSELLOR`/`ADMIN`). `User` entity carries the field. The JWT now embeds the role as a claim and `JwtAuthenticationFilter` turns it into a Spring Security authority (`ROLE_STUDENT`, etc.) so Phase 2 can gate endpoints with `hasRole(...)` later without touching the filter again. Signup and guest-login always force `STUDENT` server-side — a client can never request a different role. `UserProfileResponse` now includes `role`. Migration applied and `mvnw.cmd spring-boot:run` started clean.
-- **Frontend:** Login and Signup screens actually call the API (replacing today's toast-only stubs), store the returned token (nothing exists for this yet — likely `expo-secure-store`), and branch navigation by role.
+- **Backend — done, verified, committed.** `V3__add_user_role.sql` adds `role` (VARCHAR + CHECK, defaults `STUDENT`) to `users`. New `Role` enum (`STUDENT`/`COUNSELLOR`/`ADMIN`). `User` entity carries the field. The JWT now embeds the role as a claim and `JwtAuthenticationFilter` turns it into a Spring Security authority (`ROLE_STUDENT`, etc.) so Phase 2 can gate endpoints with `hasRole(...)` later without touching the filter again. Signup and guest-login always force `STUDENT` server-side — a client can never request a different role. `UserProfileResponse` now includes `role`. Migration applied and `mvnw.cmd spring-boot:run` started clean.
+- **Frontend — done, type-checked, committed.** Login and Signup screens call the real API (replacing the old toast-only stubs). Token + user profile are persisted via `expo-secure-store` (`src/state/useAuthStore.ts`). Splash checks for a saved session on launch and skips straight to the app if one exists. Every role currently lands on the same `Main` experience — that's the intentional seam for role-based routing once counsellor/admin screens exist in Phase 2. **Still to do:** verify signup/login/guest actually work end-to-end on your phone against the real backend (the `expo export` bundle smoke test couldn't complete in the dev sandbox, so a real device run is the verification step here).
 
 Building these together is what prevents the two repos from drifting on what a "user" object even looks like — that drift is the most common source of integration bugs in apps like this.
 
