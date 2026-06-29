@@ -4,8 +4,10 @@ import com.moodmate.backend.auth.dto.AuthResponse;
 import com.moodmate.backend.auth.dto.LoginRequest;
 import com.moodmate.backend.auth.dto.SignupRequest;
 import com.moodmate.backend.auth.dto.UserProfileResponse;
+import com.moodmate.backend.auth.dto.UserSummary;
 import com.moodmate.backend.common.exception.BadRequestException;
 import com.moodmate.backend.common.exception.ConflictException;
+import com.moodmate.backend.common.exception.ResourceNotFoundException;
 import com.moodmate.backend.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -80,6 +82,15 @@ public class AuthService {
         }
 
         return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail(), user.getRole()), toProfile(user));
+    }
+
+    /** Minimal cross-domain read for other domains (e.g. support's counsellor-request flow) that
+     * only need a user's identity, not their full profile. */
+    @Transactional(readOnly = true)
+    public UserSummary getUserSummary(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        return new UserSummary(user.getId(), user.getFullName(), user.getAvatarEmoji());
     }
 
     private UserProfileResponse toProfile(User user) {

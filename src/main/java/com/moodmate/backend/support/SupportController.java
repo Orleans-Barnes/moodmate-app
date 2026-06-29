@@ -5,6 +5,9 @@ import com.moodmate.backend.support.dto.AppointmentResponse;
 import com.moodmate.backend.support.dto.BookAppointmentRequest;
 import com.moodmate.backend.support.dto.ConversationResponse;
 import com.moodmate.backend.support.dto.CounsellorDto;
+import com.moodmate.backend.support.dto.CounsellorRequestAdminView;
+import com.moodmate.backend.support.dto.CounsellorRequestInput;
+import com.moodmate.backend.support.dto.CounsellorRequestResponse;
 import com.moodmate.backend.support.dto.MessageResponse;
 import com.moodmate.backend.support.dto.PeerMentorDto;
 import com.moodmate.backend.support.dto.SendMessageRequest;
@@ -14,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +45,30 @@ public class SupportController {
     @GetMapping("/mentors")
     public List<PeerMentorDto> mentors() {
         return supportService.listPeerMentors();
+    }
+
+    @PostMapping("/counsellor-requests")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CounsellorRequestResponse requestCounsellorStatus(@Valid @RequestBody CounsellorRequestInput request) {
+        return supportService.requestCounsellorStatus(currentUser.id(), request);
+    }
+
+    @GetMapping("/counsellor-requests/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<CounsellorRequestAdminView> pendingCounsellorRequests() {
+        return supportService.listPendingCounsellorRequests();
+    }
+
+    @PostMapping("/counsellor-requests/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CounsellorRequestAdminView approveCounsellorRequest(@PathVariable Long id) {
+        return supportService.approveCounsellorRequest(id);
+    }
+
+    @PostMapping("/counsellor-requests/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CounsellorRequestAdminView rejectCounsellorRequest(@PathVariable Long id) {
+        return supportService.rejectCounsellorRequest(id);
     }
 
     @PostMapping("/appointments")

@@ -2,6 +2,8 @@ package com.moodmate.backend.support;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -25,6 +27,11 @@ public class Counsellor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** The account this roster entry belongs to, once a self-serve request is approved. Null for
+     * legacy seeded rows that pre-date account linkage. */
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(nullable = false)
     private String name;
 
@@ -45,4 +52,9 @@ public class Counsellor {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private CounsellorStatus status = CounsellorStatus.PENDING;
 }

@@ -1,16 +1,23 @@
 package com.moodmate.backend.support;
 
+import com.moodmate.backend.auth.AuthService;
+import com.moodmate.backend.auth.dto.UserSummary;
 import com.moodmate.backend.common.exception.BadRequestException;
+import com.moodmate.backend.common.exception.ConflictException;
 import com.moodmate.backend.common.exception.ResourceNotFoundException;
 import com.moodmate.backend.support.dto.AppointmentResponse;
 import com.moodmate.backend.support.dto.BookAppointmentRequest;
 import com.moodmate.backend.support.dto.ConversationResponse;
 import com.moodmate.backend.support.dto.CounsellorDto;
+import com.moodmate.backend.support.dto.CounsellorRequestAdminView;
+import com.moodmate.backend.support.dto.CounsellorRequestInput;
+import com.moodmate.backend.support.dto.CounsellorRequestResponse;
 import com.moodmate.backend.support.dto.MessageResponse;
 import com.moodmate.backend.support.dto.PeerMentorDto;
 import com.moodmate.backend.support.dto.SendMessageRequest;
 import com.moodmate.backend.support.dto.StartConversationRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -31,10 +38,70 @@ public class SupportService {
     private final AppointmentRepository appointmentRepository;
     private final ConversationRepository conversationRepository;
     private final SupportMessageRepository supportMessageRepository;
+    private final AuthService authService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<CounsellorDto> listCounsellors() {
-        return counsellorRepository.findByAvailableTrueOrderBySortOrder().stream().map(this::toDto).toList();
+        return counsellorRepository.findByStatusAndAvailableTrueOrderBySortOrder(CounsellorStatus.APPROVED)
+                .stream().map(this::toDto).toList();
+    }
+
+    @Transactional
+    public CounsellorRequestResponse requestCounsellorStatus(Long userId, CounsellorRequestInput request) {
+        if (counsellorRepository.findByUserId(userId).isPresent()) {
+            throw new ConflictException("You already have a counsellor request on file");
+        }
+
+        UserSummary requester = authService.getUserSummary(userId);
+
+        Counsellor counsellor = Counsellor.builder()
+                .userId(userId)
+                .name(requester.fullName())
+                .avatarEmoji(requester.avatarEmoji())
+                .title(request.title())
+                .bio(request.bio())
+                .specialties(request.specialties())
+                .available(false)
+                .sortOrder(0)
+                .status(CounsellorStatus.PENDING)
+                .build();
+
+        counsellor = counsellorRepository.save(counsellor);
+        return new CounsellorRequestResponse(counsellor.getId(), counsellor.getStatus());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CounsellorRequestAdminView> listPendingCounsellorRequests() {
+        return counsellorRepository.findByStatus(CounsellorStatus.PENDING).stream().map(this::toAdminView).toList();
+    }
+
+    @Transactional
+    public CounsellorRequestAdminView approveCounsellorRequest(Long counsellorId) {
+        Counsellor counsellor = findPendingRequest(counsellorId);
+        counsellor.setStatus(CounsellorStatus.APPROVED);
+        counsellor.setAvailable(true);
+        counsellor = counsellorRepository.save(counsellor);
+
+        eventPublisher.publishEvent(new CounsellorApprovedEvent(counsellor.getUserId()));
+        return toAdminView(counsellor);
+    }
+
+    @Transactional
+    public CounsellorRequestAdminView rejectCounsellorRequest(Long counsellorId) {
+        Counsellor counsellor = findPendingRequest(counsellorId);
+        counsellor.setStatus(CounsellorStatus.REJECTED);
+        counsellor = counsellorRepository.save(counsellor);
+        return toAdminView(counsellor);
+    }
+
+    private Counsellor findPendingRequest(Long counsellorId) {
+        Counsellor counsellor = counsellorRepository.findById(counsellorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counsellor request not found: " + counsellorId));
+        if (counsellor.getStatus() != CounsellorStatus.PENDING) {
+            throw new BadRequestException("This request has already been " + counsellor.getStatus());
+        }
+        return counsellor;
     }
 
     @Transactional(readOnly = true)
@@ -199,5 +266,10 @@ public class SupportService {
     private PeerMentorDto toDto(PeerMentor m) {
         return new PeerMentorDto(m.getId(), m.getName(), m.getBio(), m.getAvatarEmoji(), m.getFocusArea(),
                 m.isAvailable());
+    }
+
+    private CounsellorRequestAdminView toAdminView(Counsellor c) {
+        return new CounsellorRequestAdminView(c.getId(), c.getUserId(), c.getName(), c.getTitle(), c.getBio(),
+                c.getSpecialties(), c.getStatus());
     }
 }
