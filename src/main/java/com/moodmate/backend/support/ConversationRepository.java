@@ -1,0 +1,16 @@
+package com.moodmate.backend.support;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface ConversationRepository extends JpaRepository<Conversation, Long> {
+    Optional<Conversation> findByUserIdAndCounsellorId(Long userId, Long counsellorId);
+
+    Optional<Conversation> findByUserIdAndPeerMentorId(Long userId, Long peerMentorId);
+
+    List<Conversation> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    Optional<Conversation> findByIdAndUserId(Long id, Long userId);
+}
