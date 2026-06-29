@@ -4,6 +4,8 @@ import com.moodmate.backend.security.CurrentUser;
 import com.moodmate.backend.support.dto.AppointmentResponse;
 import com.moodmate.backend.support.dto.BookAppointmentRequest;
 import com.moodmate.backend.support.dto.ConversationResponse;
+import com.moodmate.backend.support.dto.CounsellorAppointmentView;
+import com.moodmate.backend.support.dto.CounsellorConversationView;
 import com.moodmate.backend.support.dto.CounsellorDto;
 import com.moodmate.backend.support.dto.CounsellorRequestAdminView;
 import com.moodmate.backend.support.dto.CounsellorRequestInput;
@@ -87,6 +89,30 @@ public class SupportController {
         return supportService.cancelAppointment(currentUser.id(), id);
     }
 
+    @GetMapping("/counsellor/appointments")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public List<CounsellorAppointmentView> counsellorAppointments() {
+        return supportService.listCounsellorAppointments(currentUser.id());
+    }
+
+    @PostMapping("/counsellor/appointments/{id}/confirm")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public CounsellorAppointmentView confirmAppointment(@PathVariable Long id) {
+        return supportService.confirmAppointment(currentUser.id(), id);
+    }
+
+    @PostMapping("/counsellor/appointments/{id}/complete")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public CounsellorAppointmentView completeAppointment(@PathVariable Long id) {
+        return supportService.completeAppointment(currentUser.id(), id);
+    }
+
+    @PostMapping("/counsellor/appointments/{id}/cancel")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public CounsellorAppointmentView cancelAppointmentAsCounsellor(@PathVariable Long id) {
+        return supportService.cancelAppointmentAsCounsellor(currentUser.id(), id);
+    }
+
     @PostMapping("/conversations")
     @ResponseStatus(HttpStatus.CREATED)
     public ConversationResponse startConversation(@RequestBody StartConversationRequest request) {
@@ -114,5 +140,32 @@ public class SupportController {
     @PostMapping("/conversations/{id}/read")
     public void markRead(@PathVariable Long id) {
         supportService.markRead(currentUser.id(), id);
+    }
+
+    @GetMapping("/counsellor/conversations")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public List<CounsellorConversationView> counsellorConversations() {
+        return supportService.listCounsellorConversations(currentUser.id());
+    }
+
+    @GetMapping("/counsellor/conversations/{id}/messages")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public Page<MessageResponse> counsellorMessages(@PathVariable Long id,
+                                                     @RequestParam(defaultValue = "0") int page,
+                                                     @RequestParam(defaultValue = "50") int size) {
+        return supportService.listCounsellorMessages(currentUser.id(), id, PageRequest.of(page, size));
+    }
+
+    @PostMapping("/counsellor/conversations/{id}/messages")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public MessageResponse sendCounsellorMessage(@PathVariable Long id, @Valid @RequestBody SendMessageRequest request) {
+        return supportService.sendCounsellorMessage(currentUser.id(), id, request);
+    }
+
+    @PostMapping("/counsellor/conversations/{id}/read")
+    @PreAuthorize("hasRole('COUNSELLOR')")
+    public void markCounsellorRead(@PathVariable Long id) {
+        supportService.markReadAsCounsellor(currentUser.id(), id);
     }
 }

@@ -11,6 +11,8 @@ import com.moodmate.backend.support.dto.ConversationResponse;
 import com.moodmate.backend.support.dto.CounsellorDto;
 import com.moodmate.backend.support.dto.CounsellorRequestAdminView;
 import com.moodmate.backend.support.dto.CounsellorRequestInput;
+import com.moodmate.backend.support.dto.CounsellorAppointmentView;
+import com.moodmate.backend.support.dto.CounsellorConversationView;
 import com.moodmate.backend.support.dto.CounsellorRequestResponse;
 import com.moodmate.backend.support.dto.MessageResponse;
 import com.moodmate.backend.support.dto.PeerMentorDto;
@@ -157,6 +159,59 @@ public class SupportService {
         return toResponse(appointment, counsellorName);
     }
 
+    @Transactional(readOnly = true)
+    public List<CounsellorAppointmentView> listCounsellorAppointments(Long counsellorUserId) {
+        Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
+        List<Appointment> appointments = appointmentRepository.findByCounsellorIdOrderByScheduledAtDesc(counsellor.getId());
+        Map<Long, UserSummary> students = authService.getUserSummaries(
+                appointments.stream().map(Appointment::getUserId).distinct().toList());
+        return appointments.stream().map(a -> toCounsellorView(a, students)).toList();
+    }
+
+    @Transactional
+    public CounsellorAppointmentView confirmAppointment(Long counsellorUserId, Long appointmentId) {
+        Appointment appointment = findOwnedAppointment(counsellorUserId, appointmentId);
+        if (appointment.getStatus() != AppointmentStatus.PENDING) {
+            throw new BadRequestException("Only a pending appointment can be confirmed");
+        }
+        appointment.setStatus(AppointmentStatus.CONFIRMED);
+        appointment = appointmentRepository.save(appointment);
+        return toCounsellorView(appointment, authService.getUserSummaries(List.of(appointment.getUserId())));
+    }
+
+    @Transactional
+    public CounsellorAppointmentView completeAppointment(Long counsellorUserId, Long appointmentId) {
+        Appointment appointment = findOwnedAppointment(counsellorUserId, appointmentId);
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED) {
+            throw new BadRequestException("Only a confirmed appointment can be marked completed");
+        }
+        appointment.setStatus(AppointmentStatus.COMPLETED);
+        appointment = appointmentRepository.save(appointment);
+        return toCounsellorView(appointment, authService.getUserSummaries(List.of(appointment.getUserId())));
+    }
+
+    @Transactional
+    public CounsellorAppointmentView cancelAppointmentAsCounsellor(Long counsellorUserId, Long appointmentId) {
+        Appointment appointment = findOwnedAppointment(counsellorUserId, appointmentId);
+        if (appointment.getStatus() == AppointmentStatus.COMPLETED || appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new BadRequestException("Cannot cancel an appointment that is already " + appointment.getStatus());
+        }
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment = appointmentRepository.save(appointment);
+        return toCounsellorView(appointment, authService.getUserSummaries(List.of(appointment.getUserId())));
+    }
+
+    private Counsellor findLinkedCounsellor(Long userId) {
+        return counsellorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("No counsellor profile linked to this account"));
+    }
+
+    private Appointment findOwnedAppointment(Long counsellorUserId, Long appointmentId) {
+        Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
+        return appointmentRepository.findByIdAndCounsellorId(appointmentId, counsellor.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found: " + appointmentId));
+    }
+
     @Transactional
     public ConversationResponse startConversation(Long userId, StartConversationRequest request) {
         boolean hasCounsellor = request.counsellorId() != null;
@@ -224,8 +279,53 @@ public class SupportService {
         supportMessageRepository.saveAll(unread);
     }
 
+    @Transactional(readOnly = true)
+    public List<CounsellorConversationView> listCounsellorConversations(Long counsellorUserId) {
+        Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
+        List<Conversation> conversations = conversationRepository.findByCounsellorIdOrderByCreatedAtDesc(counsellor.getId());
+        Map<Long, UserSummary> students = authService.getUserSummaries(
+                conversations.stream().map(Conversation::getUserId).distinct().toList());
+        return conversations.stream().map(c -> toCounsellorConversationView(c, students)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MessageResponse> listCounsellorMessages(Long counsellorUserId, Long conversationId, Pageable pageable) {
+        Conversation conversation = findOwnedConversationForCounsellor(counsellorUserId, conversationId);
+        return supportMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId(), pageable)
+                .map(this::toMessageResponse);
+    }
+
+    @Transactional
+    public MessageResponse sendCounsellorMessage(Long counsellorUserId, Long conversationId, SendMessageRequest request) {
+        Conversation conversation = findOwnedConversationForCounsellor(counsellorUserId, conversationId);
+
+        SupportMessage message = SupportMessage.builder()
+                .conversationId(conversation.getId())
+                .senderType(SenderType.COUNSELLOR)
+                .body(request.body())
+                .build();
+
+        return toMessageResponse(supportMessageRepository.save(message));
+    }
+
+    @Transactional
+    public void markReadAsCounsellor(Long counsellorUserId, Long conversationId) {
+        Conversation conversation = findOwnedConversationForCounsellor(counsellorUserId, conversationId);
+        List<SupportMessage> unread = supportMessageRepository
+                .findByConversationIdAndSenderTypeNotAndReadAtIsNull(conversation.getId(), SenderType.COUNSELLOR);
+        Instant now = Instant.now();
+        unread.forEach(m -> m.setReadAt(now));
+        supportMessageRepository.saveAll(unread);
+    }
+
     private Conversation findOwnedConversation(Long userId, Long conversationId) {
         return conversationRepository.findByIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+    }
+
+    private Conversation findOwnedConversationForCounsellor(Long counsellorUserId, Long conversationId) {
+        Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
+        return conversationRepository.findByIdAndCounsellorId(conversationId, counsellor.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
     }
 
@@ -253,6 +353,22 @@ public class SupportService {
     private AppointmentResponse toResponse(Appointment appointment, String counsellorName) {
         return new AppointmentResponse(appointment.getId(), appointment.getCounsellorId(), counsellorName,
                 appointment.getScheduledAt(), appointment.getStatus(), appointment.getNotes(), appointment.getCreatedAt());
+    }
+
+    private CounsellorAppointmentView toCounsellorView(Appointment a, Map<Long, UserSummary> students) {
+        UserSummary student = students.get(a.getUserId());
+        return new CounsellorAppointmentView(a.getId(), a.getUserId(), student != null ? student.fullName() : "Student",
+                a.getScheduledAt(), a.getStatus(), a.getNotes(), a.getCreatedAt());
+    }
+
+    private CounsellorConversationView toCounsellorConversationView(Conversation c, Map<Long, UserSummary> students) {
+        UserSummary student = students.get(c.getUserId());
+        String preview = supportMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(c.getId())
+                .map(SupportMessage::getBody).orElse(null);
+        long unreadCount = supportMessageRepository
+                .countByConversationIdAndSenderTypeNotAndReadAtIsNull(c.getId(), SenderType.COUNSELLOR);
+        return new CounsellorConversationView(c.getId(), c.getUserId(), student != null ? student.fullName() : "Student",
+                c.getCreatedAt(), preview, unreadCount);
     }
 
     private CounsellorDto toDto(Counsellor c) {

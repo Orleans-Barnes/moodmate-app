@@ -16,7 +16,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -91,6 +94,17 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
         return new UserSummary(user.getId(), user.getFullName(), user.getAvatarEmoji());
+    }
+
+    /** Batch version of getUserSummary - lets callers resolve a list of users in one query
+     * instead of one round-trip per id (e.g. naming every student in a counsellor's appointment list). */
+    @Transactional(readOnly = true)
+    public Map<Long, UserSummary> getUserSummaries(List<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> new UserSummary(u.getId(), u.getFullName(), u.getAvatarEmoji())));
     }
 
     private UserProfileResponse toProfile(User user) {
