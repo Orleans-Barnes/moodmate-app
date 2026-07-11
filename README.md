@@ -1,50 +1,151 @@
-# Welcome to your Expo app 👋
+# MoodMate — React Native Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+AI-powered mental wellness mobile app for university students in Ghana.  
+Built with **React Native**, **Expo SDK 54**, **TypeScript**, and **Spring Boot** (backend).
 
-## Get started
+---
 
-1. Install dependencies
+## Contributors
+- [Orleans-Barnes](https://github.com/Orleans-Barnes)
+- [kwakuOhene](https://github.com/kwakuOhene)
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## Prerequisites
 
-   ```bash
-   npx expo start
-   ```
+Make sure you have these installed before you start:
 
-In the output, you'll find options to open the app in a
+| Tool | Version | Download |
+|------|---------|----------|
+| Node.js | 18 or higher | https://nodejs.org |
+| Git | Any | https://git-scm.com |
+| Expo Go (phone) | Latest | Play Store / App Store |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Getting Started
 
-## Get a fresh project
-
-When you're ready, run:
+### 1. Clone the repository
 
 ```bash
-npm run reset-project
+git clone https://github.com/Orleans-Barnes/moodmate-app.git
+cd moodmate-app
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Install dependencies
 
-## Learn more
+```bash
+npm install
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+### 3. Update the backend IP address
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Open `src/config.ts` and replace the IP with your teammate's PC IP address:
 
-## Join the community
+```ts
+export const BACKEND_BASE_URL = 'http://YOUR_PC_IP:8080';
+```
 
-Join our community of developers creating universal apps.
+**How to find your IP (Windows):**
+1. Open Command Prompt
+2. Run: `ipconfig`
+3. Find **IPv4 Address** under your Wi-Fi adapter
+4. Replace `YOUR_PC_IP` with that address (e.g. `192.168.1.105`)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+> ⚠️ This IP changes every time you reconnect to Wi-Fi. Always check it first if the app can't connect.
+
+### 4. Start the backend first
+
+The backend must be running before you launch the app.  
+See the `backend` branch for backend setup instructions.
+
+### 5. Run the app
+
+```bash
+npm start
+```
+
+Then:
+- Install **Expo Go** on your Android phone
+- Scan the **QR code** shown in the terminal
+- Make sure your phone and PC are on the **same Wi-Fi network**
+
+---
+
+## Project Structure
+
+```
+moodmate-app/
+├── App.tsx                  # App entry point & navigation setup
+├── src/
+│   ├── api/                 # All backend API calls
+│   ├── components/          # Reusable UI components
+│   ├── navigation/          # React Navigation stack & tab config
+│   ├── screens/             # All app screens organised by feature
+│   │   ├── admin/           # Admin dashboard
+│   │   ├── auth/            # Login, Signup, Forgot Password
+│   │   ├── counsellor/      # Counsellor portal screens
+│   │   ├── home/            # Home screen
+│   │   ├── insights/        # AI chat & insights
+│   │   ├── journal/         # Journal entries
+│   │   ├── modals/          # Breathing, games, profile, etc.
+│   │   └── support/         # Student-counsellor messaging
+│   ├── state/               # Zustand global state stores
+│   ├── theme/               # Design tokens (colors, fonts, spacing)
+│   └── config.ts            # Backend URL — update this with your IP
+├── assets/
+│   ├── music/               # Background music tracks
+│   └── sounds/              # Sound effects
+└── package.json
+```
+
+---
+
+## User Roles
+
+| Role | Access |
+|------|--------|
+| **Student** | Home, Journal, Community, Explore, Support, AI Chat |
+| **Counsellor** | Dashboard, Appointments, Messaging (whitelisted by admin) |
+| **Admin** | User management, Counsellor whitelist, Platform stats |
+
+---
+
+## Common Issues
+
+**"Cannot connect to Server"**  
+→ Check your IP in `src/config.ts` matches your current PC IP (`ipconfig`)  
+→ Make sure the backend (`start.bat`) is running  
+→ Ensure your phone and PC are on the same Wi-Fi  
+
+**App not loading after `npm start`**  
+→ Run `npm install` again  
+→ Clear Expo cache: `npx expo start --clear`  
+
+**Expo Go shows blank screen**  
+→ Shake your phone → Reload  
+
+---
+
+## Backend
+
+The Spring Boot backend lives on the `backend` branch of this repo.  
+Switch to it for backend setup:
+
+```bash
+git checkout backend
+```
+
+---
+
+## Tech Stack
+
+- React Native 0.81.5
+- Expo SDK 54
+- TypeScript 5.7
+- React Navigation 7
+- Zustand (state management)
+- Expo SecureStore (token storage)
+- Expo Notifications (push notifications)
+- Supabase (real-time messaging fallback)
+- Groq AI (LLaMA 3 — AI chat & insights)
