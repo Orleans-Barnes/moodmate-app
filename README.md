@@ -1,7 +1,7 @@
-# MoodMate — React Native Frontend
+# MoodMate — Spring Boot Backend
 
-AI-powered mental wellness mobile app for university students in Ghana.  
-Built with **React Native**, **Expo SDK 54**, **TypeScript**, and **Spring Boot** (backend).
+REST API backend for the MoodMate mental wellness mobile app for university students in Ghana.  
+Built with **Java 21**, **Spring Boot 3.5**, **PostgreSQL**, and **Flyway**.
 
 ---
 
@@ -13,139 +13,151 @@ Built with **React Native**, **Expo SDK 54**, **TypeScript**, and **Spring Boot*
 
 ## Prerequisites
 
-Make sure you have these installed before you start:
-
 | Tool | Version | Download |
 |------|---------|----------|
-| Node.js | 18 or higher | https://nodejs.org |
+| Java JDK | 21 | https://adoptium.net |
+| PostgreSQL | 14+ | https://postgresql.org |
 | Git | Any | https://git-scm.com |
-| Expo Go (phone) | Latest | Play Store / App Store |
+
+> Maven is bundled via `mvnw` — no separate installation needed.
 
 ---
 
-## Getting Started
+## Database Setup
 
-### 1. Clone the repository
+Open **pgAdmin** or **psql** and run:
 
-```bash
-git clone https://github.com/Orleans-Barnes/moodmate-app.git
-cd moodmate-app
+```sql
+CREATE DATABASE moodmate;
+CREATE USER moodmate WITH PASSWORD 'moodmate';
+GRANT ALL PRIVILEGES ON DATABASE moodmate TO moodmate;
 ```
 
-### 2. Install dependencies
+Flyway automatically creates all tables on first run — no manual SQL needed.
 
-```bash
-npm install
+---
+
+## Environment Setup
+
+Create a file called `start.bat` in the project root (it is already in `.gitignore` so it will never be committed):
+
+```bat
+@echo off
+set GROQ_API_KEY=your_groq_api_key_here
+set MAIL_HOST=smtp.gmail.com
+set MAIL_PORT=587
+set MAIL_USERNAME=your_gmail@gmail.com
+set MAIL_PASSWORD=your_16char_app_password
+
+echo Starting MoodMate backend...
+call mvnw.cmd spring-boot:run
 ```
 
-### 3. Update the backend IP address
+**How to get a Groq API key:**
+Go to https://console.groq.com → API Keys → Create key
 
-Open `src/config.ts` and replace the IP with your teammate's PC IP address:
+**How to get a Gmail App Password:**
+1. Go to https://myaccount.google.com/security → enable 2-Step Verification
+2. Go to https://myaccount.google.com/apppasswords
+3. Create a new app password named "MoodMate Backend"
+4. Paste the 16-character code (remove spaces)
 
-```ts
-export const BACKEND_BASE_URL = 'http://YOUR_PC_IP:8080';
+**Optional — Paystack (payments):**
+- `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY` from https://dashboard.paystack.com (test mode keys)
+- Without these, all features work except actual payment checkout
+
+---
+
+## Running the Backend
+
+```cmd
+start.bat
 ```
 
-**How to find your IP (Windows):**
-1. Open Command Prompt
-2. Run: `ipconfig`
-3. Find **IPv4 Address** under your Wi-Fi adapter
-4. Replace `YOUR_PC_IP` with that address (e.g. `192.168.1.105`)
-
-> ⚠️ This IP changes every time you reconnect to Wi-Fi. Always check it first if the app can't connect.
-
-### 4. Start the backend first
-
-The backend must be running before you launch the app.  
-See the `backend` branch for backend setup instructions.
-
-### 5. Run the app
-
-```bash
-npm start
+Wait for this line — it means the server is ready:
+```
+Started MoodMateBackendApplication in X seconds
 ```
 
-Then:
-- Install **Expo Go** on your Android phone
-- Scan the **QR code** shown in the terminal
-- Make sure your phone and PC are on the **same Wi-Fi network**
+API available at: `http://localhost:8080`
 
 ---
 
 ## Project Structure
 
 ```
-moodmate-app/
-├── App.tsx                  # App entry point & navigation setup
-├── src/
-│   ├── api/                 # All backend API calls
-│   ├── components/          # Reusable UI components
-│   ├── navigation/          # React Navigation stack & tab config
-│   ├── screens/             # All app screens organised by feature
-│   │   ├── admin/           # Admin dashboard
-│   │   ├── auth/            # Login, Signup, Forgot Password
-│   │   ├── counsellor/      # Counsellor portal screens
-│   │   ├── home/            # Home screen
-│   │   ├── insights/        # AI chat & insights
-│   │   ├── journal/         # Journal entries
-│   │   ├── modals/          # Breathing, games, profile, etc.
-│   │   └── support/         # Student-counsellor messaging
-│   ├── state/               # Zustand global state stores
-│   ├── theme/               # Design tokens (colors, fonts, spacing)
-│   └── config.ts            # Backend URL — update this with your IP
-├── assets/
-│   ├── music/               # Background music tracks
-│   └── sounds/              # Sound effects
-└── package.json
+src/main/java/com/moodmate/backend/
+├── admin/         — Counsellor whitelist management
+├── ai/            — Groq AI (LLaMA 3 chat, vision, Whisper audio)
+├── auth/          — JWT authentication, signup, login, password reset
+├── checkin/       — Mood check-in tracking
+├── common/        — Shared exceptions, DTOs, event interfaces
+├── community/     — Anonymous community posts & reactions
+├── config/        — Security, CORS, JWT, app properties
+├── gratitude/     — Gratitude jar entries
+├── hub/           — Wellness articles & events
+├── journal/       — Personal journal entries
+├── payments/      — Paystack subscriptions & leaf packs
+├── push/          — Expo push notifications & streak reminders
+├── security/      — JWT filter, rate limiting
+├── sos/           — Crisis resources (always public, no auth required)
+├── support/       — Counsellors, appointments, messaging
+├── wallet/        — Leaf currency & tree skins
+└── wellness/      — Daily goals & streak tracking
+
+src/main/resources/
+├── application.yml          — App config (all secrets via env vars)
+└── db/migration/            — Flyway SQL migrations V1 → V15
 ```
 
 ---
 
-## User Roles
+## API Overview
 
-| Role | Access |
-|------|--------|
-| **Student** | Home, Journal, Community, Explore, Support, AI Chat |
-| **Counsellor** | Dashboard, Appointments, Messaging (whitelisted by admin) |
-| **Admin** | User management, Counsellor whitelist, Platform stats |
+All endpoints require a Bearer JWT except:
+
+| Endpoint | Reason |
+|----------|--------|
+| `/api/auth/**` | Issues the token |
+| `/api/sos/**` | Crisis resources — always public |
+| `/api/payments/webhook` | Authenticated by Paystack HMAC signature |
+| `/actuator/health` | Infrastructure health check |
+
+| Domain | Base Path |
+|--------|-----------|
+| Auth | `/api/auth` |
+| Mood check-ins | `/api/checkins` |
+| Wellness & goals | `/api/wellness` |
+| Wallet & shop | `/api/wallet` |
+| Journal | `/api/journal` |
+| Gratitude jar | `/api/gratitude` |
+| Community | `/api/community` |
+| Support & messaging | `/api/support` |
+| Wellness hub | `/api/hub` |
+| SOS / crisis | `/api/sos` |
+| Payments | `/api/payments` |
+| Admin | `/api/admin` |
+| AI | `/api/ai` |
 
 ---
 
-## Common Issues
+## Frontend
 
-**"Cannot connect to Server"**  
-→ Check your IP in `src/config.ts` matches your current PC IP (`ipconfig`)  
-→ Make sure the backend (`start.bat`) is running  
-→ Ensure your phone and PC are on the same Wi-Fi  
-
-**App not loading after `npm start`**  
-→ Run `npm install` again  
-→ Clear Expo cache: `npx expo start --clear`  
-
-**Expo Go shows blank screen**  
-→ Shake your phone → Reload  
-
----
-
-## Backend
-
-The Spring Boot backend lives on the `backend` branch of this repo.  
-Switch to it for backend setup:
+The React Native frontend is on the `main` branch:
 
 ```bash
-git checkout backend
+git checkout main
 ```
 
 ---
 
 ## Tech Stack
 
-- React Native 0.81.5
-- Expo SDK 54
-- TypeScript 5.7
-- React Navigation 7
-- Zustand (state management)
-- Expo SecureStore (token storage)
-- Expo Notifications (push notifications)
-- Supabase (real-time messaging fallback)
-- Groq AI (LLaMA 3 — AI chat & insights)
+- Java 21 + Spring Boot 3.5
+- Spring Security + JWT (stateless, HS256)
+- PostgreSQL + Spring Data JPA + Flyway
+- Lombok
+- Groq AI (LLaMA 3.1 — chat, vision, Whisper)
+- Paystack (payments — test mode)
+- Expo Push Notification Service
+- JavaMailSender (Gmail SMTP — OTP emails)
