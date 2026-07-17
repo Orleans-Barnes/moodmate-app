@@ -1,0 +1,77 @@
+server:
+  port: ${PORT:8099}
+
+spring:
+  application:
+    name: moodmate-admin
+  datasource:
+    # No currentSchema pinned on the URL - this service straddles two things: (1) its own "admin"
+    # schema, owning just counsellor_whitelist (JPA, Flyway-managed, see below), and (2) read-only
+    # cross-schema JdbcTemplate queries in AdminService that are always explicitly schema-qualified
+    # (auth.users, mood.mood_checkins, etc.) regardless of search_path - see AdminService's
+    # class-level doc comment for why that's a deliberate exception to the rest of this system.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/moodmate?currentSchema=admin}
+    username: ${DB_USERNAME:moodmate}
+    password: ${DB_PASSWORD:moodmate}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway migrations, not Hibernate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_schema: admin
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: admin
+    default-schema: admin
+    create-schemas: true
+    baseline-on-migrate: true
+    ignore-missing-migrations: true
+  jackson:
+    time-zone: UTC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Feature 16 (Observability) - Part 3/5. metrics: auto-recorded JVM/process/
+        # http.server.requests/HikariCP-pool metrics, no code needed. prometheus: scrape endpoint
+        # for monitoring/prometheus/prometheus.yml (needs micrometer-registry-prometheus, added in
+        # pom.xml). See root OBSERVABILITY.md for the "unauthenticated, same as health/info
+        # already were" caveat.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      # Feature 16 (Observability) - Part 9, Performance Monitoring (P95/P99 latency). Client-side
+      # computed percentile gauges (not full histogram buckets - that's the lighter-weight of the
+      # two options Micrometer supports, and enough for the Grafana "API Monitoring" dashboard's
+      # p95/p99 panels; histogram buckets would additionally allow server-side aggregation across
+      # multiple instances of the *same* service in Prometheus, which this single-instance-per-
+      # service topology doesn't need).
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,
+    # thread, correlation ID (via CorrelationIdFilter's MDC entry, key "correlationId" - see that
+    # class's doc comment), logger class, message. CorrelationIdFilter itself logs
+    # "METHOD /uri completed STATUS in N ms" as %msg for every request, satisfying this feature's
+    # request-logging requirement without a second filter.
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] [correlationId=%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.moodmate.admin: INFO

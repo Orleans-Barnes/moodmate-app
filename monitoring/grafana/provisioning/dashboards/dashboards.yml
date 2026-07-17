@@ -1,0 +1,14 @@
+# Feature 16 (Observability) - auto-loads every .json dashboard in ../../dashboards on container
+# startup, so dashboards are already present the first time anyone opens Grafana - no manual
+# import step.
+apiVersion: 1
+
+providers:
+  - name: "MoodMate Dashboards"
+    orgId: 1
+    folder: "MoodMate"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

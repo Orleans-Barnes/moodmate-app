@@ -1,72 +1,128 @@
 # MoodMate Backend
 
-Spring Boot + PostgreSQL backend for the MoodMate app: auth, mood check-ins, gamification (tree/streak/XP/leaf wallet/shop), journal, gratitude jar, community, support (counsellor booking, appointments, peer-mentor messaging), wellness hub (articles/events/RSVP), SOS/crisis resources, and Pro subscriptions + leaf-pack purchases via Paystack (test mode).
+Spring Boot + PostgreSQL **microservices** backend for the MoodMate app: auth, mood check-ins,
+gamification (tree/streak/XP/leaf wallet/shop/streak shield), journal + gratitude jar (with crisis
+keyword detection), community, support (counsellor booking, appointments, peer-mentor messaging,
+SOS resources), wellness hub (articles/events/RSVP), AI chat + insights (Groq), crisis-alert
+triage, admin dashboard, and Pro subscriptions + leaf-pack purchases via Paystack (test mode).
+
+This started as a monolith (`com.moodmate.backend`) and was fully split into 12 independent Spring
+Boot services, one Postgres schema per service, fronted by a single Spring Cloud Gateway. Each
+service still has its own `README.md` for anything specific to it.
 
 ## Tech stack
 
-- Java 17, Spring Boot 3.5.11 (web, data-jpa, security, validation, webflux-for-WebClient)
-- PostgreSQL + Flyway (schema is owned by migrations — `ddl-auto: validate`, never auto-generated)
-- JWT auth (jjwt 0.12.6, HS256, stateless)
-- Paystack REST API (test/sandbox mode) for billing
-- Lombok
+- Java 17, Spring Boot 3.5.11, Spring Cloud Gateway (2025.0.0 / Northfields)
+- PostgreSQL + Flyway per service (`ddl-auto: validate` — schema is owned by migrations, never
+  auto-generated). One shared Postgres instance, one schema per service (`?currentSchema=<name>`).
+- JWT auth (jjwt 0.12.6, HS256, stateless) — validated **only** at the gateway; every downstream
+  service trusts the `X-User-Id`/`X-User-Role` headers the gateway injects rather than
+  re-validating the token itself.
+- Groq (OpenAI-compatible chat completions API) for AI chat and insights narratives.
+- Paystack REST API (test/sandbox mode) for billing.
+- Gmail SMTP (`spring-boot-starter-mail`) for password-reset emails.
+- Lombok.
 
-## Project layout
+## Services
 
-One package per domain under `com.moodmate.backend`: `auth`, `checkin`, `wellness` (goals/tree/XP + `GoalEngine`), `wallet` (leaves/shop), `journal`, `gratitude`, `community`, `support`, `hub` (wellness hub), `sos`, `payments` (subscriptions + Paystack), plus shared `security`, `config`, `common/exception`.
+| Service | Port | Owns | Notes |
+|---|---|---|---|
+| `moodmate-gateway` | 8080 | — | Single public entry point. Routes `/api/**` by path, validates JWTs, injects `X-User-Id`/`X-User-Role`. |
+| `moodmate-auth` | 8091 | `auth` schema | Signup/login/guest, admin-setup, forgot/reset password, profile, avatar upload, push tokens. |
+| `moodmate-mood` | 8092 | `mood` schema | Check-ins, mood trend/analytics. |
+| `moodmate-support` | 8093 | `support` schema | Counsellors, appointments, conversations/messages, SOS resources (public, unauthenticated). |
+| `moodmate-community` | 8094 | `community` schema | Posts, reactions. |
+| `moodmate-wellness` | 8095 | `wellness` schema | Daily goals, tree XP/streak, streak shield, wellness hub (articles/events/RSVP). |
+| `moodmate-wallet` | 8096 | `wallet` schema | Leaf balance, tree skins, subscriptions, Paystack checkout/webhook. |
+| `moodmate-journal` | 8097 | `journal` schema | Journal entries (with crisis keyword detection), gratitude jar. |
+| `moodmate-gamification` | 8098 | `gamification` schema | Achievements, missions. |
+| `moodmate-admin` | 8099 | `admin` schema (+ read-only cross-schema reporting) | Dashboard stats, counsellor whitelist. |
+| `moodmate-crisis` | 8100 | `crisis` schema | Crisis-alert triage (counsellor/admin), created internally by `moodmate-ai`/`moodmate-journal`. |
+| `moodmate-ai` | 8101 | `ai` schema | AI chat (Groq) with crisis-keyword detection, `/api/insights`. |
+
+Two cross-service exceptions to "each service only touches its own schema," both deliberate and
+documented in the owning service's code: `moodmate-admin` does read-only cross-schema SQL for
+reporting (see its `AdminService` doc comment), and every service-to-service call otherwise goes
+over HTTP to a small set of `/internal/**` endpoints that are not reachable through the gateway
+(only reachable by another service calling the target directly on its own port).
 
 ## Setup
 
-1. **PostgreSQL** — create a local database:
+1. **PostgreSQL** — one database, one role, shared by every service (each gets its own schema
+   automatically via Flyway on first startup — `create-schemas: true`, you don't create schemas
+   yourself):
    ```sql
    CREATE DATABASE moodmate;
    CREATE USER moodmate WITH PASSWORD 'moodmate';
    GRANT ALL PRIVILEGES ON DATABASE moodmate TO moodmate;
    ```
-   (Adjust credentials to taste — they just need to match your env vars below.)
 
-2. **Environment variables** — copy `.env.example` to `.env` and fill it in (or export the same variables directly):
-   - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` — Postgres connection.
-   - `JWT_SECRET` — 32+ random chars (`openssl rand -base64 48`). The app has a dev-only fallback so it won't crash without one, but never ship that fallback.
-   - `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` — from your [Paystack dashboard](https://dashboard.paystack.com/#/settings/developers), **test mode** (`sk_test_…` / `pk_test_…`). Payments endpoints work without these set, except actually calling Paystack (checkout/verify), which will throw a clear error until a real test secret key is present.
-   - `PAYSTACK_CALLBACK_URL` — where Paystack redirects after checkout (defaults to a mobile deep link).
+2. **Environment variables** — set these as real env vars in the shell you'll run the services
+   from (`set VAR=value` on Windows), never hardcoded into any file:
 
-   Spring Boot doesn't auto-load `.env` files — either `export $(grep -v '^#' .env | xargs)` before running, use a plugin like `spring-dotenv`, or pass `--env-file=.env` if your launcher supports it (e.g. `docker run --env-file`).
+   | Variable | Used by | Required for |
+   |---|---|---|
+   | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | every service | Postgres connection (has local-dev defaults) |
+   | `JWT_SECRET` | gateway + auth | Must be byte-for-byte identical in both. Has a dev-only fallback; never ship it. |
+   | `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | wallet | Checkout/webhook/verify (`sk_test_…`/`pk_test_…` from your [Paystack dashboard](https://dashboard.paystack.com/#/settings/developers)) |
+   | `MAIL_USERNAME`, `MAIL_PASSWORD` | auth | Forgot/reset-password emails (Gmail address + **App Password with spaces removed**) |
+   | `GROQ_API_KEY` | ai | AI chat + insights narrative (from [console.groq.com](https://console.groq.com)) |
+   | `GROQ_MODEL` | ai | Optional override if the default (`llama-3.3-70b-versatile`) is ever deprecated on Groq's side |
+   | `PUBLIC_BASE_URL` | auth | Must match the gateway's externally-reachable address (same IP the frontend's `BACKEND_BASE_URL` uses) — embedded into uploaded avatar URLs so a phone can actually load them |
+   | `AVATAR_STORAGE_DIR` | auth | Optional, defaults to `./uploads/avatars` relative to wherever auth-service runs |
+   | `SEED_DEMO_ACCOUNTS`, `SEED_ADMIN_PASSWORD` | auth | Optional — off by default; see `moodmate-auth/DataInitializer`'s doc comment |
 
-3. **Run** (migrations apply automatically on startup via Flyway). You don't need Maven installed — this project includes the Maven Wrapper, which downloads and caches the right Maven version on first run (still needs a **JDK 17** on your machine, with `JAVA_HOME` set):
+3. **Run everything at once**: `start-all.bat` opens all 12 services, each in its own titled
+   window, and reads `JAVA_HOME`/the Maven Wrapper automatically. `stop-all.bat` stops them all by
+   port. Run a single service the same way `start-all.bat` does:
    ```
-   mvnw.cmd spring-boot:run        (Windows)
-   ./mvnw spring-boot:run          (macOS/Linux/WSL)
+   mvnw -pl moodmate-<name> spring-boot:run
    ```
-   If you do have Maven installed already, plain `mvn spring-boot:run` works too. To build a runnable jar instead:
-   ```
-   mvnw.cmd clean package
-   java -jar target\moodmate-backend-1.0.0.jar
-   ```
+   To just compile everything without running it: `mvnw compile` (or `mvnw -pl <module> -am compile`
+   for one service and its dependencies).
 
-4. **Paystack webhook (local testing)** — Paystack needs a public URL to POST to. Use a tunnel (e.g. `ngrok http 8080`) and set the webhook URL in your Paystack dashboard to `https://<tunnel>/api/payments/webhook`. The endpoint is public (no JWT) because it's authenticated by Paystack's `X-Paystack-Signature` HMAC header instead — see `PaystackSignatureVerifier`. If you don't wire up a webhook at all, payments still complete correctly: the client calls `GET /api/payments/verify/{reference}` right after returning from checkout, which fulfills the transaction itself.
+4. **Paystack webhook (local testing)** — needs a public URL. Use a tunnel (e.g. `ngrok http 8080`)
+   and set the webhook URL in your Paystack dashboard to `https://<tunnel>/api/payments/webhook`.
+   That route is public at the gateway (no JWT) because it's authenticated by Paystack's
+   `X-Paystack-Signature` HMAC header instead. Without a webhook wired up, payments still complete
+   correctly — the client calls `GET /api/payments/verify/{reference}` right after checkout, which
+   fulfills the transaction on its own.
 
 ## API overview
 
-All endpoints are under `/api`. Auth is a Bearer JWT (`Authorization: Bearer <token>`) issued by `/api/auth/login` or `/api/auth/signup`, except:
+Everything goes through the gateway at `http://<your-ip>:8080`. Auth is a Bearer JWT
+(`Authorization: Bearer <token>`) issued by `/api/auth/login`, `/signup`, `/guest`, or
+`/admin-setup`, except:
 - `/api/auth/**` (issues the token)
-- `/api/sos/**` (crisis resources — product rule: never gated behind auth or Pro)
+- `/api/sos/**` (crisis resources — product rule: never gated behind auth or Pro, see
+  `moodmate-support/SosController`)
+- `/media/**` (uploaded avatar images)
 - `/api/payments/webhook` (Paystack signature instead of a JWT)
-- `/actuator/health`
+- `/actuator/health` on each service
 
-| Domain | Base path |
-|---|---|
-| Auth | `/api/auth` |
-| Mood check-ins | `/api/checkins` |
-| Gamification (goals/tree) | `/api/wellness` |
-| Wallet & shop | `/api/wallet` |
-| Journal | `/api/journal` |
-| Gratitude jar | `/api/gratitude` |
-| Community | `/api/community` |
-| Support (counsellors/appointments/messages) | `/api/support` |
-| Wellness hub (articles/events) | `/api/hub` |
-| SOS / crisis resources | `/api/sos` |
-| Subscriptions & payments | `/api/payments` |
+| Domain | Base path | Service |
+|---|---|---|
+| Auth | `/api/auth` | moodmate-auth |
+| User profile / avatar | `/api/users`, `/media` | moodmate-auth |
+| Push tokens | `/api/push` | moodmate-auth |
+| Mood check-ins | `/api/checkins` | moodmate-mood |
+| Support (counsellors/appointments/messages) | `/api/support` | moodmate-support |
+| SOS / crisis resources | `/api/sos` | moodmate-support |
+| Community | `/api/community` | moodmate-community |
+| Wellness (goals/tree/streak/streak shield) + hub | `/api/wellness`, `/api/hub` | moodmate-wellness |
+| Wallet & shop, subscriptions & payments | `/api/wallet`, `/api/payments` | moodmate-wallet |
+| Journal, gratitude jar | `/api/journal`, `/api/gratitude` | moodmate-journal |
+| Gamification (achievements/missions) | `/api/gamification` | moodmate-gamification |
+| Admin dashboard | `/api/admin` | moodmate-admin |
+| Crisis-alert triage | `/api/crisis` | moodmate-crisis |
+| AI chat, insights | `/api/ai`, `/api/insights` | moodmate-ai |
 
 ## A note on verification
 
-This backend was written and reviewed in an environment that could not actually compile or run it: only a Java 11 JRE was available (no `javac`, and the project requires Java 17), there's no Maven binary, and network access to both Maven Central and the Paystack API was blocked. So nothing here has been built, started, or hit with a real request in that environment — everything was written carefully and re-read by hand (entity ↔ migration column matching, request/response shapes, idempotency logic in `PaymentsService`, the `GoalEngine` streak/XP rules), but **you should run `mvn clean compile` and exercise the endpoints yourself before trusting this in anything real.** If something doesn't compile, it's most likely a small import or type mismatch — flag it and I'll fix it immediately.
+Every service in this repo has been compiled successfully via the real Maven Wrapper
+(`mvnw compile` at the root, and `mvnw -pl <module> -am compile` per-service during development) —
+unlike the original monolith, nothing here is unverified-by-construction. What has **not** yet
+been done is a full runtime pass: starting every service together, pointing the mobile app at the
+gateway, and clicking through signup → check-in → journal → community → wallet/Paystack →
+gamification → admin → AI chat end to end. Do that before trusting any of this in front of anyone
+else, and flag the exact error and the screen/action that triggered it if anything breaks.
