@@ -16,7 +16,7 @@ finished and integrated, so most remaining work is verification + completion, no
 | 1E | Notifications | ~15% (local-only reminder + push token plumbing exist; no backend prefs/model/center/rules yet) | Medium | 1st — every later phase benefits from this existing first |
 | 1F-A | Counsellor Platform (everything but video) | ~90% (frontend wiring done 2026-07-19: reschedule, availability-status persistence, analytics, directory search/filter, chat read-parity; device walkthrough still outstanding) | Medium | 2nd |
 | 1G | Peer Mentor Platform (request/match workflow) | ~95% (request/accept workflow, MENTOR role + account linkage, mentor dashboard/messaging built and backend-compiled clean 2026-07-19; device walkthrough is the only thing outstanding) | Low–Medium | 3rd |
-| 1F-B | Jitsi Video Sessions | 0% | High | 4th — deserves its own milestone, don't rush it alongside 1F-A |
+| 1F-B | Jitsi Video Sessions | ~70% (8x8 JaaS meeting-window endpoints + WebView call screen built 2026-07-19, AppID-only/no JWT by deliberate scope choice; not compiler/tsc-verified this session, no device walkthrough yet) | Medium (down from High) | 4th |
 | 1H | Admin Portal (as modules, not screens) | ~40% | High | 5th |
 | 1I | Production Readiness | 0% | High (pre-launch gate) | 6th — separate milestone from feature completion |
 | 2 | AI | Existing groundwork, uncommitted | Low (deliberately deferred) | Last |
@@ -471,53 +471,79 @@ weighed against completeness and completeness won.
 
 ## Phase 1F-B — Jitsi Video Sessions (its own milestone)
 
-**Status:** 0% — nothing exists (no Jitsi dependency, no meeting-room model, no
-appointment→room linkage). **Risk: High.** Treat this as a project in its own right, not a
-checkbox inside 1F-A — it involves room creation, secure room naming, appointment authorization,
-join tokens, video UI, reconnect handling, and mute/camera controls, each of which can go wrong
-independently.
+**Status:** ~70% complete. **Risk: Medium** (down from High — the core room-authorization gap
+this phase called out is closed; what's left is verification and a real API key upgrade later,
+not missing functionality). Framed as **"Secure Counselling Session,"** not a bare "Video Call" -
+every join is anchored to a specific `Appointment`, never an arbitrary joinable room.
 
-**Framing:** this should ship as a flagship feature — not "Video Call," but **"Secure Counselling
-Session."** The distinction matters for both trust and scope: a bare video-SDK embed invites scope
-creep toward a generic calling feature, while framing it as a counselling-session flow keeps every
-design decision anchored to the appointment it belongs to.
+**Scope decision made this pass:** the user supplied an 8x8 JaaS (Jitsi-as-a-Service) AppID
+(`vpaas-magic-cookie-b9599a59473b4325900ea2c6ad3ea273`) but not a real JaaS API key (RS256 private
+key + kid) for signing per-user JWTs - the sample JWT that came with the AppID is 8x8's own public
+"Sample App" demo token (2-hour expiry, shared sample key), not something real users can be issued.
+Asked the user directly rather than guessing given this materially changes the security model and
+secrets footprint; chose **AppID-only, no JWT** for now. This means calls run on 8x8.vc scoped
+under the real AppID (not the fully public meet.jit.si), but without a JWT there's no server-side
+per-user room authorization from 8x8's side - our backend withholding the room name outside the
+authorized window/identity is what actually gates access, same security model as a plain
+meet.jit.si room would have had, just under the app's own namespace. Revisit once a real JaaS API
+key exists (`MeetingWindowView`'s shape already leaves room for a `jwt` field later without a
+breaking change) - moderator controls, lobby/waiting room, and recording all require a real key.
 
-**Target flow:**
+**Shipped:**
+- **Backend** (`moodmate-support`): `Appointment.jitsiRoomName` (nullable, random
+  `MoodMate-{uuid}` suffix, generated once at booking time in `bookAppointment`) + migration V5.
+  `SupportService.buildMeetingWindow(appointment)`: CONFIRMED-only; join window opens 15 min
+  before `scheduledAt` and stays open until 50 min (assumed session length) + 10 min grace after;
+  returns `MeetingWindowView` with `open` always populated, but `roomName`/`joinUrl` **only**
+  populated when `open` is true (see scope decision above for why this withholding matters).
+  `getStudentMeetingWindow`/`getCounsellorMeetingWindow` (mirrors the existing student/counsellor
+  endpoint-pair convention exactly, e.g. reschedule/cancel). New endpoints:
+  `GET /api/support/appointments/{id}/meeting` (student), `GET
+  /api/support/counsellor/appointments/{id}/meeting` (counsellor).
+- **Frontend:** `react-native-webview` added (`~13.15.0`, the exact SDK54-compatible version from
+  `expo/bundledNativeModules.json`, not looked up over the network per this project's own documented
+  practice) - works inside Expo Go, no dev-client rebuild needed, which was the deciding factor
+  over a native Jitsi SDK (those require ejecting from Expo Go). `MeetingWindowView` type +
+  `getAppointmentMeeting`/`getCounsellorAppointmentMeeting` in `src/api/support.ts`.
+  `VideoSessionScreen.tsx` (new): fetches the join window on focus, polls every 20s while closed
+  (auto-drops the user into the call the moment it opens, no manual refresh needed), renders a
+  WebView embedding 8x8's own `external_api.js` JaaS snippet (adapted, no JWT) once open, shows a
+  reason-specific message (not confirmed / too early with an opens-at time / expired) otherwise.
+  Registered as `RootStackParamList['VideoSession']` (`{ appointmentId, otherPartyName }` - the
+  screen itself reads the logged-in role from `useAuthStore` to pick student vs counsellor
+  endpoint, no role flag needed in the route params). "Join Session" button added to
+  `SupportScreen.tsx`'s upcoming-appointment card (student) and `CounsellorAppointmentsScreen.tsx`
+  (counsellor), both shown once `status === 'CONFIRMED'` - the real 15-minute time gate is
+  re-checked server-side by `VideoSessionScreen` itself, not duplicated client-side. `app.json`:
+  added `NSCameraUsageDescription`/`NSMicrophoneUsageDescription` (iOS) and
+  `CAMERA`/`RECORD_AUDIO` (Android) permissions, required for the WebView's `getUserMedia` call to
+  work in a real standalone build (Expo Go has its own camera/mic handling and may not need these,
+  but a future EAS build will).
 
-```
-Appointment
-  ↓
-Counsellor confirms
-  ↓
-Backend creates meeting metadata
-  ↓
-Student receives notification (Phase 1E dependency)
-  ↓
-Join button appears 15 minutes before appointment
-  ↓
-Both participants authenticate
-  ↓
-Backend returns room credentials
-  ↓
-Join Jitsi
-  ↓
-Session ends
-  ↓
-Appointment marked complete
-  ↓
-Optional feedback
-```
+**Verification status:**
+- Backend Java - **not compiler-verified this session** (same sandbox limitation as Phase 1G: this
+  session's `mvnw` is a 0-byte file, no system `mvn` either). Manual review only. Needs a real
+  `mvnw -pl moodmate-support -am compile` on your machine.
+- Frontend `tsc --noEmit` - **could not complete in this session's sandboxed shell**, same
+  environment constraint already documented for Phase 1F-A's `npx expo export` attempt (every
+  attempt hit the shell tool's ~45s hard per-call limit with `tsc` still actively working - 20s of
+  real CPU time logged in one 40s run before being killed - not a hang, genuinely slow file I/O on
+  this mounted path across a 60-screen project). Did a careful manual type-review instead of every
+  changed file in place of a real compiler run, the same practice that caught real bugs earlier in
+  Phase 1G before the user's own local run caught one more. **This still needs a real `npm run
+  typecheck` run on your own machine before calling this phase's exit criteria met** - do not skip
+  it on the strength of manual review alone.
+- Device walkthrough - not done (student joins a confirmed appointment 15 min early, sees the
+  "opens at" state, then gets pulled into the call automatically once open; counsellor does the
+  same from their side; both see/hear each other; call ends cleanly). This is real end-to-end
+  proof that 8x8.vc's AppID-scoped, no-JWT room actually works from two real devices, which no
+  amount of code review can substitute for.
 
-**Key design constraint:** the meeting room must be tied to the `Appointment` entity (e.g. a
-`jitsiRoomId` or a deterministic room name derived from the appointment ID plus a signed join
-token), never an arbitrary joinable room name — the backend must authorize that only the booked
-student and assigned counsellor can fetch the join URL/credentials for that specific appointment.
-The "join button appears 15 minutes before" requirement also implies a time-gated authorization
-check, not just an identity check.
-
-**Depends on:** Phase 1E (for the join-reminder notification) and Phase 1F-A's appointment
-lifecycle (confirm/complete) being stable first. **Status: ⬜ Not started — do not start until
-1F-A is stable.**
+**Not yet built (deliberately out of scope for this pass):** join-reminder push notification
+("peer mentor meeting in 30 min" style, but for counsellor sessions - Phase 1E Step 4's scheduling
+rules don't cover this yet), automatic `Appointment` → `COMPLETED` transition when a call ends
+(currently still a manual "Mark Complete" click by the counsellor), and anything that needs a real
+JaaS API key (moderator lock, waiting room, recording, per-participant JWT claims).
 
 ---
 
