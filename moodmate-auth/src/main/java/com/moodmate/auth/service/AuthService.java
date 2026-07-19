@@ -70,7 +70,7 @@ public class AuthService {
         return buildResponse(user);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest req) {
         User user = userRepo.findByEmail(req.email().toLowerCase().trim())
                 .orElseThrow(() -> new ApiException("Invalid email or password", HttpStatus.UNAUTHORIZED));

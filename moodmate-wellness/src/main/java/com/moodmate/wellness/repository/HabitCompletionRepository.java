@@ -1,7 +1,10 @@
 package com.moodmate.wellness.repository;
 
+import com.moodmate.wellness.dto.UserHabitCountDto;
 import com.moodmate.wellness.entity.HabitCompletion;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,4 +33,11 @@ public interface HabitCompletionRepository extends JpaRepository<HabitCompletion
      * InternalWellnessController's daily-stats endpoint that moodmate-mood's WellnessServiceClient
      * calls for habit-correlation analytics. */
     List<HabitCompletion> findByUserIdAndCompletionDateBetween(Long userId, LocalDate from, LocalDate to);
+
+    // Phase 1E, Step 4 (Scheduling Rules) - how many habits each user completed on a given date,
+    // the other half of the pair HabitService.todaySummaryForAllUsers() merges with
+    // HabitRepository.countHabitsPerUser() above.
+    @Query("SELECT new com.moodmate.wellness.dto.UserHabitCountDto(hc.userId, COUNT(hc)) " +
+            "FROM HabitCompletion hc WHERE hc.completionDate = :date GROUP BY hc.userId")
+    List<UserHabitCountDto> countCompletionsPerUserOnDate(@Param("date") LocalDate date);
 }

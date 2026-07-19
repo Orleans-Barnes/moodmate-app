@@ -1,7 +1,6 @@
 package com.moodmate.ai.service;
 
 import com.moodmate.ai.client.CrisisServiceClient;
-import com.moodmate.ai.client.GroqClient;
 import com.moodmate.ai.client.GroqMessage;
 import com.moodmate.ai.client.PaymentsServiceClient;
 import com.moodmate.ai.config.AiSafetyProperties;
@@ -60,7 +59,7 @@ public class AiChatService {
             of those feelings yourself or attempt to handle a crisis on your own.""";
 
     private final AiChatMessageRepository repository;
-    private final GroqClient groqClient;
+    private final AiModelRouter aiModelRouter;
     private final GroqProperties groqProperties;
     private final CrisisServiceClient crisisServiceClient;
     private final PaymentsServiceClient paymentsServiceClient;
@@ -145,7 +144,19 @@ public class AiChatService {
                 .build());
 
         List<GroqMessage> conversation = buildConversation(userId, userText);
-        String reply = groqClient.complete(conversation, 0.7, 400);
+        // Model preference is a Pro-only capability - only pass the client's requested model
+        // through to the router if this user is verified Pro (same server-side isPro() check
+        // used for the free-tier cap above, not a client-supplied flag - a free client can't
+        // grant itself model choice by just sending the field). The isPro() lookup is skipped
+        // entirely when no preference was sent (today's frontend never sends one), so this adds
+        // no extra network call on the common path - only once a model-picker UI starts sending
+        // preferredModel does the extra check kick in, and only for Pro verification of that.
+        String preferredModel = null;
+        if (request.preferredModel() != null && !request.preferredModel().isBlank()
+                && paymentsServiceClient.isPro(userId)) {
+            preferredModel = request.preferredModel();
+        }
+        String reply = aiModelRouter.complete(conversation, 0.7, 400, preferredModel);
 
         AiChatMessage assistantMessage = repository.save(AiChatMessage.builder()
                 .userId(userId)

@@ -4,6 +4,7 @@ import com.moodmate.support.client.AuthServiceClient;
 import com.moodmate.support.client.UserSummary;
 import com.moodmate.support.dto.AppointmentResponse;
 import com.moodmate.support.dto.BookAppointmentRequest;
+import com.moodmate.support.dto.ConfirmedAppointmentResponse;
 import com.moodmate.support.dto.ConversationResponse;
 import com.moodmate.support.dto.CounsellorAppointmentView;
 import com.moodmate.support.dto.CounsellorConversationView;
@@ -450,6 +451,16 @@ public class SupportService {
                 .countByConversationIdAndSenderTypeNotAndReadAtIsNull(c.getId(), SenderType.COUNSELLOR);
         return new CounsellorConversationView(c.getId(), c.getUserId(), student != null ? student.fullName() : "Student",
                 c.getCreatedAt(), preview, unreadCount);
+    }
+
+    /** Phase 1E, Step 4 - backs GET /internal/support/appointments/confirmed. Every CONFIRMED
+     * appointment regardless of date; moodmate-notifications' AppointmentReminderScheduledJob is
+     * responsible for the "within the next 24h" window check, not this service. */
+    @Transactional(readOnly = true)
+    public List<ConfirmedAppointmentResponse> confirmedAppointments() {
+        return appointmentRepository.findByStatus(AppointmentStatus.CONFIRMED).stream()
+                .map(a -> new ConfirmedAppointmentResponse(a.getId(), a.getUserId(), a.getScheduledAt()))
+                .toList();
     }
 
     private CounsellorDto toDto(Counsellor c) {

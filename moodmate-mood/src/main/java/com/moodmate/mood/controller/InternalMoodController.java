@@ -1,9 +1,12 @@
 package com.moodmate.mood.controller;
 
 import com.moodmate.mood.dto.MoodHistoryResponse;
+import com.moodmate.mood.dto.UserLastCheckInResponse;
 import com.moodmate.mood.service.MoodService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Service-to-service only, same /internal/** pattern as moodmate-wallet's InternalWalletController
@@ -24,5 +27,12 @@ public class InternalMoodController {
     @GetMapping("/{userId}/trend")
     public MoodHistoryResponse trend(@PathVariable Long userId, @RequestParam(defaultValue = "30") int days) {
         return moodService.trend(userId, days);
+    }
+
+    // Phase 1E, Step 4 (Scheduling Rules) - polled by moodmate-notifications' MoodServiceClient /
+    // MoodReminderScheduledJob, never by the gateway (see this class's own doc comment above).
+    @GetMapping("/latest-per-user")
+    public List<UserLastCheckInResponse> latestPerUser() {
+        return moodService.latestCheckInPerUser();
     }
 }

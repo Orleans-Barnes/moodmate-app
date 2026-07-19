@@ -1,6 +1,5 @@
 package com.moodmate.ai.service;
 
-import com.moodmate.ai.client.GroqClient;
 import com.moodmate.ai.client.GroqMessage;
 import com.moodmate.ai.client.MoodServiceClient;
 import com.moodmate.ai.client.MoodTrendSummary;
@@ -22,10 +21,10 @@ import java.util.Set;
  *
  * wellnessScore (0-100) and sentimentScore (-100 to 100) are computed deterministically from that
  * data - no LLM involved, so they're fast, free, and reproducible. Only narrativeSummary is
- * Groq-generated (the frontend's own type comment says "AI-generated narrative"); if Groq is
- * unavailable or misconfigured, this falls back to a simple templated sentence built from the same
- * stats rather than failing the whole endpoint - a wellness score with no narrative text is still
- * useful, but an insights screen that 502s because Groq is down is not.
+ * AI-generated, via AiModelRouter (Groq primary, Gemini automatic fallback - see that class); if
+ * BOTH configured models are unavailable, this falls back to a simple templated sentence built
+ * from the same stats rather than failing the whole endpoint - a wellness score with no narrative
+ * text is still useful, but an insights screen that 502s because both providers are down is not.
  */
 @Slf4j
 @Service
@@ -39,7 +38,7 @@ public class InsightsService {
     private static final short STRESS_ALERT_THRESHOLD = 4; // out of 5 - see mood-service's 1-5 scale
 
     private final MoodServiceClient moodServiceClient;
-    private final GroqClient groqClient;
+    private final AiModelRouter aiModelRouter;
 
     public InsightsResponse getInsights(Long userId) {
         MoodTrendSummary trend = moodServiceClient.getTrend(userId, TREND_WINDOW_DAYS);
@@ -93,9 +92,11 @@ public class InsightsService {
                 "just a short supportive reflection, second person (\"you\").",
                 TREND_WINDOW_DAYS, avgStress, avgEnergy, positiveRatio * 100, checkinCount, wellnessScore);
         try {
-            return groqClient.complete(List.of(new GroqMessage("user", prompt)), 0.8, 200).trim();
+            return aiModelRouter.complete(List.of(new GroqMessage("user", prompt)), 0.8, 200).trim();
         } catch (Exception e) {
-            log.warn("Groq narrative generation failed, falling back to templated summary: {}", e.getMessage());
+            // aiModelRouter already tried both Groq and Gemini internally before this catch is
+            // ever reached - this is the "both providers down" case, not a single-provider outage.
+            log.warn("AI narrative generation failed on both configured models, falling back to templated summary: {}", e.getMessage());
             return String.format(
                     "Over the last %d days you've checked in %d times, averaging %.1f/5 on stress and %.1f/5 on energy. " +
                     "Keep showing up for yourself - every check-in helps build a clearer picture of how you're doing.",

@@ -3,6 +3,7 @@ package com.moodmate.mood.service;
 import com.moodmate.mood.dto.CheckInRequest;
 import com.moodmate.mood.dto.CheckInResponse;
 import com.moodmate.mood.dto.MoodHistoryResponse;
+import com.moodmate.mood.dto.UserLastCheckInResponse;
 import com.moodmate.mood.entity.MoodCheckin;
 import com.moodmate.mood.repository.MoodCheckinRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -63,6 +66,18 @@ public class MoodService {
     @Transactional(readOnly = true)
     public long countForUser(Long userId) {
         return repository.countByUserId(userId);
+    }
+
+    /** Phase 1E, Step 4 - backs GET /internal/mood/latest-per-user. Converts each user's raw
+     * MAX(createdAt) Instant to a UTC LocalDate here, once, so moodmate-notifications' scheduled
+     * job can compare it directly against "today" without needing to know or care what time zone
+     * this service stores timestamps in (matches this service's own
+     * hibernate.jdbc.time_zone: UTC configuration). */
+    @Transactional(readOnly = true)
+    public List<UserLastCheckInResponse> latestCheckInPerUser() {
+        return repository.findLatestCheckInPerUser().stream()
+                .map(s -> new UserLastCheckInResponse(s.userId(), LocalDate.ofInstant(s.lastCheckInAt(), ZoneOffset.UTC)))
+                .toList();
     }
 
     private CheckInResponse toDto(MoodCheckin checkIn) {

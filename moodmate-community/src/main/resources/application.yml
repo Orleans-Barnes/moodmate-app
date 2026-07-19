@@ -2,6 +2,12 @@ server:
   port: ${PORT:8094}
 
 spring:
+  # Loads the repo-root .env file as real Spring properties - see moodmate-gateway/application.yml's
+  # spring.config.import comment for the full root-cause explanation this fixes across every service.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   application:
     name: moodmate-community
   datasource:
@@ -9,6 +15,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/moodmate?currentSchema=community}
     username: ${DB_USERNAME:moodmate}
     password: ${DB_PASSWORD:moodmate}
+    # Capped for local dev - see moodmate-wellness/application.yml's datasource.hikari comment for
+    # the full "remaining connection slots" root-cause explanation this fixes across all services.
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
   jpa:
     hibernate:
       ddl-auto: validate   # schema is owned by Flyway migrations, not Hibernate

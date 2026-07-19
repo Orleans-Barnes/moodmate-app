@@ -24,6 +24,7 @@
         <module>moodmate-admin</module>
         <module>moodmate-crisis</module>
         <module>moodmate-ai</module>
+        <module>moodmate-notifications</module>
     </modules>
 
     <properties>

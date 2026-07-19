@@ -37,4 +37,10 @@ public class UserController {
     public ResponseEntity<UserDto> deleteAvatar(@RequestHeader("X-User-Id") Long userId) {
         return ResponseEntity.ok(authService.deleteAvatar(userId));
     }
+
+    // Phase 1C-i's academic-profile / wellness-preference / profile-status endpoints live in
+    // StudentProfileController, WellnessPreferenceController, and ProfileStatusController
+    // (com.moodmate.auth.profile.controller) - kept out of this controller deliberately so it
+    // doesn't grow into a "god controller" as Peer Mentor / Counsellor / Premium profiles get
+    // added later. All still route under /api/users/me/... - only the code organization split.
 }

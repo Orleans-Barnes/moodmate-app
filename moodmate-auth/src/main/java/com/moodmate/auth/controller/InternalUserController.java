@@ -4,6 +4,8 @@ import com.moodmate.auth.dto.ModerationReasonRequest;
 import com.moodmate.auth.dto.ModerationStatusResponse;
 import com.moodmate.auth.dto.RoleUpdateRequest;
 import com.moodmate.auth.dto.UserSummary;
+import com.moodmate.auth.profile.dto.NotificationPreferenceResponse;
+import com.moodmate.auth.profile.service.NotificationPreferenceService;
 import com.moodmate.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,17 @@ import java.util.Map;
 public class InternalUserController {
 
     private final AuthService authService;
+    private final NotificationPreferenceService notificationPreferenceService;
+
+    // Phase 1E, Step 5 (Expo Push) - moodmate-notifications' AuthServiceClient reads this before
+    // deciding whether to actually send a push for a given notification (per-type toggle + quiet
+    // hours), same internal-only reasoning as every other endpoint in this controller. Reuses
+    // NotificationPreferenceService.get() unmodified - it already takes a userId parameter rather
+    // than reading "the current user," so no new service-layer code was needed, only this route.
+    @GetMapping("/{userId}/notification-preferences")
+    public NotificationPreferenceResponse notificationPreferences(@PathVariable Long userId) {
+        return notificationPreferenceService.get(userId);
+    }
 
     @GetMapping("/{userId}/summary")
     public UserSummary summary(@PathVariable Long userId) {

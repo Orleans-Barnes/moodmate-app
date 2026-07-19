@@ -2,12 +2,27 @@ server:
   port: ${PORT:8095}
 
 spring:
+  # Loads the repo-root .env file as real Spring properties - see moodmate-gateway/application.yml's
+  # spring.config.import comment for the full root-cause explanation this fixes across every service.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   application:
     name: moodmate-wellness
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/moodmate?currentSchema=wellness}
     username: ${DB_USERNAME:moodmate}
     password: ${DB_PASSWORD:moodmate}
+    # Capped for local dev: with no explicit size, HikariCP defaults to 10 per service - across
+    # all 11 JPA-backed services that's up to 110 simultaneous connections demanded from one
+    # shared local Postgres instance, whose default max_connections (~100, minus a handful
+    # reserved for superuser) gets exhausted the moment enough services are running at once -
+    # this is exactly what produced "remaining connection slots are reserved for roles with the
+    # SUPERUSER attribute". 5 per service (55 total across all 11) leaves comfortable headroom.
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
   jpa:
     hibernate:
       ddl-auto: validate

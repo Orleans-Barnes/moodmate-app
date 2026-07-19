@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -144,6 +146,27 @@ public class HabitService {
         double rate = Math.round((last30 / 30.0) * 1000.0) / 1000.0;
 
         return new HabitStatsResponse(habit.getId(), habit.getStreakCount(), longest, total, rate);
+    }
+
+    /** Phase 1E, Step 4 - backs GET /internal/wellness/habits/today-summary. Merges two grouped
+     * counts (total habits per user, completions-today per user) rather than iterating per-user -
+     * one query each, regardless of how many users/habits exist. "Today" is LocalDate.now() with
+     * no explicit zone, matching every other date computed in this class (toggleCompletion,
+     * listHabits, etc.) rather than introducing a UTC-explicit inconsistency within this one file. */
+    @Transactional(readOnly = true)
+    public List<UserHabitTodaySummary> todaySummaryForAllUsers() {
+        LocalDate today = LocalDate.now();
+        Map<Long, Long> totals = new HashMap<>();
+        habitRepository.countHabitsPerUser().forEach(d -> totals.put(d.userId(), d.count()));
+        Map<Long, Long> completedToday = new HashMap<>();
+        habitCompletionRepository.countCompletionsPerUserOnDate(today).forEach(d -> completedToday.put(d.userId(), d.count()));
+
+        return totals.entrySet().stream()
+                .map(e -> new UserHabitTodaySummary(
+                        e.getKey(),
+                        e.getValue().intValue(),
+                        completedToday.getOrDefault(e.getKey(), 0L).intValue()))
+                .toList();
     }
 
     private boolean isCompletedOn(Long habitId, LocalDate date) {

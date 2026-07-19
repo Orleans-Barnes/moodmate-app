@@ -1,7 +1,6 @@
 package com.moodmate.ai.service;
 
 import com.moodmate.ai.client.CrisisServiceClient;
-import com.moodmate.ai.client.GroqClient;
 import com.moodmate.ai.client.PaymentsServiceClient;
 import com.moodmate.ai.config.AiSafetyProperties;
 import com.moodmate.ai.config.AiUsageProperties;
@@ -26,12 +25,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /** Covers Premium Enforcement's free-tier daily message cap (Feature 3) and Feature 11's Abuse
- * Protection guards (message-length cap, duplicate-spam guard). Groq/crisis calls are mocked out
- * entirely - this test is about the gates, not the chat behavior already covered elsewhere. */
+ * Protection guards (message-length cap, duplicate-spam guard), plus the Pro-only model-preference
+ * gate added alongside AiModelRouter (dual-model routing). AiModelRouter/crisis calls are mocked
+ * out entirely here - AiModelRouter's own failover behavior is covered by AiModelRouterTest, not
+ * re-tested through AiChatService. */
 class AiChatServiceTest {
 
     private AiChatMessageRepository repository;
-    private GroqClient groqClient;
+    private AiModelRouter aiModelRouter;
     private CrisisServiceClient crisisServiceClient;
     private PaymentsServiceClient paymentsServiceClient;
     private AiChatService service;
@@ -39,14 +40,14 @@ class AiChatServiceTest {
     @BeforeEach
     void setUp() {
         repository = mock(AiChatMessageRepository.class);
-        groqClient = mock(GroqClient.class);
+        aiModelRouter = mock(AiModelRouter.class);
         crisisServiceClient = mock(CrisisServiceClient.class);
         paymentsServiceClient = mock(PaymentsServiceClient.class);
         GroqProperties groqProperties = new GroqProperties("key", "http://localhost", "model", 20);
         AiUsageProperties aiUsageProperties = new AiUsageProperties(10);
         AiSafetyProperties aiSafetyProperties = new AiSafetyProperties("disclaimer text", 1, 2000, 10);
 
-        service = new AiChatService(repository, groqClient, groqProperties, crisisServiceClient,
+        service = new AiChatService(repository, aiModelRouter, groqProperties, crisisServiceClient,
                 paymentsServiceClient, aiUsageProperties, aiSafetyProperties);
 
         when(repository.save(any(AiChatMessage.class))).thenAnswer(inv -> {
@@ -60,16 +61,16 @@ class AiChatServiceTest {
     }
 
     @Test
-    void freeUserOverDailyCapIsRejectedBeforeAnyGroqCall() {
+    void freeUserOverDailyCapIsRejectedBeforeAnyModelCall() {
         when(paymentsServiceClient.isPro(1L)).thenReturn(false);
         when(repository.countByUserIdAndRoleAndCreatedAtGreaterThanEqual(eq(1L), eq(ChatRole.USER), any()))
                 .thenReturn(10L); // already at the limit
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.sendMessage(1L, new AiChatRequest("hello", null, null, null)));
+                () -> service.sendMessage(1L, new AiChatRequest("hello", null, null, null, null)));
 
         assertEquals(HttpStatus.PAYMENT_REQUIRED, ex.getStatus());
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(aiModelRouter);
         verify(repository, never()).save(any());
     }
 
@@ -79,34 +80,35 @@ class AiChatServiceTest {
         when(repository.countByUserIdAndRoleAndCreatedAtGreaterThanEqual(eq(1L), eq(ChatRole.USER), any()))
                 .thenReturn(3L);
         when(repository.findByUserIdOrderByCreatedAtDesc(eq(1L), any())).thenReturn(List.of());
-        when(groqClient.complete(any(), any(Double.class), any(Integer.class))).thenReturn("a supportive reply");
+        when(aiModelRouter.complete(any(), any(Double.class), any(Integer.class), any()))
+                .thenReturn("a supportive reply");
 
-        var response = service.sendMessage(1L, new AiChatRequest("hello", null, null, null));
+        var response = service.sendMessage(1L, new AiChatRequest("hello", null, null, null, null));
 
         assertEquals("a supportive reply", response.reply());
-        verify(groqClient, times(1)).complete(any(), any(Double.class), any(Integer.class));
+        verify(aiModelRouter, times(1)).complete(any(), any(Double.class), any(Integer.class), any());
     }
 
     @Test
     void proUserBypassesCapEntirely() {
         when(paymentsServiceClient.isPro(2L)).thenReturn(true);
         when(repository.findByUserIdOrderByCreatedAtDesc(eq(2L), any())).thenReturn(List.of());
-        when(groqClient.complete(any(), any(Double.class), any(Integer.class))).thenReturn("reply");
+        when(aiModelRouter.complete(any(), any(Double.class), any(Integer.class), any())).thenReturn("reply");
 
-        service.sendMessage(2L, new AiChatRequest("hello", null, null, null));
+        service.sendMessage(2L, new AiChatRequest("hello", null, null, null, null));
 
         verify(repository, never()).countByUserIdAndRoleAndCreatedAtGreaterThanEqual(anyLong(), any(), any());
     }
 
     @Test
-    void oversizedMessageIsRejectedBeforeAnyGroqCallOrPersistence() {
+    void oversizedMessageIsRejectedBeforeAnyModelCallOrPersistence() {
         String tooLong = "x".repeat(2001); // AiSafetyProperties in setUp() uses a 2000-char limit
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.sendMessage(1L, new AiChatRequest(tooLong, null, null, null)));
+                () -> service.sendMessage(1L, new AiChatRequest(tooLong, null, null, null, null)));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(aiModelRouter);
         verify(repository, never()).save(any());
     }
 
@@ -119,10 +121,10 @@ class AiChatServiceTest {
                 .thenReturn(Optional.of(lastMessage));
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.sendMessage(1L, new AiChatRequest("hello", null, null, null)));
+                () -> service.sendMessage(1L, new AiChatRequest("hello", null, null, null, null)));
 
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
-        verifyNoInteractions(groqClient);
+        verifyNoInteractions(aiModelRouter);
     }
 
     @Test
@@ -133,9 +135,9 @@ class AiChatServiceTest {
         when(repository.findTopByUserIdAndRoleOrderByCreatedAtDesc(1L, ChatRole.USER))
                 .thenReturn(Optional.of(lastMessage));
         when(repository.findByUserIdOrderByCreatedAtDesc(eq(1L), any())).thenReturn(List.of());
-        when(groqClient.complete(any(), any(Double.class), any(Integer.class))).thenReturn("reply");
+        when(aiModelRouter.complete(any(), any(Double.class), any(Integer.class), any())).thenReturn("reply");
 
-        assertDoesNotThrow(() -> service.sendMessage(1L, new AiChatRequest("hello", null, null, null)));
+        assertDoesNotThrow(() -> service.sendMessage(1L, new AiChatRequest("hello", null, null, null, null)));
     }
 
     @Test
@@ -146,8 +148,40 @@ class AiChatServiceTest {
         when(repository.findTopByUserIdAndRoleOrderByCreatedAtDesc(1L, ChatRole.USER))
                 .thenReturn(Optional.of(lastMessage));
         when(repository.findByUserIdOrderByCreatedAtDesc(eq(1L), any())).thenReturn(List.of());
-        when(groqClient.complete(any(), any(Double.class), any(Integer.class))).thenReturn("reply");
+        when(aiModelRouter.complete(any(), any(Double.class), any(Integer.class), any())).thenReturn("reply");
 
-        assertDoesNotThrow(() -> service.sendMessage(1L, new AiChatRequest("a completely different message", null, null, null)));
+        assertDoesNotThrow(() -> service.sendMessage(1L, new AiChatRequest("a completely different message", null, null, null, null)));
+    }
+
+    @Test
+    void proUserPreferredModelIsPassedThroughToRouter() {
+        when(paymentsServiceClient.isPro(2L)).thenReturn(true);
+        when(repository.findByUserIdOrderByCreatedAtDesc(eq(2L), any())).thenReturn(List.of());
+        when(aiModelRouter.complete(any(), any(Double.class), any(Integer.class), eq("gemini")))
+                .thenReturn("reply from gemini");
+
+        var response = service.sendMessage(2L, new AiChatRequest("hello", null, null, null, "gemini"));
+
+        assertEquals("reply from gemini", response.reply());
+        verify(aiModelRouter).complete(any(), any(Double.class), any(Integer.class), eq("gemini"));
+    }
+
+    @Test
+    void freeUserPreferredModelIsIgnoredNotPassedToRouter() {
+        // Free-tier daily cap is disabled in setUp()'s AiUsageProperties(10) only when usedToday
+        // stays under 10 - use a fresh low count so this reaches the router call at all.
+        when(paymentsServiceClient.isPro(1L)).thenReturn(false);
+        when(repository.countByUserIdAndRoleAndCreatedAtGreaterThanEqual(eq(1L), eq(ChatRole.USER), any()))
+                .thenReturn(0L);
+        when(repository.findByUserIdOrderByCreatedAtDesc(eq(1L), any())).thenReturn(List.of());
+        when(aiModelRouter.complete(any(), any(Double.class), any(Integer.class), eq(null)))
+                .thenReturn("reply from default order");
+
+        var response = service.sendMessage(1L, new AiChatRequest("hello", null, null, null, "gemini"));
+
+        assertEquals("reply from default order", response.reply());
+        // A free-tier user's preferredModel must never reach the router as anything but null -
+        // otherwise a free client could grant itself Pro-only model choice just by sending the field.
+        verify(aiModelRouter).complete(any(), any(Double.class), any(Integer.class), eq(null));
     }
 }

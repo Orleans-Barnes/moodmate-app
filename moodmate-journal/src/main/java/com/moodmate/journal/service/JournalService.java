@@ -5,6 +5,7 @@ import com.moodmate.journal.client.PaymentsServiceClient;
 import com.moodmate.journal.config.JournalUsageProperties;
 import com.moodmate.journal.dto.JournalEntryRequest;
 import com.moodmate.journal.dto.JournalEntryResponse;
+import com.moodmate.journal.dto.UserLastJournalEntryResponse;
 import com.moodmate.journal.entity.JournalEntry;
 import com.moodmate.journal.exception.ApiException;
 import com.moodmate.journal.repository.JournalEntryRepository;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -146,6 +149,17 @@ public class JournalService {
     @Transactional(readOnly = true)
     public long count(Long userId) {
         return journalEntryRepository.countByUserId(userId);
+    }
+
+    /** Phase 1E, Step 4 - backs GET /internal/journal/latest-per-user. Converts each user's raw
+     * MAX(createdAt) Instant to a UTC LocalDate here, once, so moodmate-notifications' scheduled
+     * job can compare it directly against "today" - same split as moodmate-mood's
+     * MoodService.latestCheckInPerUser(). */
+    @Transactional(readOnly = true)
+    public List<UserLastJournalEntryResponse> latestEntryPerUser() {
+        return journalEntryRepository.findLatestEntryPerUser().stream()
+                .map(s -> new UserLastJournalEntryResponse(s.userId(), LocalDate.ofInstant(s.lastEntryAt(), ZoneOffset.UTC)))
+                .toList();
     }
 
     private JournalEntry findOwned(Long userId, Long entryId) {

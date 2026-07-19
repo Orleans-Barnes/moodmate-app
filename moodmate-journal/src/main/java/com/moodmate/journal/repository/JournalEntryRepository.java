@@ -1,5 +1,6 @@
 package com.moodmate.journal.repository;
 
+import com.moodmate.journal.dto.UserLastJournalEntrySummary;
 import com.moodmate.journal.entity.JournalEntry;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -60,4 +61,10 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, Long
     // a filter-chip UI. Ordered alphabetically for a stable, predictable display order.
     @Query("SELECT DISTINCT t FROM JournalEntry e JOIN e.tags t WHERE e.userId = :userId ORDER BY t ASC")
     List<String> findDistinctTagsByUserId(@Param("userId") Long userId);
+
+    // Phase 1E, Step 4 (Scheduling Rules) - feeds GET /internal/journal/latest-per-user, same
+    // grouped-MAX(createdAt)-per-user pattern as moodmate-mood's findLatestCheckInPerUser().
+    @Query("SELECT new com.moodmate.journal.dto.UserLastJournalEntrySummary(e.userId, MAX(e.createdAt)) " +
+            "FROM JournalEntry e GROUP BY e.userId")
+    List<UserLastJournalEntrySummary> findLatestEntryPerUser();
 }

@@ -2,6 +2,19 @@ server:
   port: ${PORT:8080}
 
 spring:
+  # Loads the repo-root .env file's KEY=value lines as real Spring properties, so every ${FOO}
+  # placeholder below actually sees what's in .env - plain Spring Boot does NOT read .env files on
+  # its own; without this, .env has always been silently ignored no matter what's set in it,
+  # regardless of how mvnw is invoked (this was the real cause behind "GROQ_API_KEY is not set"
+  # even with a real key sitting in .env - discovered from moodmate-ai's own startup log).
+  # optional: so a missing .env doesn't crash startup (each var already has its own safe
+  # fallback/degraded-mode behavior - see each property's own comment). Two paths covers both
+  # invocation styles: cwd = repo root (mvnw -pl X spring-boot:run from root, this project's normal
+  # pattern) or cwd = the module's own directory.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   application:
     name: moodmate-gateway
   cloud:
@@ -227,6 +240,17 @@ spring:
               uri: http://localhost:8101
               predicates:
                 - Path=/api/insights/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Notifications Service (Phase 1E Step 2) ─────────────────────────
+            # /internal/notifications is NOT routed here on purpose - see moodmate-notifications's
+            # InternalNotificationController doc comment, same pattern as crisis-service's
+            # /internal/crisis/** and wallet-service's /internal/wallet/** above.
+            - id: notifications-service
+              uri: http://localhost:8102
+              predicates:
+                - Path=/api/notifications/**
               filters:
                 - JwtAuthFilter
 
