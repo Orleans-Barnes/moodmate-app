@@ -42,6 +42,7 @@ export type RootStackParamList = {
   AdminUserManagement: undefined;
   AdminCounsellorMentorManagement: undefined;
   AdminWellnessContent: undefined;
+  AdminModeration: undefined;
 
   CounsellorChat: { conversationId: number; studentName: string };
   MentorChat: { conversationId: number; studentName: string };

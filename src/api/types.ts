@@ -107,6 +107,26 @@ export interface CommunityPostView {
   isOwnPost: boolean;
 }
 
+// Phase 1H (Admin Portal - Community Moderation). Mirrors
+// com.moodmate.community.dto.ReportResponse / entity.ContentType / entity.ReportStatus exactly -
+// this backend was already fully built (Feature 7) before this pass; only the admin frontend was
+// missing.
+export type ContentType = 'POST' | 'COMMENT';
+export type ReportStatus = 'PENDING' | 'DISMISSED' | 'CONTENT_REMOVED';
+
+export interface ReportView {
+  id: number;
+  contentType: ContentType;
+  contentId: number;
+  postId: number;
+  contentPreview: string | null;
+  contentAuthorId: number | null;
+  reporterId: number;
+  reason: string;
+  status: ReportStatus;
+  createdAt: string;
+}
+
 export interface CommunityPostCreateRequest {
   content: string;
   topic?: string;

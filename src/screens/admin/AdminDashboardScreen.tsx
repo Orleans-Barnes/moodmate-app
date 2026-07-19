@@ -298,6 +298,12 @@ export function AdminDashboardScreen({ navigation }: Props) {
             <Text style={s.quickActionText}>Wellness{'\n'}Content</Text>
           </Pressable>
         </View>
+        <View style={[s.quickActionRow, { marginTop: spacing.sm }]}>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminModeration')}>
+            <Ionicons name="shield-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Community{'\n'}Moderation</Text>
+          </Pressable>
+        </View>
 
         {/* ── Counsellor Approval Queue ── */}
         <Text style={s.sectionTitle}>Counsellor Requests</Text>
