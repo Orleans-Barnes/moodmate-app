@@ -15,7 +15,7 @@ finished and integrated, so most remaining work is verification + completion, no
 | 1D | Personalized Dashboard | 100% | — | ✅ Done |
 | 1E | Notifications | ~15% (local-only reminder + push token plumbing exist; no backend prefs/model/center/rules yet) | Medium | 1st — every later phase benefits from this existing first |
 | 1F-A | Counsellor Platform (everything but video) | ~90% (frontend wiring done 2026-07-19: reschedule, availability-status persistence, analytics, directory search/filter, chat read-parity; device walkthrough still outstanding) | Medium | 2nd |
-| 1G | Peer Mentor Platform (request/match workflow) | ~50% | Medium | 3rd |
+| 1G | Peer Mentor Platform (request/match workflow) | ~90% (request/accept workflow, MENTOR role + account linkage, mentor dashboard/messaging built 2026-07-19; backend not compiler-verified this session, device walkthrough outstanding) | Medium | 3rd |
 | 1F-B | Jitsi Video Sessions | 0% | High | 4th — deserves its own milestone, don't rush it alongside 1F-A |
 | 1H | Admin Portal (as modules, not screens) | ~40% | High | 5th |
 | 1I | Production Readiness | 0% | High (pre-launch gate) | 6th — separate milestone from feature completion |
@@ -374,44 +374,96 @@ project's own documented lesson that `tsc` passing is necessary but not sufficie
 
 ## Phase 1G — Peer Mentor Platform (build the real workflow)
 
-**Status:** ~50% complete. **Risk: Medium.** Probably the single biggest missing *business logic*
-piece in the whole remaining roadmap — bigger than video, and shouldn't be blocked on 1F-B.
+**Status:** ~90% complete. **Risk: Medium** (down from High — the missing business-logic gap this
+phase called out is closed; what's left is backend compile verification and a device walkthrough,
+not missing functionality). Do the same exit-criteria pass 1F-A still needs before calling this
+fully done.
 
-**Current state (the gap):** `PeerMentor` entity + `listPeerMentors()` exist, and
-`startConversation`'s `hasMentor` branch already supports messaging a mentor — but it creates the
-conversation **immediately**, with no pending/accepted state at all. Today the flow is just:
-
-```
-Student → message mentor
-```
-
-**Target flow** (the actual deliverable for this phase):
+**Target flow, now built end-to-end:**
 
 ```
 Student
   ↓
-Request mentor
+Request mentor          ← POST /api/support/mentor-requests
   ↓
-Mentor accepts (or declines)
+Mentor accepts/declines ← POST /api/support/mentor/requests/{id}/accept|decline
   ↓
-Conversation created
+Conversation created    ← acceptMentorRequest creates it directly, no first-message needed
   ↓
-Meeting scheduled
-  ↓
-Chat
+Chat                    ← /api/support/mentor/conversations/** (mentor side), existing
+                           /api/support/conversations/** (student side, unchanged)
   ↓
 (Optional Jitsi, once 1F-B exists)
 ```
 
-**Backend work needed:** a `MentorRequest` entity/state machine (`PENDING`/`ACCEPTED`/`DECLINED`),
-new endpoints for a student to send a request and a mentor to accept/decline, and gating
-`startConversation`'s mentor branch behind an accepted request rather than allowing it
-unconditionally. **Frontend work needed:** a request-sending UI (distinct from directly messaging),
-and a mentor-facing request-management view — there's no `PeerMentorDashboardScreen` equivalent to
-`CounsellorDashboardScreen` yet. `PeerMentorSignupScreen.tsx` and `CounsellorOrMentorScreen.tsx`
-already handle mentor onboarding. **Status: 🟡 Plumbing exists (entity, messaging); the actual
-match/request business logic that makes this meaningfully different from "message a counsellor"
-is unbuilt.**
+**Blocker found and resolved mid-phase, worth recording:** `PeerMentor` had no `userId` at all
+(unlike `Counsellor`), and `PeerMentorSignupScreen.tsx`'s own doc comment says explicitly this is
+"NOT a real registration form" - peer mentor accounts didn't exist in the backend
+(`Role.java` was `STUDENT, COUNSELLOR, ADMIN`), so there was no way for anyone to authenticate
+*as* a mentor before this pass. Chose the "full account linkage" option over a smaller
+admin-approved-queue-without-real-accounts alternative, given the deadline was explicitly
+weighed against completeness and completeness won.
+
+**Shipped:**
+- **Account linkage:** `Role.MENTOR` added (auth-service). `PeerMentor.userId` (nullable, mirrors
+  `Counsellor.userId`) + migration V4. `AuthServiceClient.promoteToMentor` mirrors
+  `promoteToCounsellor`. Account linkage is **admin-only** (`POST /api/support/mentors/{id}/link-account`),
+  not a self-serve request/approve flow like counsellors have - real peer mentor accounts require
+  offline certification (per `PeerMentorSignupScreen.tsx`'s own copy: "complete training
+  programme", "get certified through the MoodMate Peer Mentor Academy"), which is out of scope
+  here; an admin manually links a `userId` to an existing roster row instead of this service
+  fabricating a fake application flow around a certification process it doesn't run.
+- **Request/accept workflow:** `MentorRequest` entity (`PENDING`/`ACCEPTED`/`DECLINED`), migration
+  V4, repository (partial unique index prevents duplicate PENDING requests to the same mentor, but
+  allows re-requesting after a DECLINED one). `SupportService`: `requestMentor`,
+  `listMyMentorRequests` (student), `listMentorRequestsForMentor`, `acceptMentorRequest` (creates
+  the conversation directly - no first-message-unlocks-it step), `declineMentorRequest`.
+  `startConversation`'s mentor branch now requires an ACCEPTED request first (defense in depth;
+  `acceptMentorRequest` already creates the conversation, so this rarely fires as the primary
+  path). Endpoints: `POST /api/support/mentor-requests` (student), `GET /api/support/mentor-requests`
+  (student's own), `GET /api/support/mentor/requests` + accept/decline (MENTOR-role only).
+- **Mentor-side messaging:** `listMentorConversations`/`listMentorMessages`/`sendMentorMessage`/
+  `markReadAsMentor` mirroring the counsellor equivalents exactly, under `/api/support/mentor/conversations/**`.
+  Student-side messaging needed no changes - `listConversations`/`listMessages`/`sendMessage` were
+  already generic across counsellor/mentor conversations.
+- **Frontend:** `Role`/`UserRole` gain `MENTOR` (two separate type aliases existed for this in
+  `api/types.ts` and `navigation/types.ts` - both needed updating, and `LoginScreen.tsx`'s
+  `ROLE_THEME`/`roleEmojis` both type against `Record<UserRole, ...>` so a MENTOR theme entry was
+  required too, even though mentors log in via the plain STUDENT role card since MENTOR accounts
+  are admin-linked, not self-serve signup). New `MentorTabParamList` (Dashboard/Conversations/
+  Profile - no Appointments tab, mentors don't book sessions) + `MentorTabs.tsx`. New screens:
+  `PeerMentorDashboardScreen.tsx` (pending-request accept/decline queue + recent conversations,
+  deliberately trimmed vs `CounsellorDashboardScreen` - no appointments/analytics/session-history/
+  crisis-alerts, none of which apply to mentors), `MentorConversationsScreen.tsx`,
+  `MentorChatScreen.tsx` (includes the same "· Read" indicator, no Supabase real-time channel -
+  polling only, same fallback CounsellorChatScreen uses when real-time isn't connected),
+  `MentorProfileScreen.tsx` (a small dedicated screen rather than reusing
+  `CounsellorProfileScreen` - that screen's Props type is pinned to `CounsellorTabParamList` and
+  its `navigation` prop isn't even used in its body, so retyping/wrapping it risked a type
+  mismatch for a screen this small - not worth it under a deadline). `SupportScreen.tsx`'s mentor
+  roster cards now show Request/Request sent/Message/Request again depending on the student's own
+  latest request status, instead of messaging unconditionally. `MainRouter.tsx` routes MENTOR to
+  `MentorTabs`; `RootNavigator.tsx` registers `MentorChat`.
+- **Real bug caught in manual review, not a compiler:** `listMentorConversations` initially reused
+  `toCounsellorConversationView`, which hardcodes `SenderType.COUNSELLOR` for the unread-count
+  exclusion - would have counted a mentor's own sent messages as unread on their own dashboard.
+  Fixed by splitting into a parameterized `toConversationViewForOwner(c, students, ownerSenderType)`
+  with two thin wrappers.
+
+**Verification status - read carefully, this is not a normal "done":**
+- Frontend `tsc --noEmit` - 0 errors, confirmed with the real exit code, twice.
+- Backend Java - **not compiler-verified this session.** `mvnw` is a 0-byte file in this session's
+  view of the mounted backend folder (confirmed with `wc -c mvnw` → `0`), and there is no system
+  `mvn` installed in this sandbox either - every earlier "successful" `mvnw compile` this session
+  produced was silently a no-op (confirmed by checking `target/classes` for the new `.class` files
+  after: they weren't there). Once this was caught, every new Java file was instead reviewed by
+  hand against the existing counsellor-side code it mirrors, which is how the `SenderType`
+  bug above was caught. **This must be compiled for real before treating any of it as done:**
+  `mvnw -pl moodmate-support,moodmate-auth -am compile`, then `mvnw -pl moodmate-support test` if
+  there are existing tests worth re-running against this surface area.
+- Device walkthrough - not done (student requesting a mentor, mentor accepting/declining, both
+  sides messaging) - needs a real MENTOR-role account, which needs the admin link-account endpoint
+  called for a real user first.
 
 ---
 
