@@ -6,6 +6,7 @@ import com.moodmate.support.dto.AppointmentResponse;
 import com.moodmate.support.dto.BookAppointmentRequest;
 import com.moodmate.support.dto.ConfirmedAppointmentResponse;
 import com.moodmate.support.dto.ConversationResponse;
+import com.moodmate.support.dto.CounsellorAnalyticsResponse;
 import com.moodmate.support.dto.CounsellorAppointmentView;
 import com.moodmate.support.dto.CounsellorConversationView;
 import com.moodmate.support.dto.CounsellorDto;
@@ -20,6 +21,7 @@ import com.moodmate.support.entity.Appointment;
 import com.moodmate.support.entity.AppointmentStatus;
 import com.moodmate.support.entity.Conversation;
 import com.moodmate.support.entity.Counsellor;
+import com.moodmate.support.entity.CounsellorAvailabilityStatus;
 import com.moodmate.support.entity.CounsellorStatus;
 import com.moodmate.support.entity.PeerMentor;
 import com.moodmate.support.entity.SenderType;
@@ -170,6 +172,37 @@ public class SupportService {
                 .toList();
     }
 
+    /** Phase 1F-A - student-initiated reschedule. Only a PENDING or CONFIRMED appointment can be
+     * rescheduled (a COMPLETED/CANCELLED one is final). A CONFIRMED appointment reschedules back
+     * to PENDING rather than staying CONFIRMED at the new time - the counsellor confirmed a
+     * specific slot, not "whatever time the student picks next," so a fresh confirmation is
+     * required at the new time too, same as an initial booking. This keeps the state machine to
+     * exactly the transitions confirmAppointment() already understands, rather than adding a
+     * separate "confirmed but at a pending-reschedule" state. */
+    @Transactional
+    public AppointmentResponse rescheduleAppointment(Long userId, Long appointmentId, Instant newScheduledAt) {
+        Appointment appointment = appointmentRepository.findByIdAndUserId(appointmentId, userId)
+                .orElseThrow(() -> new ApiException("Appointment not found: " + appointmentId, HttpStatus.NOT_FOUND));
+
+        if (appointment.getStatus() != AppointmentStatus.PENDING && appointment.getStatus() != AppointmentStatus.CONFIRMED) {
+            throw new ApiException("Cannot reschedule an appointment that is " + appointment.getStatus(), HttpStatus.BAD_REQUEST);
+        }
+
+        boolean neededReconfirmation = appointment.getStatus() == AppointmentStatus.CONFIRMED;
+        appointment.setScheduledAt(newScheduledAt);
+        appointment.setStatus(AppointmentStatus.PENDING);
+        appointment = appointmentRepository.save(appointment);
+
+        Counsellor counsellor = counsellorRepository.findById(appointment.getCounsellorId()).orElse(null);
+        if (counsellor != null) {
+            notifyCounsellor(counsellor,
+                    neededReconfirmation ? "Appointment rescheduled - please reconfirm" : "Appointment rescheduled",
+                    "A student has requested a new time for their appointment.",
+                    Map.of("screen", "Appointments", "appointmentId", appointment.getId().toString()));
+        }
+        return toResponse(appointment, counsellor != null ? counsellor.getName() : "Counsellor");
+    }
+
     @Transactional
     public AppointmentResponse cancelAppointment(Long userId, Long appointmentId) {
         Appointment appointment = appointmentRepository.findByIdAndUserId(appointmentId, userId)
@@ -262,6 +295,53 @@ public class SupportService {
             return;
         }
         authServiceClient.notify(counsellor.getUserId(), title, body, data);
+    }
+
+    /** Phase 1F-A - the counsellor dashboard's Online/Busy/Away toggle, now persisted (was
+     * previously local-only React state - see CounsellorAvailabilityStatus's doc comment). */
+    @Transactional
+    public CounsellorAvailabilityStatus updateAvailabilityStatus(Long counsellorUserId, CounsellorAvailabilityStatus newStatus) {
+        Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
+        counsellor.setAvailabilityStatus(newStatus);
+        counsellorRepository.save(counsellor);
+        return newStatus;
+    }
+
+    /**
+     * Phase 1F-A - backs GET /api/support/counsellor/analytics. Lifetime counts, computed from
+     * this counsellor's full appointment history rather than a separate aggregate table - the
+     * dataset per counsellor is small enough that this is simple and always correct, no cache to
+     * go stale.
+     *
+     * Bucket definitions (the only ones that aren't obvious from AppointmentStatus alone):
+     * - upcoming: PENDING or CONFIRMED, scheduledAt still in the future.
+     * - missed: CONFIRMED, but scheduledAt has already passed and it was never marked COMPLETED -
+     *   nothing in this system auto-transitions status on time passing, so this is computed here
+     *   rather than read off a stored value.
+     * - completionRate: completed / (completed + missed). Cancelled and still-upcoming
+     *   appointments are excluded from the denominator - they were never "attempted," so folding
+     *   them in would understate a counsellor's actual completion behavior.
+     */
+    @Transactional(readOnly = true)
+    public CounsellorAnalyticsResponse counsellorAnalytics(Long counsellorUserId) {
+        Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
+        List<Appointment> appointments = appointmentRepository.findByCounsellorIdOrderByScheduledAtDesc(counsellor.getId());
+        Instant now = Instant.now();
+
+        long total = appointments.size();
+        long completed = appointments.stream().filter(a -> a.getStatus() == AppointmentStatus.COMPLETED).count();
+        long cancelled = appointments.stream().filter(a -> a.getStatus() == AppointmentStatus.CANCELLED).count();
+        long upcoming = appointments.stream()
+                .filter(a -> (a.getStatus() == AppointmentStatus.PENDING || a.getStatus() == AppointmentStatus.CONFIRMED)
+                        && a.getScheduledAt().isAfter(now))
+                .count();
+        long missed = appointments.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.CONFIRMED && a.getScheduledAt().isBefore(now))
+                .count();
+
+        double completionRate = (completed + missed) > 0 ? (double) completed / (completed + missed) : 0.0;
+
+        return new CounsellorAnalyticsResponse(total, upcoming, completed, missed, cancelled, completionRate);
     }
 
     private Counsellor findLinkedCounsellor(Long userId) {
@@ -468,7 +548,7 @@ public class SupportService {
                 ? List.of()
                 : Arrays.stream(c.getSpecialties().split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
         return new CounsellorDto(c.getId(), c.getName(), c.getTitle(), c.getBio(), c.getAvatarEmoji(), specialties,
-                c.isAvailable());
+                c.isAvailable(), c.getAvailabilityStatus());
     }
 
     private PeerMentorDto toDto(PeerMentor m) {

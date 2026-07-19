@@ -57,4 +57,11 @@ public class Counsellor {
     @Column(nullable = false)
     @Builder.Default
     private CounsellorStatus status = CounsellorStatus.PENDING;
+
+    // Phase 1F-A - see CounsellorAvailabilityStatus's doc comment for why this is a distinct enum
+    // from `status` above.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "availability_status", nullable = false, length = 20)
+    @Builder.Default
+    private CounsellorAvailabilityStatus availabilityStatus = CounsellorAvailabilityStatus.ONLINE;
 }

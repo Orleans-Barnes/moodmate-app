@@ -3,6 +3,7 @@ package com.moodmate.support.controller;
 import com.moodmate.support.dto.AppointmentResponse;
 import com.moodmate.support.dto.BookAppointmentRequest;
 import com.moodmate.support.dto.ConversationResponse;
+import com.moodmate.support.dto.CounsellorAnalyticsResponse;
 import com.moodmate.support.dto.CounsellorAppointmentView;
 import com.moodmate.support.dto.CounsellorConversationView;
 import com.moodmate.support.dto.CounsellorDto;
@@ -11,8 +12,11 @@ import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
 import com.moodmate.support.dto.MessageResponse;
 import com.moodmate.support.dto.PeerMentorDto;
+import com.moodmate.support.dto.RescheduleAppointmentRequest;
 import com.moodmate.support.dto.SendMessageRequest;
 import com.moodmate.support.dto.StartConversationRequest;
+import com.moodmate.support.dto.UpdateAvailabilityStatusRequest;
+import com.moodmate.support.entity.CounsellorAvailabilityStatus;
 import com.moodmate.support.service.SupportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -98,6 +102,17 @@ public class SupportController {
     @PostMapping("/appointments/{id}/cancel")
     public AppointmentResponse cancelAppointment(@RequestHeader("X-User-Id") Long userId, @PathVariable Long id) {
         return supportService.cancelAppointment(userId, id);
+    }
+
+    // Phase 1F-A - student-initiated reschedule. POST rather than PATCH to match every other
+    // state-changing route in this controller (cancel/confirm/complete are all POST too) - no
+    // route here has ever used PUT/PATCH, so introducing one now would be an inconsistency, not
+    // an improvement.
+    @PostMapping("/appointments/{id}/reschedule")
+    public AppointmentResponse rescheduleAppointment(@RequestHeader("X-User-Id") Long userId,
+                                                      @PathVariable Long id,
+                                                      @Valid @RequestBody RescheduleAppointmentRequest request) {
+        return supportService.rescheduleAppointment(userId, id, request.scheduledAt());
     }
 
     @GetMapping("/counsellor/appointments")
@@ -197,6 +212,24 @@ public class SupportController {
                                     @PathVariable Long id) {
         requireCounsellor(role);
         supportService.markReadAsCounsellor(userId, id);
+    }
+
+    // Phase 1F-A - persists the counsellor dashboard's Online/Busy/Away toggle (previously local-
+    // only React state, never seen by students). Read back via GET /api/support/counsellors.
+    @PostMapping("/counsellor/availability-status")
+    public CounsellorAvailabilityStatus updateAvailabilityStatus(@RequestHeader("X-User-Role") String role,
+                                                                   @RequestHeader("X-User-Id") Long userId,
+                                                                   @Valid @RequestBody UpdateAvailabilityStatusRequest request) {
+        requireCounsellor(role);
+        return supportService.updateAvailabilityStatus(userId, request.availabilityStatus());
+    }
+
+    // Phase 1F-A - backs the counsellor dashboard's analytics cards.
+    @GetMapping("/counsellor/analytics")
+    public CounsellorAnalyticsResponse counsellorAnalytics(@RequestHeader("X-User-Role") String role,
+                                                            @RequestHeader("X-User-Id") Long userId) {
+        requireCounsellor(role);
+        return supportService.counsellorAnalytics(userId);
     }
 
     private void requireAdmin(String role) {
