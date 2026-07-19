@@ -14,6 +14,7 @@ import com.moodmate.support.dto.CounsellorRequestAdminView;
 import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
 import com.moodmate.support.dto.LinkMentorAccountRequest;
+import com.moodmate.support.dto.MeetingWindowView;
 import com.moodmate.support.dto.MentorRequestResponse;
 import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
@@ -154,6 +155,7 @@ public class SupportService {
                 .scheduledAt(request.scheduledAt())
                 .status(AppointmentStatus.PENDING)
                 .notes(request.notes())
+                .jitsiRoomName(generateJitsiRoomName())
                 .build();
 
         appointment = appointmentRepository.save(appointment);
@@ -291,6 +293,73 @@ public class SupportService {
                 Map.of("screen", "Appointments", "appointmentId", appointment.getId().toString()));
 
         return toCounsellorView(appointment, authServiceClient.getUserSummaries(List.of(appointment.getUserId())));
+    }
+
+    // ── Phase 1F-B - Jitsi (8x8 JaaS) meeting credentials ───────────────────────────────────────
+    // A session is assumed to run SESSION_DURATION_MINUTES from its scheduledAt. The join window
+    // opens JOIN_WINDOW_BEFORE_MINUTES early and stays open until SESSION_DURATION_MINUTES +
+    // JOIN_WINDOW_GRACE_MINUTES after scheduledAt, so a session running slightly long isn't cut off
+    // the instant the nominal duration elapses. Neither participant ever gets the real room path
+    // outside this window or before the appointment is CONFIRMED. Using 8x8's JaaS domain (8x8.vc)
+    // scoped under our own AppID rather than the fully public meet.jit.si - but no real JaaS API
+    // key/JWT signing is configured yet (deliberate scope decision, see tracker), so this is still
+    // an unauthenticated join once the room path is known: withholding that path IS the access
+    // control for now, same model as a plain meet.jit.si room, just under our own AppID namespace.
+    // Revisit once a real JaaS API key exists - the join response shape (open/roomName/joinUrl)
+    // already leaves room for a `jwt` field to be added later without a breaking change.
+
+    private static final String JAAS_APP_ID = "vpaas-magic-cookie-b9599a59473b4325900ea2c6ad3ea273";
+    private static final int JOIN_WINDOW_BEFORE_MINUTES = 15;
+    private static final int SESSION_DURATION_MINUTES = 50;
+    private static final int JOIN_WINDOW_GRACE_MINUTES = 10;
+
+    @Transactional(readOnly = true)
+    public MeetingWindowView getStudentMeetingWindow(Long userId, Long appointmentId) {
+        Appointment appointment = appointmentRepository.findByIdAndUserId(appointmentId, userId)
+                .orElseThrow(() -> new ApiException("Appointment not found: " + appointmentId, HttpStatus.NOT_FOUND));
+        return buildMeetingWindow(appointment);
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingWindowView getCounsellorMeetingWindow(Long counsellorUserId, Long appointmentId) {
+        Appointment appointment = findOwnedAppointment(counsellorUserId, appointmentId);
+        return buildMeetingWindow(appointment);
+    }
+
+    private MeetingWindowView buildMeetingWindow(Appointment appointment) {
+        Instant opensAt = appointment.getScheduledAt().minusSeconds(JOIN_WINDOW_BEFORE_MINUTES * 60L);
+        Instant closesAt = appointment.getScheduledAt()
+                .plusSeconds((SESSION_DURATION_MINUTES + JOIN_WINDOW_GRACE_MINUTES) * 60L);
+        Instant now = Instant.now();
+
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED) {
+            return MeetingWindowView.closed("NOT_CONFIRMED",
+                    "This appointment isn't confirmed yet.", opensAt, closesAt);
+        }
+        if (now.isBefore(opensAt)) {
+            return MeetingWindowView.closed("TOO_EARLY",
+                    "The session hasn't opened yet.", opensAt, closesAt);
+        }
+        if (now.isAfter(closesAt)) {
+            return MeetingWindowView.closed("EXPIRED",
+                    "This session's join window has closed.", opensAt, closesAt);
+        }
+
+        // Defensive backfill - only reachable for appointments booked before this column existed.
+        if (appointment.getJitsiRoomName() == null) {
+            appointment.setJitsiRoomName(generateJitsiRoomName());
+            appointment = appointmentRepository.save(appointment);
+        }
+
+        // roomName is the full JaaS path (AppID + room) - this exact string is what the frontend's
+        // JitsiMeetExternalAPI config expects for `roomName`, per 8x8's own embed snippet.
+        String fullRoomName = JAAS_APP_ID + "/" + appointment.getJitsiRoomName();
+        String joinUrl = "https://8x8.vc/" + fullRoomName;
+        return MeetingWindowView.open(fullRoomName, joinUrl, opensAt, closesAt);
+    }
+
+    private String generateJitsiRoomName() {
+        return "MoodMate-" + java.util.UUID.randomUUID().toString().replace("-", "");
     }
 
     /** Feature 9 (Notification Deep Linking) helper - a Counsellor row's userId is nullable (legacy

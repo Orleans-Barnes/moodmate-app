@@ -55,6 +55,16 @@ public class Appointment {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    // Phase 1F-B (Jitsi) - a random, non-guessable room name generated once at booking time
+    // (SupportService.bookAppointment), never derived from the sequential appointment id. Since
+    // meet.jit.si is a public instance with no server-side room auth, this room name is itself the
+    // only real access control on the video side - our backend controls who ever *learns* it (via
+    // the time- and identity-gated /meeting endpoints), not who can technically join once known.
+    // Nullable so pre-1F-B rows (booked before this column existed) don't break; the meeting
+    // endpoint lazily backfills one if a legacy row is ever fetched with this null.
+    @Column(name = "jitsi_room_name", length = 100)
+    private String jitsiRoomName;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

@@ -11,6 +11,7 @@ import com.moodmate.support.dto.CounsellorRequestAdminView;
 import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
 import com.moodmate.support.dto.LinkMentorAccountRequest;
+import com.moodmate.support.dto.MeetingWindowView;
 import com.moodmate.support.dto.MentorRequestResponse;
 import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
@@ -119,6 +120,14 @@ public class SupportController {
         return supportService.rescheduleAppointment(userId, id, request.scheduledAt());
     }
 
+    // Phase 1F-B - Jitsi meeting credentials, student side. Withholds the room name/join URL
+    // entirely unless the appointment is CONFIRMED and the current time is inside the join window
+    // - see SupportService.buildMeetingWindow for why that withholding is the real access control.
+    @GetMapping("/appointments/{id}/meeting")
+    public MeetingWindowView appointmentMeeting(@RequestHeader("X-User-Id") Long userId, @PathVariable Long id) {
+        return supportService.getStudentMeetingWindow(userId, id);
+    }
+
     @GetMapping("/counsellor/appointments")
     public List<CounsellorAppointmentView> counsellorAppointments(@RequestHeader("X-User-Role") String role,
                                                                    @RequestHeader("X-User-Id") Long userId) {
@@ -148,6 +157,15 @@ public class SupportController {
                                                                     @PathVariable Long id) {
         requireCounsellor(role);
         return supportService.cancelAppointmentAsCounsellor(userId, id);
+    }
+
+    // Phase 1F-B - Jitsi meeting credentials, counsellor side. Mirrors appointmentMeeting above.
+    @GetMapping("/counsellor/appointments/{id}/meeting")
+    public MeetingWindowView counsellorAppointmentMeeting(@RequestHeader("X-User-Role") String role,
+                                                            @RequestHeader("X-User-Id") Long userId,
+                                                            @PathVariable Long id) {
+        requireCounsellor(role);
+        return supportService.getCounsellorMeetingWindow(userId, id);
     }
 
     @PostMapping("/conversations")
