@@ -358,3 +358,63 @@ export interface PaymentTransactionView {
   paidAt: string | null;
   createdAt: string;
 }
+
+// Mirrors com.moodmate.auth.profile.* (Phase 1C-i) exactly — enum names below are the literal
+// wire values (see PHASE_1C_I_API_CONTRACT.md "API version stability": enum constant names are
+// part of the API contract, renaming one is a breaking change). Display labels for these live in
+// the ProfileSetup screens, not here — this file only mirrors the backend shapes.
+export type Programme =
+  | 'COMPUTER_SCIENCE' | 'INFORMATION_TECHNOLOGY' | 'COMPUTER_ENGINEERING'
+  | 'ELECTRICAL_ENGINEERING' | 'MECHANICAL_ENGINEERING' | 'CIVIL_ENGINEERING'
+  | 'BUSINESS_ADMINISTRATION' | 'ACCOUNTING' | 'MEDICINE' | 'NURSING' | 'PHARMACY'
+  | 'LAW' | 'PSYCHOLOGY' | 'ECONOMICS' | 'AGRICULTURE' | 'ARCHITECTURE' | 'OTHER';
+
+export type YearOfStudy =
+  | 'FIRST_YEAR' | 'SECOND_YEAR' | 'THIRD_YEAR' | 'FOURTH_YEAR' | 'FIFTH_YEAR' | 'POSTGRADUATE';
+
+export type WellnessGoal =
+  | 'LESS_STRESS' | 'BETTER_SLEEP' | 'MORE_CONFIDENT' | 'BETTER_FOCUS' | 'BETTER_GRADES'
+  | 'TRACK_EMOTIONS' | 'BUILD_HEALTHY_HABITS' | 'CONNECT_WITH_SUPPORT' | 'MORE_MOTIVATION';
+
+export type Challenge =
+  | 'ACADEMIC_PRESSURE' | 'LONELINESS' | 'ANXIETY' | 'BURNOUT' | 'FINANCIAL_STRESS'
+  | 'RELATIONSHIPS' | 'TIME_MANAGEMENT' | 'CAREER_CONCERNS';
+
+export type PreferredSupport =
+  | 'AI_COACH' | 'COUNSELLOR' | 'PEER_MENTOR' | 'JOURNALING' | 'BREATHING'
+  | 'COMMUNITY' | 'SELF_GUIDED';
+
+export interface StudentProfileRequest {
+  programme?: Programme | null;
+  yearOfStudy?: YearOfStudy | null;
+}
+
+export interface StudentProfileResponse {
+  programme: Programme | null;
+  yearOfStudy: YearOfStudy | null;
+  updatedAt: string;
+}
+
+export interface WellnessPreferenceRequest {
+  goals?: WellnessGoal[] | null;
+  challenges?: Challenge[] | null;
+  preferredSupport?: PreferredSupport[] | null;
+}
+
+export interface WellnessPreferenceResponse {
+  goals: WellnessGoal[];
+  challenges: Challenge[];
+  preferredSupport: PreferredSupport[];
+  completed: boolean;
+  skipped: boolean;
+  completedAt: string | null;
+  skippedAt: string | null;
+  updatedAt: string;
+}
+
+export interface ProfileStatusResponse {
+  profileCompletion: number;
+  needsAcademicProfile: boolean;
+  needsGoals: boolean;
+  canShowOnboarding: boolean;
+}
