@@ -400,10 +400,16 @@ public class SupportService {
         request = mentorRequestRepository.save(request);
 
         // Creates the conversation right away, same shape as startConversation's mentor branch -
-        // the student doesn't have to send a first message to unlock it themselves.
-        conversationRepository.findByUserIdAndPeerMentorId(request.getUserId(), mentor.getId())
+        // the student doesn't have to send a first message to unlock it themselves. studentUserId
+        // is captured in its own final variable for the lambda below - `request` itself is
+        // reassigned earlier in this method (line above), which makes it non-effectively-final for
+        // the rest of the method, not just before that point - javac caught this as a real
+        // compilation error ("local variables referenced from a lambda expression must be final or
+        // effectively final"), not something the manual review that built this method caught.
+        Long studentUserId = request.getUserId();
+        conversationRepository.findByUserIdAndPeerMentorId(studentUserId, mentor.getId())
                 .orElseGet(() -> conversationRepository.save(Conversation.builder()
-                        .userId(request.getUserId())
+                        .userId(studentUserId)
                         .peerMentorId(mentor.getId())
                         .build()));
 
