@@ -15,7 +15,7 @@ finished and integrated, so most remaining work is verification + completion, no
 | 1D | Personalized Dashboard | 100% | — | ✅ Done |
 | 1E | Notifications | ~15% (local-only reminder + push token plumbing exist; no backend prefs/model/center/rules yet) | Medium | 1st — every later phase benefits from this existing first |
 | 1F-A | Counsellor Platform (everything but video) | ~90% (frontend wiring done 2026-07-19: reschedule, availability-status persistence, analytics, directory search/filter, chat read-parity; device walkthrough still outstanding) | Medium | 2nd |
-| 1G | Peer Mentor Platform (request/match workflow) | ~90% (request/accept workflow, MENTOR role + account linkage, mentor dashboard/messaging built 2026-07-19; backend not compiler-verified this session, device walkthrough outstanding) | Medium | 3rd |
+| 1G | Peer Mentor Platform (request/match workflow) | ~95% (request/accept workflow, MENTOR role + account linkage, mentor dashboard/messaging built and backend-compiled clean 2026-07-19; device walkthrough is the only thing outstanding) | Low–Medium | 3rd |
 | 1F-B | Jitsi Video Sessions | 0% | High | 4th — deserves its own milestone, don't rush it alongside 1F-A |
 | 1H | Admin Portal (as modules, not screens) | ~40% | High | 5th |
 | 1I | Production Readiness | 0% | High (pre-launch gate) | 6th — separate milestone from feature completion |
@@ -450,20 +450,22 @@ weighed against completeness and completeness won.
   Fixed by splitting into a parameterized `toConversationViewForOwner(c, students, ownerSenderType)`
   with two thin wrappers.
 
-**Verification status - read carefully, this is not a normal "done":**
+**Verification status:**
 - Frontend `tsc --noEmit` - 0 errors, confirmed with the real exit code, twice.
-- Backend Java - **not compiler-verified this session.** `mvnw` is a 0-byte file in this session's
-  view of the mounted backend folder (confirmed with `wc -c mvnw` → `0`), and there is no system
-  `mvn` installed in this sandbox either - every earlier "successful" `mvnw compile` this session
-  produced was silently a no-op (confirmed by checking `target/classes` for the new `.class` files
-  after: they weren't there). Once this was caught, every new Java file was instead reviewed by
-  hand against the existing counsellor-side code it mirrors, which is how the `SenderType`
-  bug above was caught. **This must be compiled for real before treating any of it as done:**
-  `mvnw -pl moodmate-support,moodmate-auth -am compile`, then `mvnw -pl moodmate-support test` if
-  there are existing tests worth re-running against this surface area.
-- Device walkthrough - not done (student requesting a mentor, mentor accepting/declining, both
-  sides messaging) - needs a real MENTOR-role account, which needs the admin link-account endpoint
-  called for a real user first.
+- Backend Java - **✅ confirmed with a real `mvnw -pl moodmate-support,moodmate-auth -am compile`
+  on your machine: BUILD SUCCESS**, both modules (this sandbox's own `mvnw` was a 0-byte file this
+  session with no system `mvn` either, so every in-session compile attempt was silently a no-op -
+  see the two commits below for the full story). That real compile caught one genuine error a
+  from-scratch manual review had missed: `SupportService.acceptMentorRequest`'s conversation-lookup
+  lambda captured `request.getUserId()`, but `request` is reassigned earlier in the same method
+  (`request = mentorRequestRepository.save(request)`) - once a local is reassigned anywhere in its
+  scope, javac won't treat it as effectively final for a lambda even after that reassignment.
+  Fixed by capturing `studentUserId` in its own never-reassigned variable before the lambda
+  (commit `1e3438b`). No other errors on the second run.
+- Device walkthrough - still not done (student requesting a mentor, mentor accepting/declining,
+  both sides messaging) - needs a real MENTOR-role account, which needs the admin link-account
+  endpoint called for a real user first. This is the only remaining item before this phase is
+  fully done, not just backend-correct.
 
 ---
 
