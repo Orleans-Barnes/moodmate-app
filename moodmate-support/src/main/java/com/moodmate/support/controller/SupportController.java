@@ -10,8 +10,12 @@ import com.moodmate.support.dto.CounsellorDto;
 import com.moodmate.support.dto.CounsellorRequestAdminView;
 import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
+import com.moodmate.support.dto.LinkMentorAccountRequest;
+import com.moodmate.support.dto.MentorRequestResponse;
+import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
 import com.moodmate.support.dto.PeerMentorDto;
+import com.moodmate.support.dto.RequestMentorRequest;
 import com.moodmate.support.dto.RescheduleAppointmentRequest;
 import com.moodmate.support.dto.SendMessageRequest;
 import com.moodmate.support.dto.StartConversationRequest;
@@ -232,6 +236,87 @@ public class SupportController {
         return supportService.counsellorAnalytics(userId);
     }
 
+    // ── Phase 1G - Peer Mentor request/accept workflow ─────────────────────────────────────────
+
+    // Admin-only account linkage - see SupportService.linkMentorAccount's doc comment.
+    @PostMapping("/mentors/{id}/link-account")
+    public PeerMentorDto linkMentorAccount(@RequestHeader("X-User-Role") String role,
+                                            @PathVariable Long id,
+                                            @Valid @RequestBody LinkMentorAccountRequest request) {
+        requireAdmin(role);
+        return supportService.linkMentorAccount(id, request.userId());
+    }
+
+    @PostMapping("/mentor-requests")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MentorRequestResponse requestMentor(@RequestHeader("X-User-Id") Long userId,
+                                                @Valid @RequestBody RequestMentorRequest request) {
+        return supportService.requestMentor(userId, request);
+    }
+
+    @GetMapping("/mentor-requests")
+    public List<MentorRequestResponse> myMentorRequests(@RequestHeader("X-User-Id") Long userId) {
+        return supportService.listMyMentorRequests(userId);
+    }
+
+    @GetMapping("/mentor/requests")
+    public List<MentorRequestView> mentorRequests(@RequestHeader("X-User-Role") String role,
+                                                    @RequestHeader("X-User-Id") Long userId) {
+        requireMentor(role);
+        return supportService.listMentorRequestsForMentor(userId);
+    }
+
+    @PostMapping("/mentor/requests/{id}/accept")
+    public MentorRequestView acceptMentorRequest(@RequestHeader("X-User-Role") String role,
+                                                  @RequestHeader("X-User-Id") Long userId,
+                                                  @PathVariable Long id) {
+        requireMentor(role);
+        return supportService.acceptMentorRequest(userId, id);
+    }
+
+    @PostMapping("/mentor/requests/{id}/decline")
+    public MentorRequestView declineMentorRequest(@RequestHeader("X-User-Role") String role,
+                                                   @RequestHeader("X-User-Id") Long userId,
+                                                   @PathVariable Long id) {
+        requireMentor(role);
+        return supportService.declineMentorRequest(userId, id);
+    }
+
+    @GetMapping("/mentor/conversations")
+    public List<CounsellorConversationView> mentorConversations(@RequestHeader("X-User-Role") String role,
+                                                                   @RequestHeader("X-User-Id") Long userId) {
+        requireMentor(role);
+        return supportService.listMentorConversations(userId);
+    }
+
+    @GetMapping("/mentor/conversations/{id}/messages")
+    public Page<MessageResponse> mentorMessages(@RequestHeader("X-User-Role") String role,
+                                                  @RequestHeader("X-User-Id") Long userId,
+                                                  @PathVariable Long id,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "50") int size) {
+        requireMentor(role);
+        return supportService.listMentorMessages(userId, id, PageRequest.of(page, size));
+    }
+
+    @PostMapping("/mentor/conversations/{id}/messages")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MessageResponse sendMentorMessage(@RequestHeader("X-User-Role") String role,
+                                              @RequestHeader("X-User-Id") Long userId,
+                                              @PathVariable Long id,
+                                              @Valid @RequestBody SendMessageRequest request) {
+        requireMentor(role);
+        return supportService.sendMentorMessage(userId, id, request);
+    }
+
+    @PostMapping("/mentor/conversations/{id}/read")
+    public void markMentorRead(@RequestHeader("X-User-Role") String role,
+                                @RequestHeader("X-User-Id") Long userId,
+                                @PathVariable Long id) {
+        requireMentor(role);
+        supportService.markReadAsMentor(userId, id);
+    }
+
     private void requireAdmin(String role) {
         if (!"ADMIN".equals(role)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires ADMIN role");
@@ -241,6 +326,12 @@ public class SupportController {
     private void requireCounsellor(String role) {
         if (!"COUNSELLOR".equals(role)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires COUNSELLOR role");
+        }
+    }
+
+    private void requireMentor(String role) {
+        if (!"MENTOR".equals(role)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires MENTOR role");
         }
     }
 }

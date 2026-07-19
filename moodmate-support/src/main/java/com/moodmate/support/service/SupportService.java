@@ -13,8 +13,12 @@ import com.moodmate.support.dto.CounsellorDto;
 import com.moodmate.support.dto.CounsellorRequestAdminView;
 import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
+import com.moodmate.support.dto.LinkMentorAccountRequest;
+import com.moodmate.support.dto.MentorRequestResponse;
+import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
 import com.moodmate.support.dto.PeerMentorDto;
+import com.moodmate.support.dto.RequestMentorRequest;
 import com.moodmate.support.dto.SendMessageRequest;
 import com.moodmate.support.dto.StartConversationRequest;
 import com.moodmate.support.entity.Appointment;
@@ -23,6 +27,8 @@ import com.moodmate.support.entity.Conversation;
 import com.moodmate.support.entity.Counsellor;
 import com.moodmate.support.entity.CounsellorAvailabilityStatus;
 import com.moodmate.support.entity.CounsellorStatus;
+import com.moodmate.support.entity.MentorRequest;
+import com.moodmate.support.entity.MentorRequestStatus;
 import com.moodmate.support.entity.PeerMentor;
 import com.moodmate.support.entity.SenderType;
 import com.moodmate.support.entity.SupportMessage;
@@ -30,6 +36,7 @@ import com.moodmate.support.exception.ApiException;
 import com.moodmate.support.repository.AppointmentRepository;
 import com.moodmate.support.repository.ConversationRepository;
 import com.moodmate.support.repository.CounsellorRepository;
+import com.moodmate.support.repository.MentorRequestRepository;
 import com.moodmate.support.repository.PeerMentorRepository;
 import com.moodmate.support.repository.SupportMessageRepository;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +68,7 @@ public class SupportService {
     private final AppointmentRepository appointmentRepository;
     private final ConversationRepository conversationRepository;
     private final SupportMessageRepository supportMessageRepository;
+    private final MentorRequestRepository mentorRequestRepository;
     private final AuthServiceClient authServiceClient;
 
     @Transactional(readOnly = true)
@@ -297,6 +305,207 @@ public class SupportService {
         authServiceClient.notify(counsellor.getUserId(), title, body, data);
     }
 
+    // Phase 1G - mirrors notifyCounsellor exactly.
+    private void notifyMentor(PeerMentor mentor, String title, String body, Map<String, String> data) {
+        if (mentor.getUserId() == null) {
+            log.debug("Skipping notification for mentor {} - no linked user account", mentor.getId());
+            return;
+        }
+        authServiceClient.notify(mentor.getUserId(), title, body, data);
+    }
+
+    // ── Phase 1G - Peer Mentor request/accept workflow ──────────────────────────────────────────
+
+    /** Admin-only account linkage - see PeerMentor.userId's doc comment. Not a self-serve
+     * request/approve flow like counsellors have (no CounsellorRequest equivalent for mentors):
+     * peer mentor accounts require offline certification (see PeerMentorSignupScreen.tsx's own
+     * doc comment - "complete training programme", "get certified through the MoodMate Peer
+     * Mentor Academy" - a real training pipeline that's explicitly out of scope for this phase),
+     * so for now an admin manually links a userId to an existing roster row rather than this
+     * service fabricating a fake self-serve application flow around a certification process it
+     * doesn't actually run. */
+    @Transactional
+    public PeerMentorDto linkMentorAccount(Long mentorId, Long userId) {
+        PeerMentor mentor = peerMentorRepository.findById(mentorId)
+                .orElseThrow(() -> new ApiException("Peer mentor not found: " + mentorId, HttpStatus.NOT_FOUND));
+        if (mentor.getUserId() != null) {
+            throw new ApiException("This mentor roster entry is already linked to an account", HttpStatus.CONFLICT);
+        }
+        mentor.setUserId(userId);
+        mentor = peerMentorRepository.save(mentor);
+        authServiceClient.promoteToMentor(userId);
+        return toDto(mentor);
+    }
+
+    @Transactional
+    public MentorRequestResponse requestMentor(Long userId, RequestMentorRequest request) {
+        PeerMentor mentor = peerMentorRepository.findById(request.peerMentorId())
+                .orElseThrow(() -> new ApiException("Peer mentor not found: " + request.peerMentorId(), HttpStatus.NOT_FOUND));
+        if (mentorRequestRepository.existsByUserIdAndPeerMentorIdAndStatus(userId, mentor.getId(), MentorRequestStatus.PENDING)) {
+            throw new ApiException("You already have a pending request with this mentor", HttpStatus.CONFLICT);
+        }
+
+        MentorRequest mentorRequest = MentorRequest.builder()
+                .userId(userId)
+                .peerMentorId(mentor.getId())
+                .status(MentorRequestStatus.PENDING)
+                .message(request.message())
+                .build();
+        mentorRequest = mentorRequestRepository.save(mentorRequest);
+
+        notifyMentor(mentor, "New mentor request",
+                "A student would like to connect with you.",
+                Map.of("screen", "PeerMentorDashboard", "requestId", mentorRequest.getId().toString()));
+
+        return toMentorRequestResponse(mentorRequest, mentor.getName(), null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MentorRequestResponse> listMyMentorRequests(Long userId) {
+        List<MentorRequest> requests = mentorRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<Long> mentorIds = requests.stream().map(MentorRequest::getPeerMentorId).distinct().toList();
+        Map<Long, PeerMentor> mentors = mentorIds.isEmpty()
+                ? Map.of()
+                : peerMentorRepository.findAllById(mentorIds).stream()
+                        .collect(Collectors.toMap(PeerMentor::getId, m -> m));
+
+        return requests.stream().map(r -> {
+            PeerMentor mentor = mentors.get(r.getPeerMentorId());
+            Long conversationId = r.getStatus() == MentorRequestStatus.ACCEPTED
+                    ? conversationRepository.findByUserIdAndPeerMentorId(userId, r.getPeerMentorId())
+                            .map(Conversation::getId).orElse(null)
+                    : null;
+            return toMentorRequestResponse(r, mentor != null ? mentor.getName() : "Mentor", conversationId);
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MentorRequestView> listMentorRequestsForMentor(Long mentorUserId) {
+        PeerMentor mentor = findLinkedMentor(mentorUserId);
+        List<MentorRequest> requests = mentorRequestRepository.findByPeerMentorIdOrderByCreatedAtDesc(mentor.getId());
+        Map<Long, UserSummary> students = authServiceClient.getUserSummaries(
+                requests.stream().map(MentorRequest::getUserId).distinct().toList());
+        return requests.stream().map(r -> toMentorRequestView(r, students)).toList();
+    }
+
+    @Transactional
+    public MentorRequestView acceptMentorRequest(Long mentorUserId, Long requestId) {
+        PeerMentor mentor = findLinkedMentor(mentorUserId);
+        MentorRequest request = findOwnedMentorRequest(mentor, requestId);
+        if (request.getStatus() != MentorRequestStatus.PENDING) {
+            throw new ApiException("Only a pending request can be accepted", HttpStatus.BAD_REQUEST);
+        }
+        request.setStatus(MentorRequestStatus.ACCEPTED);
+        request.setRespondedAt(Instant.now());
+        request = mentorRequestRepository.save(request);
+
+        // Creates the conversation right away, same shape as startConversation's mentor branch -
+        // the student doesn't have to send a first message to unlock it themselves.
+        conversationRepository.findByUserIdAndPeerMentorId(request.getUserId(), mentor.getId())
+                .orElseGet(() -> conversationRepository.save(Conversation.builder()
+                        .userId(request.getUserId())
+                        .peerMentorId(mentor.getId())
+                        .build()));
+
+        authServiceClient.notify(request.getUserId(), "Mentor request accepted",
+                mentor.getName() + " accepted your request. You can now message them.",
+                Map.of("screen", "Support"));
+
+        return toMentorRequestView(request, authServiceClient.getUserSummaries(List.of(request.getUserId())));
+    }
+
+    @Transactional
+    public MentorRequestView declineMentorRequest(Long mentorUserId, Long requestId) {
+        PeerMentor mentor = findLinkedMentor(mentorUserId);
+        MentorRequest request = findOwnedMentorRequest(mentor, requestId);
+        if (request.getStatus() != MentorRequestStatus.PENDING) {
+            throw new ApiException("Only a pending request can be declined", HttpStatus.BAD_REQUEST);
+        }
+        request.setStatus(MentorRequestStatus.DECLINED);
+        request.setRespondedAt(Instant.now());
+        request = mentorRequestRepository.save(request);
+
+        authServiceClient.notify(request.getUserId(), "Mentor request declined",
+                mentor.getName() + " isn't able to take on new requests right now.",
+                Map.of("screen", "Support"));
+
+        return toMentorRequestView(request, authServiceClient.getUserSummaries(List.of(request.getUserId())));
+    }
+
+    // ── Phase 1G - mentor-side conversations/messages, mirroring the counsellor equivalents ────
+
+    @Transactional(readOnly = true)
+    public List<CounsellorConversationView> listMentorConversations(Long mentorUserId) {
+        PeerMentor mentor = findLinkedMentor(mentorUserId);
+        List<Conversation> conversations = conversationRepository.findByPeerMentorIdOrderByCreatedAtDesc(mentor.getId());
+        Map<Long, UserSummary> students = authServiceClient.getUserSummaries(
+                conversations.stream().map(Conversation::getUserId).distinct().toList());
+        return conversations.stream().map(c -> toMentorConversationView(c, students)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MessageResponse> listMentorMessages(Long mentorUserId, Long conversationId, Pageable pageable) {
+        Conversation conversation = findOwnedConversationForMentor(mentorUserId, conversationId);
+        return supportMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId(), pageable)
+                .map(this::toMessageResponse);
+    }
+
+    @Transactional
+    public MessageResponse sendMentorMessage(Long mentorUserId, Long conversationId, SendMessageRequest request) {
+        Conversation conversation = findOwnedConversationForMentor(mentorUserId, conversationId);
+
+        SupportMessage message = SupportMessage.builder()
+                .conversationId(conversation.getId())
+                .senderType(SenderType.PEER_MENTOR)
+                .body(request.body())
+                .build();
+
+        MessageResponse response = toMessageResponse(supportMessageRepository.save(message));
+
+        authServiceClient.notify(conversation.getUserId(), "New message",
+                "You have a new message from your mentor.",
+                Map.of("screen", "Chat", "conversationId", conversation.getId().toString()));
+
+        return response;
+    }
+
+    @Transactional
+    public void markReadAsMentor(Long mentorUserId, Long conversationId) {
+        Conversation conversation = findOwnedConversationForMentor(mentorUserId, conversationId);
+        List<SupportMessage> unread = supportMessageRepository
+                .findByConversationIdAndSenderTypeNotAndReadAtIsNull(conversation.getId(), SenderType.PEER_MENTOR);
+        Instant now = Instant.now();
+        unread.forEach(m -> m.setReadAt(now));
+        supportMessageRepository.saveAll(unread);
+    }
+
+    private PeerMentor findLinkedMentor(Long userId) {
+        return peerMentorRepository.findByUserId(userId)
+                .orElseThrow(() -> new ApiException("No peer mentor profile linked to this account", HttpStatus.NOT_FOUND));
+    }
+
+    private MentorRequest findOwnedMentorRequest(PeerMentor mentor, Long requestId) {
+        return mentorRequestRepository.findByIdAndPeerMentorId(requestId, mentor.getId())
+                .orElseThrow(() -> new ApiException("Mentor request not found: " + requestId, HttpStatus.NOT_FOUND));
+    }
+
+    private Conversation findOwnedConversationForMentor(Long mentorUserId, Long conversationId) {
+        PeerMentor mentor = findLinkedMentor(mentorUserId);
+        return conversationRepository.findByIdAndPeerMentorId(conversationId, mentor.getId())
+                .orElseThrow(() -> new ApiException("Conversation not found: " + conversationId, HttpStatus.NOT_FOUND));
+    }
+
+    private MentorRequestResponse toMentorRequestResponse(MentorRequest r, String mentorName, Long conversationId) {
+        return new MentorRequestResponse(r.getId(), r.getPeerMentorId(), mentorName, r.getStatus(), r.getMessage(),
+                conversationId, r.getCreatedAt(), r.getRespondedAt());
+    }
+
+    private MentorRequestView toMentorRequestView(MentorRequest r, Map<Long, UserSummary> students) {
+        UserSummary student = students.get(r.getUserId());
+        return new MentorRequestView(r.getId(), r.getUserId(), student != null ? student.fullName() : "Student",
+                r.getStatus(), r.getMessage(), r.getCreatedAt(), r.getRespondedAt());
+    }
+
     /** Phase 1F-A - the counsellor dashboard's Online/Busy/Away toggle, now persisted (was
      * previously local-only React state - see CounsellorAvailabilityStatus's doc comment). */
     @Transactional
@@ -375,6 +584,16 @@ public class SupportService {
         } else {
             PeerMentor mentor = peerMentorRepository.findById(request.peerMentorId())
                     .orElseThrow(() -> new ApiException("Peer mentor not found: " + request.peerMentorId(), HttpStatus.NOT_FOUND));
+            // Phase 1G - messaging a mentor now requires an ACCEPTED mentor request first (see
+            // requestMentor/acceptMentorRequest below). acceptMentorRequest already creates this
+            // conversation directly, so in practice this orElseGet rarely fires for mentors - this
+            // check is defense in depth for any direct caller of this endpoint, not the primary path.
+            boolean accepted = mentorRequestRepository.existsByUserIdAndPeerMentorIdAndStatus(
+                    userId, mentor.getId(), MentorRequestStatus.ACCEPTED);
+            if (!accepted) {
+                throw new ApiException("Send a mentor request first - messaging opens once the mentor accepts.",
+                        HttpStatus.FORBIDDEN);
+            }
             conversation = conversationRepository.findByUserIdAndPeerMentorId(userId, mentor.getId())
                     .orElseGet(() -> conversationRepository.save(Conversation.builder()
                             .userId(userId)
@@ -524,11 +743,24 @@ public class SupportService {
     }
 
     private CounsellorConversationView toCounsellorConversationView(Conversation c, Map<Long, UserSummary> students) {
+        return toConversationViewForOwner(c, students, SenderType.COUNSELLOR);
+    }
+
+    // Phase 1G - mirrors toCounsellorConversationView, parameterized on which SenderType owns the
+    // conversation. Reusing the COUNSELLOR-hardcoded version for mentor conversations would have
+    // counted the mentor's own sent messages as "unread" (since PEER_MENTOR != COUNSELLOR passes
+    // the "not equal" filter too) - caught in manual review since this service's compiler
+    // couldn't be run in this session, see the tracker's note on that.
+    private CounsellorConversationView toMentorConversationView(Conversation c, Map<Long, UserSummary> students) {
+        return toConversationViewForOwner(c, students, SenderType.PEER_MENTOR);
+    }
+
+    private CounsellorConversationView toConversationViewForOwner(Conversation c, Map<Long, UserSummary> students, SenderType ownerSenderType) {
         UserSummary student = students.get(c.getUserId());
         String preview = supportMessageRepository.findTopByConversationIdOrderByCreatedAtDesc(c.getId())
                 .map(SupportMessage::getBody).orElse(null);
         long unreadCount = supportMessageRepository
-                .countByConversationIdAndSenderTypeNotAndReadAtIsNull(c.getId(), SenderType.COUNSELLOR);
+                .countByConversationIdAndSenderTypeNotAndReadAtIsNull(c.getId(), ownerSenderType);
         return new CounsellorConversationView(c.getId(), c.getUserId(), student != null ? student.fullName() : "Student",
                 c.getCreatedAt(), preview, unreadCount);
     }

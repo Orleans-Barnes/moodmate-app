@@ -1,3 +1,5 @@
 package com.moodmate.auth.entity;
 
-public enum Role { STUDENT, COUNSELLOR, ADMIN }
+// Phase 1G - added MENTOR alongside COUNSELLOR/ADMIN. Promoted the same way COUNSELLOR is - see
+// InternalUserController.updateRole and moodmate-support's AuthServiceClient.promoteToMentor.
+public enum Role { STUDENT, COUNSELLOR, MENTOR, ADMIN }

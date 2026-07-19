@@ -18,4 +18,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     List<Conversation> findByCounsellorIdOrderByCreatedAtDesc(Long counsellorId);
 
     Optional<Conversation> findByIdAndCounsellorId(Long id, Long counsellorId);
+
+    // Phase 1G - mentor-side equivalents of the counsellor-side finders above.
+    List<Conversation> findByPeerMentorIdOrderByCreatedAtDesc(Long peerMentorId);
+
+    Optional<Conversation> findByIdAndPeerMentorId(Long id, Long peerMentorId);
 }

@@ -84,6 +84,22 @@ public class AuthServiceClient {
         }
     }
 
+    // Phase 1G - mirrors promoteToCounsellor exactly, fired when an admin links a userId to an
+    // existing peer_mentors row (SupportService.linkMentorAccount) rather than through a self-serve
+    // request/approve flow like counsellors have - see linkMentorAccount's doc comment for why.
+    public void promoteToMentor(Long userId) {
+        try {
+            restClient().patch()
+                    .uri("/internal/users/{id}/role", userId)
+                    .body(new RoleUpdateRequest("MENTOR"))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            throw new ApiException("Could not reach auth-service to promote user " + userId + " to MENTOR: " + e.getMessage(),
+                    HttpStatus.BAD_GATEWAY);
+        }
+    }
+
     public void notify(Long userId, String title, String body, Map<String, String> data) {
         try {
             restClient().post()

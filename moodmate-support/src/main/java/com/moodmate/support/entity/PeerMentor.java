@@ -27,6 +27,12 @@ public class PeerMentor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Phase 1G - the account this roster entry belongs to, once linked. Null for seeded rows
+     * that pre-date account linkage - same pattern as Counsellor.userId (see that field's doc
+     * comment). Set by SupportService.linkMentorAccount. */
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(nullable = false)
     private String name;
 
