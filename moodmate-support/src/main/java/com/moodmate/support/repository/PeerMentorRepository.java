@@ -12,4 +12,8 @@ public interface PeerMentorRepository extends JpaRepository<PeerMentor, Long> {
     // Phase 1G - resolves a logged-in MENTOR-role user to their roster row, same pattern as
     // CounsellorRepository.findByUserId.
     Optional<PeerMentor> findByUserId(Long userId);
+
+    // Phase 1H (Admin Portal - Peer Mentor Management) - "all mentors, including deactivated
+    // (available=false) ones" admin listing, mirrors CounsellorRepository.findAllByOrderByNameAsc.
+    List<PeerMentor> findAllByOrderByNameAsc();
 }

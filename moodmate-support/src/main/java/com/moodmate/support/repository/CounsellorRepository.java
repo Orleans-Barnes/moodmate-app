@@ -15,4 +15,9 @@ public interface CounsellorRepository extends JpaRepository<Counsellor, Long> {
     List<Counsellor> findByStatus(CounsellorStatus status);
 
     Optional<Counsellor> findByUserId(Long userId);
+
+    // Phase 1H (Admin Portal - Counsellor Management) - backs the "all counsellors, any status"
+    // admin listing (approve/reject queue only shows PENDING; this shows everything so an admin
+    // can also suspend/reinstate/edit an already-APPROVED row).
+    List<Counsellor> findAllByOrderByNameAsc();
 }

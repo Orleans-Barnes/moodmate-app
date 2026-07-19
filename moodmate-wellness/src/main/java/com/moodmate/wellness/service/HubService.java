@@ -1,7 +1,11 @@
 package com.moodmate.wellness.service;
 
 import com.moodmate.wellness.dto.ArticleResponse;
+import com.moodmate.wellness.dto.CreateArticleRequest;
+import com.moodmate.wellness.dto.CreateEventRequest;
 import com.moodmate.wellness.dto.EventResponse;
+import com.moodmate.wellness.dto.UpdateArticleRequest;
+import com.moodmate.wellness.dto.UpdateEventRequest;
 import com.moodmate.wellness.entity.EventRsvp;
 import com.moodmate.wellness.entity.WellnessArticle;
 import com.moodmate.wellness.entity.WellnessEvent;
@@ -116,6 +120,81 @@ public class HubService {
                 .filter(java.util.Objects::nonNull)
                 .map(event -> toResponse(event, rsvpsByEvent.getOrDefault(event.getId(), List.of()), userId))
                 .toList();
+    }
+
+    // ── Phase 1H (Admin Portal - Wellness Content) - admin-only writes on top of the previously
+    // read-only HubController. ──────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public ArticleResponse createArticle(CreateArticleRequest request) {
+        WellnessArticle article = WellnessArticle.builder()
+                .title(request.title())
+                .summary(request.summary())
+                .body(request.body())
+                .category(request.category())
+                .readMinutes(request.readMinutes())
+                .imageEmoji(request.imageEmoji())
+                .publishedAt(Instant.now())
+                .build();
+        return toResponse(articleRepository.save(article));
+    }
+
+    @Transactional
+    public ArticleResponse updateArticle(Long articleId, UpdateArticleRequest request) {
+        WellnessArticle article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new ApiException("Article not found: " + articleId, HttpStatus.NOT_FOUND));
+        if (request.title() != null) article.setTitle(request.title());
+        if (request.summary() != null) article.setSummary(request.summary());
+        if (request.body() != null) article.setBody(request.body());
+        if (request.category() != null) article.setCategory(request.category());
+        if (request.readMinutes() != null) article.setReadMinutes(request.readMinutes());
+        if (request.imageEmoji() != null) article.setImageEmoji(request.imageEmoji());
+        return toResponse(articleRepository.save(article));
+    }
+
+    @Transactional
+    public void deleteArticle(Long articleId) {
+        if (!articleRepository.existsById(articleId)) {
+            throw new ApiException("Article not found: " + articleId, HttpStatus.NOT_FOUND);
+        }
+        articleRepository.deleteById(articleId);
+    }
+
+    @Transactional
+    public EventResponse createEvent(CreateEventRequest request) {
+        WellnessEvent event = WellnessEvent.builder()
+                .title(request.title())
+                .description(request.description())
+                .startsAt(request.startsAt())
+                .location(request.location())
+                .capacity(request.capacity())
+                .createdAt(Instant.now())
+                .build();
+        event = eventRepository.save(event);
+        return toResponse(event, List.of(), null);
+    }
+
+    @Transactional
+    public EventResponse updateEvent(Long eventId, UpdateEventRequest request) {
+        WellnessEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ApiException("Event not found: " + eventId, HttpStatus.NOT_FOUND));
+        if (request.title() != null) event.setTitle(request.title());
+        if (request.description() != null) event.setDescription(request.description());
+        if (request.startsAt() != null) event.setStartsAt(request.startsAt());
+        if (request.location() != null) event.setLocation(request.location());
+        if (request.capacity() != null) event.setCapacity(request.capacity());
+        event = eventRepository.save(event);
+        return toResponse(event, eventRsvpRepository.findByEventIdIn(List.of(eventId)), null);
+    }
+
+    // event_rsvps.event_id has ON DELETE CASCADE (see V1__init_schema.sql) - no app-level cleanup
+    // of RSVP rows needed here, the DB handles it.
+    @Transactional
+    public void deleteEvent(Long eventId) {
+        if (!eventRepository.existsById(eventId)) {
+            throw new ApiException("Event not found: " + eventId, HttpStatus.NOT_FOUND);
+        }
+        eventRepository.deleteById(eventId);
     }
 
     private ArticleResponse toResponse(WellnessArticle a) {

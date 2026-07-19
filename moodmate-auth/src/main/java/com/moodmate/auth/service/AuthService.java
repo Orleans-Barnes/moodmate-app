@@ -14,6 +14,8 @@ import com.moodmate.auth.repository.UserRepository;
 import com.moodmate.auth.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -384,6 +386,37 @@ public class AuthService {
     // ── Feature 7 (Community Moderation) - additive, not in the monolith. Called by
     // moodmate-community's ModerationService via InternalUserController, same internal-only path
     // pattern as updateRole/getUserSummary above - never reachable through the gateway. ──────────
+
+    // ── Phase 1H (Admin Portal - User Management) - additive. Reuses banUser/unbanUser below
+    // unmodified (this is the same underlying action Feature 7's community-moderation flow
+    // performs, just reachable directly by an admin from a general user-search screen instead of
+    // only via a flagged-post queue). ──────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserView> searchUsers(String query, Pageable pageable) {
+        Page<User> page = (query == null || query.isBlank())
+                ? userRepo.findAll(pageable)
+                : userRepo.findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query, pageable);
+        return page.map(this::toAdminUserView);
+    }
+
+    /** Guards against an admin locking themselves (or another admin) out via the general user
+     * management screen - banUser() itself has no such guard since Feature 7's moderation flow
+     * only ever targets STUDENT accounts (flagged community posts), but this entry point can
+     * target anyone by search, so the extra check belongs here, not in the shared banUser(). */
+    @Transactional
+    public ModerationStatusResponse adminSuspendUser(Long userId, String reason) {
+        User user = findUser(userId);
+        if (user.getRole() == Role.ADMIN) {
+            throw new ApiException("Cannot suspend an admin account", HttpStatus.BAD_REQUEST);
+        }
+        return banUser(userId, reason);
+    }
+
+    private AdminUserView toAdminUserView(User u) {
+        return new AdminUserView(u.getId(), u.getEmail(), u.getFullName(), u.getInstitution(), u.getRole(),
+                u.isGuest(), u.isBanned(), u.getBannedReason(), u.getBannedAt(), u.getWarningCount(), u.getCreatedAt());
+    }
 
     /** Also revokes every outstanding refresh token for this user (see revokeAllForUser) so they
      * can't silently renew their session past the ban - see refresh()'s doc comment for the one

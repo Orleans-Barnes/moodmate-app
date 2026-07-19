@@ -2,6 +2,7 @@ package com.moodmate.support.service;
 
 import com.moodmate.support.client.AuthServiceClient;
 import com.moodmate.support.client.UserSummary;
+import com.moodmate.support.dto.AdminEditCounsellorRequest;
 import com.moodmate.support.dto.AppointmentResponse;
 import com.moodmate.support.dto.BookAppointmentRequest;
 import com.moodmate.support.dto.ConfirmedAppointmentResponse;
@@ -18,6 +19,7 @@ import com.moodmate.support.dto.MeetingWindowView;
 import com.moodmate.support.dto.MentorRequestResponse;
 import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
+import com.moodmate.support.dto.PeerMentorAdminView;
 import com.moodmate.support.dto.PeerMentorDto;
 import com.moodmate.support.dto.RequestMentorRequest;
 import com.moodmate.support.dto.SendMessageRequest;
@@ -137,6 +139,71 @@ public class SupportService {
             throw new ApiException("This request has already been " + counsellor.getStatus(), HttpStatus.BAD_REQUEST);
         }
         return counsellor;
+    }
+
+    // ── Phase 1H (Admin Portal - Counsellor Management) ─────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CounsellorRequestAdminView> listAllCounsellorsForAdmin() {
+        return counsellorRepository.findAllByOrderByNameAsc().stream().map(this::toAdminView).toList();
+    }
+
+    @Transactional
+    public CounsellorRequestAdminView suspendCounsellor(Long counsellorId) {
+        Counsellor counsellor = counsellorRepository.findById(counsellorId)
+                .orElseThrow(() -> new ApiException("Counsellor not found: " + counsellorId, HttpStatus.NOT_FOUND));
+        if (counsellor.getStatus() != CounsellorStatus.APPROVED) {
+            throw new ApiException("Only an approved counsellor can be suspended", HttpStatus.BAD_REQUEST);
+        }
+        counsellor.setStatus(CounsellorStatus.SUSPENDED);
+        return toAdminView(counsellorRepository.save(counsellor));
+    }
+
+    @Transactional
+    public CounsellorRequestAdminView reinstateCounsellor(Long counsellorId) {
+        Counsellor counsellor = counsellorRepository.findById(counsellorId)
+                .orElseThrow(() -> new ApiException("Counsellor not found: " + counsellorId, HttpStatus.NOT_FOUND));
+        if (counsellor.getStatus() != CounsellorStatus.SUSPENDED) {
+            throw new ApiException("Only a suspended counsellor can be reinstated", HttpStatus.BAD_REQUEST);
+        }
+        counsellor.setStatus(CounsellorStatus.APPROVED);
+        return toAdminView(counsellorRepository.save(counsellor));
+    }
+
+    @Transactional
+    public CounsellorRequestAdminView adminEditCounsellor(Long counsellorId, AdminEditCounsellorRequest request) {
+        Counsellor counsellor = counsellorRepository.findById(counsellorId)
+                .orElseThrow(() -> new ApiException("Counsellor not found: " + counsellorId, HttpStatus.NOT_FOUND));
+        if (request.title() != null) counsellor.setTitle(request.title());
+        if (request.bio() != null) counsellor.setBio(request.bio());
+        if (request.specialties() != null) counsellor.setSpecialties(request.specialties());
+        if (request.sortOrder() != null) counsellor.setSortOrder(request.sortOrder());
+        return toAdminView(counsellorRepository.save(counsellor));
+    }
+
+    // ── Phase 1H (Admin Portal - Peer Mentor Management) ────────────────────────────────────────
+    // No approve/reject queue here - Phase 1G already established that peer mentor accounts are
+    // admin-linked, not self-serve-applied-for (see linkMentorAccount's own doc comment). "Manage"
+    // for mentors means listing the full roster and toggling available on/off (deactivate keeps
+    // the row and any linked account intact, just hides it from the public roster - same effect
+    // suspendCounsellor has via status, but PeerMentor has no status enum, only this boolean).
+
+    @Transactional(readOnly = true)
+    public List<PeerMentorAdminView> listAllPeerMentorsForAdmin() {
+        return peerMentorRepository.findAllByOrderByNameAsc().stream().map(this::toPeerMentorAdminView).toList();
+    }
+
+    @Transactional
+    public PeerMentorAdminView setPeerMentorActive(Long mentorId, boolean active) {
+        PeerMentor mentor = peerMentorRepository.findById(mentorId)
+                .orElseThrow(() -> new ApiException("Peer mentor not found: " + mentorId, HttpStatus.NOT_FOUND));
+        mentor.setAvailable(active);
+        return toPeerMentorAdminView(peerMentorRepository.save(mentor));
+    }
+
+    private PeerMentorAdminView toPeerMentorAdminView(PeerMentor m) {
+        return new PeerMentorAdminView(m.getId(), m.getUserId(), m.getName(), m.getBio(), m.getAvatarEmoji(),
+                m.getFocusArea(), m.isAvailable());
     }
 
     @Transactional(readOnly = true)

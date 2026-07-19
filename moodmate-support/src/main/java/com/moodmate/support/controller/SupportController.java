@@ -1,5 +1,6 @@
 package com.moodmate.support.controller;
 
+import com.moodmate.support.dto.AdminEditCounsellorRequest;
 import com.moodmate.support.dto.AppointmentResponse;
 import com.moodmate.support.dto.BookAppointmentRequest;
 import com.moodmate.support.dto.ConversationResponse;
@@ -15,6 +16,7 @@ import com.moodmate.support.dto.MeetingWindowView;
 import com.moodmate.support.dto.MentorRequestResponse;
 import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
+import com.moodmate.support.dto.PeerMentorAdminView;
 import com.moodmate.support.dto.PeerMentorDto;
 import com.moodmate.support.dto.RequestMentorRequest;
 import com.moodmate.support.dto.RescheduleAppointmentRequest;
@@ -29,6 +31,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -90,6 +93,59 @@ public class SupportController {
                                                                @PathVariable Long id) {
         requireAdmin(role);
         return supportService.rejectCounsellorRequest(id);
+    }
+
+    // ── Phase 1H (Admin Portal - Counsellor Management) - all statuses, plus suspend/reinstate/
+    // edit for an already-APPROVED row. Kept under the same "/counsellor-requests" prefix as
+    // approve/reject above, since it's the same Counsellor row/id space, just a superset of
+    // actions on it. ─────────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/counsellor-requests")
+    public List<CounsellorRequestAdminView> allCounsellorsForAdmin(@RequestHeader("X-User-Role") String role) {
+        requireAdmin(role);
+        return supportService.listAllCounsellorsForAdmin();
+    }
+
+    @PostMapping("/counsellor-requests/{id}/suspend")
+    public CounsellorRequestAdminView suspendCounsellor(@RequestHeader("X-User-Role") String role,
+                                                          @PathVariable Long id) {
+        requireAdmin(role);
+        return supportService.suspendCounsellor(id);
+    }
+
+    @PostMapping("/counsellor-requests/{id}/reinstate")
+    public CounsellorRequestAdminView reinstateCounsellor(@RequestHeader("X-User-Role") String role,
+                                                            @PathVariable Long id) {
+        requireAdmin(role);
+        return supportService.reinstateCounsellor(id);
+    }
+
+    @PatchMapping("/counsellor-requests/{id}")
+    public CounsellorRequestAdminView adminEditCounsellor(@RequestHeader("X-User-Role") String role,
+                                                            @PathVariable Long id,
+                                                            @RequestBody AdminEditCounsellorRequest request) {
+        requireAdmin(role);
+        return supportService.adminEditCounsellor(id, request);
+    }
+
+    // ── Phase 1H (Admin Portal - Peer Mentor Management) ─────────────────────────────────────────
+
+    @GetMapping("/mentors/admin")
+    public List<PeerMentorAdminView> allMentorsForAdmin(@RequestHeader("X-User-Role") String role) {
+        requireAdmin(role);
+        return supportService.listAllPeerMentorsForAdmin();
+    }
+
+    @PostMapping("/mentors/{id}/deactivate")
+    public PeerMentorAdminView deactivateMentor(@RequestHeader("X-User-Role") String role, @PathVariable Long id) {
+        requireAdmin(role);
+        return supportService.setPeerMentorActive(id, false);
+    }
+
+    @PostMapping("/mentors/{id}/activate")
+    public PeerMentorAdminView activateMentor(@RequestHeader("X-User-Role") String role, @PathVariable Long id) {
+        requireAdmin(role);
+        return supportService.setPeerMentorActive(id, true);
     }
 
     @PostMapping("/appointments")
