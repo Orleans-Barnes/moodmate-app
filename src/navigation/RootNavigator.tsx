@@ -6,6 +6,7 @@ import { SplashScreen } from '@/screens/SplashScreen';
 import { RoleSelectScreen } from '@/screens/auth/RoleSelectScreen';
 import { LoginScreen } from '@/screens/auth/LoginScreen';
 import { OnboardingScreen } from '@/screens/auth/OnboardingScreen';
+import { ProfileSetupNavigator } from './ProfileSetupNavigator';
 import { ForgotPasswordScreen } from '@/screens/auth/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '@/screens/auth/ResetPasswordScreen';
 import { SignupScreen } from '@/screens/auth/SignupScreen';
@@ -54,6 +55,7 @@ export function RootNavigator() {
       <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="ProfileSetup" component={ProfileSetupNavigator} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="Main" component={MainRouter} />
       <Stack.Screen name="AdminSetup" component={AdminSetupScreen} />

@@ -22,6 +22,7 @@ export type RootStackParamList = {
   Login: { role: UserRole };
   Signup: undefined;
   Onboarding: undefined;
+  ProfileSetup: undefined;
   Main: undefined;
   AdminSetup: undefined;
   CounsellorSignup: undefined;
@@ -62,6 +63,16 @@ export type RootStackParamList = {
   SleepTracker: undefined;
   PrivacyData: undefined;
   HelpSupport: undefined;
+};
+
+export type ProfileSetupStackParamList = {
+  Welcome: undefined;
+  Programme: undefined;
+  YearOfStudy: undefined;
+  WellnessGoals: undefined;
+  Challenges: undefined;
+  PreferredSupport: undefined;
+  Preparing: undefined;
 };
 
 declare global {
