@@ -1,4 +1,5 @@
-export type UserRole = 'STUDENT' | 'COUNSELLOR' | 'ADMIN';
+// Phase 1G - added MENTOR alongside COUNSELLOR/ADMIN, routed to MentorTabs by MainRouter.tsx.
+export type UserRole = 'STUDENT' | 'COUNSELLOR' | 'MENTOR' | 'ADMIN';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -12,6 +13,13 @@ export type MainTabParamList = {
 export type CounsellorTabParamList = {
   Dashboard: undefined;
   Appointments: undefined;
+  Conversations: undefined;
+  CounsellorProfile: undefined;
+};
+
+// Phase 1G - no Appointments tab: peer mentors don't do bookings, only requests + messaging.
+export type MentorTabParamList = {
+  Dashboard: undefined;
   Conversations: undefined;
   CounsellorProfile: undefined;
 };
@@ -33,6 +41,7 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
 
   CounsellorChat: { conversationId: number; studentName: string };
+  MentorChat: { conversationId: number; studentName: string };
   Chat: { conversationId: number; otherPartyName: string };
 
   CheckIn: undefined;

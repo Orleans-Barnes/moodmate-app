@@ -8,9 +8,12 @@ import type {
   CounsellorConversationView,
   CounsellorView,
   ConversationView,
+  MentorRequestForMentorView,
+  MentorRequestView,
   MentorView,
   MessageResponse,
   PageResponse,
+  RequestMentorRequest,
   StartConversationRequest,
 } from './types';
 
@@ -108,6 +111,70 @@ export function listCounsellors(token: string): Promise<CounsellorView[]> {
 
 export function listMentors(token: string): Promise<MentorView[]> {
   return apiGet<MentorView[]>('/api/support/mentors', token);
+}
+
+// Phase 1G - Peer Mentor request/accept workflow, student side. Messaging a mentor now requires
+// an ACCEPTED request first (see useSupportStore's openConversation / SupportScreen's mentor
+// roster cards for how this gates the "Message" button).
+
+export function requestMentor(token: string, request: RequestMentorRequest): Promise<MentorRequestView> {
+  return apiPost<MentorRequestView>('/api/support/mentor-requests', request, token);
+}
+
+export function listMyMentorRequests(token: string): Promise<MentorRequestView[]> {
+  return apiGet<MentorRequestView[]>('/api/support/mentor-requests', token);
+}
+
+// ── Mentor-side endpoints (com.moodmate.support.SupportController, the "/mentor/..." routes) -
+// require a token belonging to a MENTOR-role user, mirroring the "/counsellor/..." endpoints
+// above exactly. ─────────────────────────────────────────────────────────────────────────────
+
+export function listMentorRequestsForMentor(token: string): Promise<MentorRequestForMentorView[]> {
+  return apiGet<MentorRequestForMentorView[]>('/api/support/mentor/requests', token);
+}
+
+export function acceptMentorRequest(token: string, requestId: number): Promise<MentorRequestForMentorView> {
+  return apiPost<MentorRequestForMentorView>(`/api/support/mentor/requests/${requestId}/accept`, undefined, token);
+}
+
+export function declineMentorRequest(token: string, requestId: number): Promise<MentorRequestForMentorView> {
+  return apiPost<MentorRequestForMentorView>(`/api/support/mentor/requests/${requestId}/decline`, undefined, token);
+}
+
+export function listMentorConversations(token: string): Promise<CounsellorConversationView[]> {
+  return apiGet<CounsellorConversationView[]>('/api/support/mentor/conversations', token);
+}
+
+export function listMentorMessages(
+  token: string,
+  conversationId: number
+): Promise<PageResponse<MessageResponse>> {
+  return apiGet<PageResponse<MessageResponse>>(
+    `/api/support/mentor/conversations/${conversationId}/messages?page=0&size=50`,
+    token
+  );
+}
+
+export function sendMentorMessage(
+  token: string,
+  conversationId: number,
+  body: string
+): Promise<MessageResponse> {
+  return apiPost<MessageResponse>(
+    `/api/support/mentor/conversations/${conversationId}/messages`,
+    { body },
+    token
+  );
+}
+
+export function markMentorRead(token: string, conversationId: number): Promise<void> {
+  return apiPost<void>(`/api/support/mentor/conversations/${conversationId}/read`, undefined, token);
+}
+
+// Admin-only account linkage - see SupportService.linkMentorAccount's doc comment for why this
+// is admin-driven rather than a self-serve request/approve flow.
+export function linkMentorAccount(token: string, mentorId: number, userId: number): Promise<MentorView> {
+  return apiPost<MentorView>(`/api/support/mentors/${mentorId}/link-account`, { userId }, token);
 }
 
 export function bookAppointment(token: string, request: BookAppointmentRequest): Promise<AppointmentView> {

@@ -32,6 +32,7 @@ import { WorryBoxScreen } from '@/screens/modals/WorryBoxScreen';
 import { SafePlaceScreen } from '@/screens/modals/SafePlaceScreen';
 import { ProudDandelionScreen } from '@/screens/modals/ProudDandelionScreen';
 import { CounsellorChatScreen } from '@/screens/counsellor/CounsellorChatScreen';
+import { MentorChatScreen } from '@/screens/mentor/MentorChatScreen';
 import { ChatScreen } from '@/screens/support/ChatScreen';
 import { MoodGateScreen } from '@/screens/gamification/MoodGateScreen';
 import { MoodSuggestScreen } from '@/screens/gamification/MoodSuggestScreen';
@@ -68,6 +69,7 @@ export function RootNavigator() {
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       <Stack.Screen name="CounsellorChat" component={CounsellorChatScreen} />
+      <Stack.Screen name="MentorChat" component={MentorChatScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
 
       <Stack.Group screenOptions={{ presentation: 'modal' }}>

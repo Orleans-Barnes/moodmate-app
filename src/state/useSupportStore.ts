@@ -6,22 +6,37 @@ import {
   listConversations,
   listCounsellors,
   listMentors,
+  listMyMentorRequests,
+  requestMentor as apiRequestMentor,
   rescheduleAppointment,
   startConversation,
 } from '@/api/support';
-import type { AppointmentView, ConversationView, CounsellorView, MentorView } from '@/api/types';
+import type {
+  AppointmentView,
+  ConversationView,
+  CounsellorView,
+  MentorRequestView,
+  MentorView,
+} from '@/api/types';
 
 interface SupportState {
   counsellors: CounsellorView[];
   mentors: MentorView[];
   appointments: AppointmentView[];
   conversations: ConversationView[];
+  // Phase 1G - the logged-in student's own mentor requests, keyed by peerMentorId in the UI (see
+  // SupportScreen.tsx) to decide whether a mentor card shows "Request", "Request sent", or
+  // "Message".
+  myMentorRequests: MentorRequestView[];
   loading: boolean;
   load: (token: string) => Promise<void>;
   book: (token: string, counsellorId: number, scheduledAt: string, notes?: string) => Promise<AppointmentView>;
   cancel: (token: string, appointmentId: number) => Promise<void>;
   /** Phase 1F-A - student-initiated reschedule of an existing appointment. */
   reschedule: (token: string, appointmentId: number, scheduledAt: string) => Promise<AppointmentView>;
+  /** Phase 1G - sends a new mentor request; does not create a conversation (that happens once the
+   * mentor accepts). */
+  requestMentor: (token: string, peerMentorId: number, message?: string) => Promise<MentorRequestView>;
   /** Reuses an existing conversation with this counsellor/mentor if one exists, otherwise starts one. */
   openConversation: (
     token: string,
@@ -39,6 +54,7 @@ export const useSupportStore = create<SupportState>((set, get) => ({
   mentors: [],
   appointments: [],
   conversations: [],
+  myMentorRequests: [],
   loading: false,
   load: async (token) => {
     set({ loading: true });
@@ -46,13 +62,14 @@ export const useSupportStore = create<SupportState>((set, get) => ({
     if (token === 'guest') return;
 
     try {
-      const [counsellors, mentors, appointments, conversations] = await Promise.all([
+      const [counsellors, mentors, appointments, conversations, myMentorRequests] = await Promise.all([
         listCounsellors(token),
         listMentors(token),
         listAppointments(token),
         listConversations(token),
+        listMyMentorRequests(token),
       ]);
-      set({ counsellors, mentors, appointments, conversations });
+      set({ counsellors, mentors, appointments, conversations, myMentorRequests });
     } finally {
       set({ loading: false });
     }
@@ -70,6 +87,11 @@ export const useSupportStore = create<SupportState>((set, get) => ({
     const updated = await rescheduleAppointment(token, appointmentId, scheduledAt);
     set({ appointments: get().appointments.map((a) => (a.id === appointmentId ? updated : a)) });
     return updated;
+  },
+  requestMentor: async (token, peerMentorId, message) => {
+    const created = await apiRequestMentor(token, { peerMentorId, message });
+    set({ myMentorRequests: [created, ...get().myMentorRequests] });
+    return created;
   },
   openConversation: async (token, target) => {
     const existing = get().conversations.find((c) =>

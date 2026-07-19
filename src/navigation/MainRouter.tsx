@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { MainTabs } from './MainTabs';
 import { CounsellorTabs } from './CounsellorTabs';
+import { MentorTabs } from './MentorTabs';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGamificationStore } from '@/state/useGamificationStore';
 import { useGuestStore } from '@/state/useGuestStore';
@@ -53,7 +54,7 @@ export function MainRouter() {
 
   return (
     <>
-      {role === 'COUNSELLOR' ? <CounsellorTabs /> : <MainTabs />}
+      {role === 'COUNSELLOR' ? <CounsellorTabs /> : role === 'MENTOR' ? <MentorTabs /> : <MainTabs />}
       {/* Guest SaveProgressModal — fires at most once per session */}
       <SaveProgressModal onCreateAccount={handleGuestCreateAccount} />
     </>

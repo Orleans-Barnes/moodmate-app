@@ -3,7 +3,8 @@
 // backend DTO and this type get written together so the two repos never drift on what a "user"
 // object looks like.
 
-export type Role = 'STUDENT' | 'COUNSELLOR' | 'ADMIN';
+// Phase 1G - added MENTOR alongside COUNSELLOR/ADMIN, mirroring backend com.moodmate.auth.entity.Role.
+export type Role = 'STUDENT' | 'COUNSELLOR' | 'MENTOR' | 'ADMIN';
 
 export interface UserProfile {
   id: number;
@@ -493,5 +494,41 @@ export interface NotificationView {
   deliveredAt: string | null;
   readAt: string | null;
   createdAt: string;
+}
+
+// Mirrors com.moodmate.support.entity.MentorRequestStatus / dto.MentorRequestResponse /
+// dto.MentorRequestView / dto.RequestMentorRequest (Phase 1G - Peer Mentor request/accept
+// workflow). Student -> request -> mentor accepts/declines -> conversation created, replacing the
+// old unconditional "message a mentor" flow.
+export type MentorRequestStatusKey = 'PENDING' | 'ACCEPTED' | 'DECLINED';
+
+export interface RequestMentorRequest {
+  peerMentorId: number;
+  message?: string;
+}
+
+/** Student-side view of one of their own mentor requests - mirrors MentorRequestResponse.
+ * conversationId is only set once ACCEPTED. */
+export interface MentorRequestView {
+  id: number;
+  peerMentorId: number;
+  mentorName: string;
+  status: MentorRequestStatusKey;
+  message: string | null;
+  conversationId: number | null;
+  createdAt: string;
+  respondedAt: string | null;
+}
+
+/** Mentor-side view of a request sent to them - mirrors backend's MentorRequestView DTO. Named
+ * distinctly from the student-side MentorRequestView above to avoid a naming collision. */
+export interface MentorRequestForMentorView {
+  id: number;
+  userId: number;
+  studentName: string;
+  status: MentorRequestStatusKey;
+  message: string | null;
+  createdAt: string;
+  respondedAt: string | null;
 }
 

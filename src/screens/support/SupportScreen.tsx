@@ -16,7 +16,7 @@ import { useSupportStore } from '@/state/useSupportStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
 import { ApiRequestError } from '@/api/client';
-import type { ConversationView, CounsellorAvailabilityStatus, CounsellorView, MentorView } from '@/api/types';
+import type { ConversationView, CounsellorAvailabilityStatus, CounsellorView, MentorRequestView, MentorView } from '@/api/types';
 import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
 
 type Props = CompositeScreenProps<
@@ -63,6 +63,12 @@ const AVAILABILITY_META: Record<CounsellorAvailabilityStatus, { label: string; d
   AWAY:   { label: 'Away',   dot: '#95A5A6', bg: '#F2F3F4',        text: '#6B7373' },
 };
 
+// Phase 1G - the most recent mentor request the student sent to a given mentor, if any. Requests
+// are appended newest-first in the store, so the first match is the latest.
+function latestMentorRequestFor(peerMentorId: number, requests: MentorRequestView[]): MentorRequestView | undefined {
+  return requests.find((r) => r.peerMentorId === peerMentorId);
+}
+
 function avatarFor(c: ConversationView, counsellors: CounsellorView[], mentors: MentorView[]): string {
   if (c.counsellorId) return counsellors.find((x) => x.id === c.counsellorId)?.avatarEmoji ?? '🧑‍⚕️';
   if (c.peerMentorId) return mentors.find((x) => x.id === c.peerMentorId)?.avatarEmoji ?? '🧑';
@@ -93,12 +99,15 @@ export function SupportScreen({ navigation }: Props) {
   const mentors = useSupportStore((s) => s.mentors);
   const appointments = useSupportStore((s) => s.appointments);
   const conversations = useSupportStore((s) => s.conversations);
+  const myMentorRequests = useSupportStore((s) => s.myMentorRequests);
   const loading = useSupportStore((s) => s.loading);
   const load = useSupportStore((s) => s.load);
   const book = useSupportStore((s) => s.book);
   const cancelAppt = useSupportStore((s) => s.cancel);
   const rescheduleAppt = useSupportStore((s) => s.reschedule);
+  const requestMentorAction = useSupportStore((s) => s.requestMentor);
   const openConversation = useSupportStore((s) => s.openConversation);
+  const [requestingMentorId, setRequestingMentorId] = useState<number | null>(null);
 
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState(() => new Date());
@@ -133,6 +142,21 @@ export function SupportScreen({ navigation }: Props) {
       navigation.navigate('Chat', { conversationId: conv.id, otherPartyName: name });
     } catch (err) {
       toast(err instanceof ApiRequestError ? err.message : 'Could not open that conversation.');
+    }
+  };
+
+  // Phase 1G - sends a mentor request rather than messaging directly; the "Message" button only
+  // appears once the mentor has accepted (see latestMentorRequestFor below).
+  const handleRequestMentor = async (peerMentorId: number) => {
+    if (!token) return;
+    setRequestingMentorId(peerMentorId);
+    try {
+      await requestMentorAction(token, peerMentorId);
+      toast('Request sent ✓');
+    } catch (err) {
+      toast(err instanceof ApiRequestError ? err.message : 'Could not send that request.');
+    } finally {
+      setRequestingMentorId(null);
     }
   };
 
@@ -403,17 +427,50 @@ export function SupportScreen({ navigation }: Props) {
                       style={styles.cardActionBtn}
                     />
                   )}
-                  <Button
-                    label="Message"
-                    variant="primary"
-                    onPress={() =>
-                      handleMessage(
-                        isCounsellor ? { counsellorId: id } : { peerMentorId: id },
-                        name
-                      )
-                    }
-                    style={styles.cardActionBtn}
-                  />
+                  {isCounsellor ? (
+                    <Button
+                      label="Message"
+                      variant="primary"
+                      onPress={() => handleMessage({ counsellorId: id }, name)}
+                      style={styles.cardActionBtn}
+                    />
+                  ) : (
+                    // Phase 1G - a mentor can only be messaged once they've accepted a request;
+                    // this button's label/action tracks the student's own latest request state.
+                    (() => {
+                      const myRequest = latestMentorRequestFor(id, myMentorRequests);
+                      if (myRequest?.status === 'ACCEPTED') {
+                        return (
+                          <Button
+                            label="Message"
+                            variant="primary"
+                            onPress={() => handleMessage({ peerMentorId: id }, name)}
+                            style={styles.cardActionBtn}
+                          />
+                        );
+                      }
+                      if (myRequest?.status === 'PENDING') {
+                        return (
+                          <Button
+                            label="Request sent"
+                            disabled
+                            style={styles.cardActionBtn}
+                          />
+                        );
+                      }
+                      // No request yet, or the previous one was declined — either way, sending a
+                      // new request is the right action.
+                      return (
+                        <Button
+                          label={requestingMentorId === id ? 'Sending…' : myRequest?.status === 'DECLINED' ? 'Request again' : 'Request to connect'}
+                          variant="primary"
+                          disabled={requestingMentorId === id}
+                          onPress={() => handleRequestMentor(id)}
+                          style={styles.cardActionBtn}
+                        />
+                      );
+                    })()
+                  )}
                 </View>
 
                 {isBookingThis && (
@@ -479,7 +536,7 @@ export function SupportScreen({ navigation }: Props) {
         <View style={styles.msgEmpty}>
           <Text style={styles.msgEmptyEmoji}>💬</Text>
           <Text style={styles.msgEmptyTitle}>No messages yet</Text>
-          <Text style={styles.msgEmptySub}>Tap "Message" on a counsellor card to start a conversation</Text>
+          <Text style={styles.msgEmptySub}>Message a counsellor directly, or request a mentor to get started</Text>
         </View>
       ) : (
         conversations.map((c) => {

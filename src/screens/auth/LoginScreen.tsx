@@ -50,6 +50,25 @@ const ROLE_THEME = {
       { color: '#74B9E8', size: 80,  left: SW * 0.3, top: SH * 0.2 },
     ],
   },
+  // Phase 1G - MENTOR accounts are created via admin account-linking, not a self-serve signup
+  // role card (see PeerMentorSignupScreen.tsx's doc comment), so this theme entry only exists to
+  // satisfy Record<UserRole, ...> below - a mentor logs in through the STUDENT role card, same as
+  // any other account, and MainRouter.tsx routes them to MentorTabs by their actual role afterward.
+  MENTOR: {
+    bg: '#F0FAF4',
+    heading: 'Peer Mentor 🌱',
+    sub: 'Support fellow students, one conversation at a time',
+    divEmoji: '🌱',
+    btnColor: '#2D6A4F',
+    shadowColor: '#1B4332',
+    orbs: [
+      { color: '#74C69D', size: 200, left: -70,     top: -50 },
+      { color: '#40916C', size: 140, left: SW - 70,  top: 80 },
+      { color: '#B7E4C7', size: 120, left: 10,       top: SH * 0.45 },
+      { color: '#D8F3DC', size: 100, left: SW - 50,  top: SH * 0.65 },
+      { color: '#52B788', size: 80,  left: SW * 0.3, top: SH * 0.2 },
+    ],
+  },
   ADMIN: {
     bg: '#F5F3FF',
     heading: 'Admin Access 🔑',
@@ -231,7 +250,7 @@ export function LoginScreen({ navigation, route }: Props) {
       await setSession(token, refreshToken, user);
 
       if (user.role === 'ADMIN')       navigation.replace('AdminDashboard');
-      else navigation.replace('Main');  // MainRouter handles COUNSELLOR vs STUDENT
+      else navigation.replace('Main');  // MainRouter handles COUNSELLOR vs MENTOR vs STUDENT
     } catch (err) {
       toast(err instanceof ApiRequestError ? err.message : 'Could not sign in. Please try again.');
     } finally {
@@ -239,7 +258,7 @@ export function LoginScreen({ navigation, route }: Props) {
     }
   };
 
-  const roleEmojis: Record<UserRole, string> = { STUDENT: '🌿', COUNSELLOR: '💙', ADMIN: '🔑' };
+  const roleEmojis: Record<UserRole, string> = { STUDENT: '🌿', COUNSELLOR: '💙', MENTOR: '🌱', ADMIN: '🔑' };
 
   return (
     <KeyboardAvoidingView style={[s.root, { backgroundColor: theme.bg }]}
