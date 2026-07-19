@@ -375,3 +375,65 @@ export function addToWhitelist(token: string, email: string, notes?: string): Pr
 export function removeFromWhitelist(token: string, email: string): Promise<void> {
   return apiDelete(`/api/admin/whitelist/${encodeURIComponent(email)}`, token);
 }
+
+// ── Phase 1H (Admin Portal - System Settings: Feature Flags) ──────────────
+
+export interface FeatureFlagView {
+  id: number;
+  flagKey: string;
+  enabled: boolean;
+  description: string | null;
+  updatedAt: string;
+}
+
+export function listFeatureFlags(token: string): Promise<FeatureFlagView[]> {
+  return apiGet<FeatureFlagView[]>('/api/admin/feature-flags', token);
+}
+
+export function createFeatureFlag(
+  token: string,
+  flagKey: string,
+  enabled: boolean,
+  description?: string
+): Promise<FeatureFlagView> {
+  return apiPost<FeatureFlagView>('/api/admin/feature-flags', { flagKey, enabled, description }, token);
+}
+
+export function setFeatureFlagEnabled(token: string, id: number, enabled: boolean): Promise<FeatureFlagView> {
+  return apiPatch<FeatureFlagView>(`/api/admin/feature-flags/${id}`, { enabled }, token);
+}
+
+export function deleteFeatureFlag(token: string, id: number): Promise<void> {
+  return apiDelete(`/api/admin/feature-flags/${id}`, token);
+}
+
+// ── Phase 1H (Admin Portal - System Settings: Admin Announcement broadcast) ─
+
+export type AnnouncementAudience = 'ALL' | 'STUDENT' | 'COUNSELLOR' | 'MENTOR' | 'ADMIN';
+
+export function broadcastAnnouncement(
+  token: string,
+  title: string,
+  body: string,
+  audience: AnnouncementAudience
+): Promise<{ recipientCount: number }> {
+  return apiPost<{ recipientCount: number }>('/api/admin/announcements', { title, body, audience }, token);
+}
+
+// ── Phase 1H (Admin Portal - Audit Logs) ───────────────────────────────────
+
+export interface AuditLogView {
+  id: number;
+  adminUserId: number;
+  adminName: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: string | null;
+  createdAt: string;
+}
+
+export function getAuditLogs(token: string, page = 0, size = 30): Promise<PageResponse<AuditLogView>> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  return apiGet<PageResponse<AuditLogView>>(`/api/admin/audit-logs?${params.toString()}`, token);
+}

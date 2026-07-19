@@ -303,6 +303,14 @@ export function AdminDashboardScreen({ navigation }: Props) {
             <Ionicons name="shield-outline" size={26} color={colors.lavender} />
             <Text style={s.quickActionText}>Community{'\n'}Moderation</Text>
           </Pressable>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminSystemSettings')}>
+            <Ionicons name="settings-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>System{'\n'}Settings</Text>
+          </Pressable>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminAuditLog')}>
+            <Ionicons name="document-text-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Audit{'\n'}Log</Text>
+          </Pressable>
         </View>
 
         {/* ── Counsellor Approval Queue ── */}
