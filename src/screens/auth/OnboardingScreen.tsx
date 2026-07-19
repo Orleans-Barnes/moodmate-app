@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { fonts, fontSizes, spacing, radii, gradients, glow } from '@/theme/tokens';
+import { useAuthStore } from '@/state/useAuthStore';
+import { getProfileStatus } from '@/api/profileSetup';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
@@ -130,6 +132,29 @@ export function OnboardingScreen({ navigation }: Props) {
     });
   };
 
+  const token = useAuthStore((st) => st.token);
+
+  // Post-onboarding routing: guests and any status-check failure fail open straight to Main
+  // (never block app entry on a non-critical check). Real students get routed to ProfileSetup
+  // only if the server says their profile isn't complete yet — this is derived server-side
+  // every time, never a client-side "have I onboarded" flag.
+  const goToPostOnboarding = async () => {
+    if (!token || token === 'guest') {
+      navigation.replace('Main');
+      return;
+    }
+    try {
+      const status = await getProfileStatus(token);
+      if (status.canShowOnboarding) {
+        navigation.replace('ProfileSetup');
+      } else {
+        navigation.replace('Main');
+      }
+    } catch {
+      navigation.replace('Main');
+    }
+  };
+
   const handleNext = () => {
     Animated.sequence([
       Animated.spring(btnScale, { toValue: 0.95, speed: 60, bounciness: 0, useNativeDriver: true }),
@@ -139,7 +164,7 @@ export function OnboardingScreen({ navigation }: Props) {
     if (index < SLIDES.length - 1) {
       goTo(index + 1);
     } else {
-      navigation.replace('Main');
+      goToPostOnboarding();
     }
   };
 
@@ -164,7 +189,7 @@ export function OnboardingScreen({ navigation }: Props) {
       {/* Skip */}
       <Pressable
         style={[s.skipBtn, { top: insets.top + spacing.md }]}
-        onPress={() => navigation.replace('Main')}
+        onPress={() => goToPostOnboarding()}
         hitSlop={12}
       >
         <Text style={s.skipTxt}>Skip</Text>
