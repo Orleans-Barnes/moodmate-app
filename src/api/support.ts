@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost } from './client';
+import { apiDelete, apiGet, apiPatch, apiPost } from './client';
 import type {
   AppointmentView,
   BookAppointmentRequest,
@@ -244,6 +244,9 @@ export function markRead(token: string, conversationId: number): Promise<void> {
 
 // ── Admin-only endpoints ─────────────────────────────────────────────────────
 
+// Phase 1H - SUSPENDED added alongside the pre-existing PENDING/APPROVED/REJECTED, an
+// admin-reversible state for an already-APPROVED counsellor (mirrors
+// com.moodmate.support.entity.CounsellorStatus exactly).
 export interface CounsellorRequestAdminView {
   id: number;
   userId: number;
@@ -251,7 +254,7 @@ export interface CounsellorRequestAdminView {
   title: string;
   bio: string;
   specialties: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 }
 
 export function listPendingCounsellorRequests(token: string): Promise<CounsellorRequestAdminView[]> {
@@ -264,6 +267,63 @@ export function approveCounsellorRequest(token: string, id: number): Promise<Cou
 
 export function rejectCounsellorRequest(token: string, id: number): Promise<CounsellorRequestAdminView> {
   return apiPost<CounsellorRequestAdminView>(`/api/support/counsellor-requests/${id}/reject`, undefined, token);
+}
+
+// Phase 1H (Admin Portal - Counsellor Management) - the full roster (any status), plus
+// suspend/reinstate/edit for an already-APPROVED row. Kept under the same "/counsellor-requests"
+// prefix as approve/reject above - same Counsellor row/id space, just a superset of actions.
+
+export function listAllCounsellorsForAdmin(token: string): Promise<CounsellorRequestAdminView[]> {
+  return apiGet<CounsellorRequestAdminView[]>('/api/support/counsellor-requests', token);
+}
+
+export function suspendCounsellor(token: string, id: number): Promise<CounsellorRequestAdminView> {
+  return apiPost<CounsellorRequestAdminView>(`/api/support/counsellor-requests/${id}/suspend`, undefined, token);
+}
+
+export function reinstateCounsellor(token: string, id: number): Promise<CounsellorRequestAdminView> {
+  return apiPost<CounsellorRequestAdminView>(`/api/support/counsellor-requests/${id}/reinstate`, undefined, token);
+}
+
+export interface AdminEditCounsellorInput {
+  title?: string;
+  bio?: string;
+  specialties?: string;
+  sortOrder?: number;
+}
+
+export function adminEditCounsellor(
+  token: string,
+  id: number,
+  input: AdminEditCounsellorInput
+): Promise<CounsellorRequestAdminView> {
+  return apiPatch<CounsellorRequestAdminView>(`/api/support/counsellor-requests/${id}`, input, token);
+}
+
+// Phase 1H (Admin Portal - Peer Mentor Management) - no approve/reject queue (Phase 1G already
+// established peer mentor accounts are admin-linked, not self-serve-applied-for). "Manage" here
+// means the full roster (including deactivated rows) plus an activate/deactivate toggle.
+
+export interface PeerMentorAdminView {
+  id: number;
+  userId: number | null;
+  name: string;
+  bio: string;
+  avatarEmoji: string;
+  focusArea: string;
+  available: boolean;
+}
+
+export function listAllMentorsForAdmin(token: string): Promise<PeerMentorAdminView[]> {
+  return apiGet<PeerMentorAdminView[]>('/api/support/mentors/admin', token);
+}
+
+export function deactivateMentor(token: string, id: number): Promise<PeerMentorAdminView> {
+  return apiPost<PeerMentorAdminView>(`/api/support/mentors/${id}/deactivate`, undefined, token);
+}
+
+export function activateMentor(token: string, id: number): Promise<PeerMentorAdminView> {
+  return apiPost<PeerMentorAdminView>(`/api/support/mentors/${id}/activate`, undefined, token);
 }
 
 // ── Admin endpoints ───────────────────────────────────────────────────────

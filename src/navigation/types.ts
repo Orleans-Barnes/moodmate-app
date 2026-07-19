@@ -39,6 +39,9 @@ export type RootStackParamList = {
   ForgotPassword: { email?: string };
   ResetPassword: { email: string };
   AdminDashboard: undefined;
+  AdminUserManagement: undefined;
+  AdminCounsellorMentorManagement: undefined;
+  AdminWellnessContent: undefined;
 
   CounsellorChat: { conversationId: number; studentName: string };
   MentorChat: { conversationId: number; studentName: string };

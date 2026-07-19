@@ -1,7 +1,7 @@
-import { apiGet, apiPost, apiPut } from './client';
+import { apiGet, apiPatch, apiPost, apiPut } from './client';
 import { ApiRequestError } from './client';
 import { BACKEND_BASE_URL } from '@/config';
-import type { AuthResponse, UserProfile } from './types';
+import type { AuthResponse, PageResponse, Role, UserProfile } from './types';
 
 export interface SignupInput {
   fullName: string;
@@ -83,4 +83,51 @@ export function forgotPassword(email: string): Promise<void> {
 
 export function resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
   return apiPost<void>('/api/auth/reset-password', { email, otp, newPassword });
+}
+
+// ── Phase 1H (Admin Portal - User Management) ─────────────────────────────
+// Mirrors com.moodmate.auth.controller.AdminUserController. Deliberately kept under
+// /api/users/admin/** rather than /api/admin/** - the latter routes to moodmate-admin, a
+// read-only cross-schema reporting service that never writes to another service's tables (see
+// that service's own AdminService.java doc comment). Every function here requires an ADMIN
+// token; the backend re-checks this itself via X-User-Role regardless.
+
+export interface AdminUserView {
+  id: number;
+  email: string;
+  fullName: string;
+  institution: string | null;
+  role: Role;
+  guest: boolean;
+  banned: boolean;
+  bannedReason: string | null;
+  bannedAt: string | null;
+  warningCount: number;
+  createdAt: string;
+}
+
+export interface ModerationStatusResponse {
+  userId: number;
+  banned: boolean;
+  bannedReason: string | null;
+  warningCount: number;
+}
+
+export function searchAdminUsers(
+  token: string,
+  query = '',
+  page = 0,
+  size = 20
+): Promise<PageResponse<AdminUserView>> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  if (query.trim()) params.set('query', query.trim());
+  return apiGet<PageResponse<AdminUserView>>(`/api/users/admin?${params.toString()}`, token);
+}
+
+export function suspendUser(token: string, userId: number, reason: string): Promise<ModerationStatusResponse> {
+  return apiPatch<ModerationStatusResponse>(`/api/users/admin/${userId}/suspend`, { reason }, token);
+}
+
+export function reinstateUser(token: string, userId: number): Promise<ModerationStatusResponse> {
+  return apiPatch<ModerationStatusResponse>(`/api/users/admin/${userId}/reinstate`, undefined, token);
 }

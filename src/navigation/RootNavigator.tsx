@@ -49,6 +49,9 @@ import { CounsellorSignupScreen } from '@/screens/counsellor/CounsellorSignupScr
 import { CounsellorOrMentorScreen } from '@/screens/counsellor/CounsellorOrMentorScreen';
 import { PeerMentorSignupScreen } from '@/screens/counsellor/PeerMentorSignupScreen';
 import { VideoSessionScreen } from '@/screens/support/VideoSessionScreen';
+import { AdminUserManagementScreen } from '@/screens/admin/AdminUserManagementScreen';
+import { AdminCounsellorMentorManagementScreen } from '@/screens/admin/AdminCounsellorMentorManagementScreen';
+import { AdminWellnessContentScreen } from '@/screens/admin/AdminWellnessContentScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -69,6 +72,9 @@ export function RootNavigator() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <Stack.Screen name="AdminUserManagement" component={AdminUserManagementScreen} />
+      <Stack.Screen name="AdminCounsellorMentorManagement" component={AdminCounsellorMentorManagementScreen} />
+      <Stack.Screen name="AdminWellnessContent" component={AdminWellnessContentScreen} />
       <Stack.Screen name="CounsellorChat" component={CounsellorChatScreen} />
       <Stack.Screen name="MentorChat" component={MentorChatScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />

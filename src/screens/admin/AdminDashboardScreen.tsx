@@ -282,6 +282,23 @@ export function AdminDashboardScreen({ navigation }: Props) {
           </View>
         )}
 
+        {/* ── Phase 1H - Admin Portal quick actions ── */}
+        <Text style={s.sectionTitle}>Manage</Text>
+        <View style={s.quickActionRow}>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminUserManagement')}>
+            <Ionicons name="people-circle-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Users</Text>
+          </Pressable>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminCounsellorMentorManagement')}>
+            <Ionicons name="medkit-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Counsellors{'\n'}& Mentors</Text>
+          </Pressable>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminWellnessContent')}>
+            <Ionicons name="leaf-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Wellness{'\n'}Content</Text>
+          </Pressable>
+        </View>
+
         {/* ── Counsellor Approval Queue ── */}
         <Text style={s.sectionTitle}>Counsellor Requests</Text>
         {loading ? (
@@ -448,6 +465,14 @@ const s = StyleSheet.create({
     borderLeftWidth: 3, borderLeftColor: '#E67E22',
   },
   alertText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: '#7D4200', flex: 1 },
+
+  // Phase 1H - quick action cards
+  quickActionRow: { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.xl },
+  quickActionCard: {
+    flex: 1, backgroundColor: colors.surface, borderRadius: radii.md, paddingVertical: spacing.md,
+    alignItems: 'center', gap: 6, ...shadow.sm,
+  },
+  quickActionText: { fontFamily: fonts.bodyBold, fontSize: 11, color: colors.ink, textAlign: 'center' },
 
   // Counsellor cards
   card: {
