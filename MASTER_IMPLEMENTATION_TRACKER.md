@@ -14,7 +14,7 @@ finished and integrated, so most remaining work is verification + completion, no
 |---|---|---|---|---|
 | 1D | Personalized Dashboard | 100% | — | ✅ Done |
 | 1E | Notifications | ~15% (local-only reminder + push token plumbing exist; no backend prefs/model/center/rules yet) | Medium | 1st — every later phase benefits from this existing first |
-| 1F-A | Counsellor Platform (everything but video) | ~60–70% | High | 2nd |
+| 1F-A | Counsellor Platform (everything but video) | ~90% (frontend wiring done 2026-07-19: reschedule, availability-status persistence, analytics, directory search/filter, chat read-parity; device walkthrough still outstanding) | Medium | 2nd |
 | 1G | Peer Mentor Platform (request/match workflow) | ~50% | Medium | 3rd |
 | 1F-B | Jitsi Video Sessions | 0% | High | 4th — deserves its own milestone, don't rush it alongside 1F-A |
 | 1H | Admin Portal (as modules, not screens) | ~40% | High | 5th |
@@ -65,10 +65,11 @@ kinds of "done."
 
 ## Phase 1E — Notifications (do this first)
 
-**Status: Steps 1–5 implemented and verified (backend compiles + tests pass, frontend `tsc`
-clean).** Not yet closed out against this project's exit criteria (see that section near the end
-of this file) — device verification, git tag, and committing the work are all still outstanding.
-**Risk: Medium.**
+**Status: ✅ COMPLETE.** Steps 1–5 implemented and verified (backend compiles + tests pass,
+frontend `tsc` clean); committed and tagged on both repos as `v1.3-phase-1E-notifications-complete`
+(backend `d43779e`, frontend `be3a5c0`). **Still outstanding, not blocking:** a real device
+walkthrough via Expo Go hasn't been confirmed back to me — worth doing before leaning on the push
+pipeline in later phases, but the code itself is done and shipped. **Risk: Medium → Low.**
 
 **What already exists (frontend, fully local, no backend involved):**
 - `src/utils/notifications.ts` — `expo-notifications` already wired up: permission request
@@ -300,42 +301,74 @@ passing `null` for that field in the test helper.
 
 ## Phase 1F-A — Counsellor Platform (everything except video)
 
-**Status:** ~60–70% complete. **Risk: High** (most product-critical flow after Home). Finish and
+**Status:** ~90% complete. **Risk: Medium** (down from High — the frontend wiring gap that made
+this risky is closed; what's left is device verification, not missing functionality). Finish and
 stabilize this before touching Jitsi.
 
 ### Directory
-`GET /api/support/counsellors` exists; `SupportScreen.tsx` renders a roster carousel via
-`useSupportStore`. Search/filter parameters don't exist yet. **Status: 🟡 Core listing done;
-search/filter is new work.**
+`GET /api/support/counsellors` exists and now returns `availabilityStatus` (`ONLINE`/`BUSY`/`AWAY`)
+per counsellor. `SupportScreen.tsx` renders a roster carousel via `useSupportStore`, with a new
+client-side search box (name/title/specialty) and an All/Counsellors/Mentors filter row, plus a
+colored-dot availability indicator per counsellor (replacing the old boolean available/unavailable
+text — mentors still use the boolean, since `PeerMentorDto` has no availability-status field).
+**Status: ✅ Done — search/filter is client-side over the already-loaded roster, no new endpoint
+needed for it.**
 
 ### Booking
 Fully implemented backend-side: `bookAppointment`, `listAppointments`, `cancelAppointment`
 (student), `confirmAppointment`, `completeAppointment`, `cancelAppointmentAsCounsellor`,
 `listCounsellorAppointments` (counsellor), with notification-deep-link hooks already wired for
 booking/confirm/cancel/complete. Frontend booking UI (day/time-slot picker) already built in
-`SupportScreen.tsx`; `CounsellorAppointmentsScreen.tsx` exists counsellor-side. **Gap:** no
-reschedule flow — only cancel-and-rebook. Confirm whether that's acceptable or add a real
-`reschedule` endpoint. **Status: ✅ Largely done — polish + reschedule decision remaining.**
+`SupportScreen.tsx`; `CounsellorAppointmentsScreen.tsx` exists counsellor-side. **Reschedule
+shipped:** backend `POST /api/support/appointments/{id}/reschedule` (only PENDING/CONFIRMED
+appointments; a CONFIRMED one reschedules back to PENDING, requiring re-confirmation at the new
+time). Frontend: `rescheduleAppointment()` in `src/api/support.ts`, `reschedule()` action in
+`useSupportStore.ts`, and a reschedule panel (same day/time-chip UI as booking) on the "Upcoming
+appointment" card in `SupportScreen.tsx`. **Status: ✅ Done.**
 
 ### Messaging
 Fully implemented backend-side: `startConversation`, `listConversations`, `listMessages`,
 `sendMessage`, `markRead` (student) + counsellor equivalents. Confirmed one-to-one per
 user+counsellor pair, not community chat. `ChatScreen.tsx`, `CounsellorChatScreen.tsx`,
-`CounsellorConversationsScreen.tsx` already exist. **Gap:** likely polling-only, no
-real-time delivery layer (WebSocket/SSE) — decide if that's needed for this phase or acceptable
-as-is. **Status: ✅ Largely done — audit real-time-ness and read-receipt UI.**
+`CounsellorConversationsScreen.tsx` already exist. `ChatScreen.tsx` (student-facing) now shows the
+same per-bubble timestamp + "· Read" indicator that `CounsellorChatScreen.tsx` already had — it
+previously rendered bubbles with no timestamp or read state at all. **Gap still open:**
+polling-only, no real-time delivery layer (WebSocket/SSE) beyond the existing Supabase real-time
+subscription both chat screens already attempt — decide if that's needed for this phase or
+acceptable as-is. **Status: ✅ Read-receipt parity done — real-time-ness still to audit.**
 
 ### Counsellor Dashboard
-`CounsellorDashboardScreen.tsx` exists — audit what it currently surfaces (today's/upcoming
-appointments) versus what's missing (session history, future video-join button).
-`listCounsellorAppointments` already covers the appointment-list half. **Status: 🟡 Scaffolded,
-needs an audit pass against the full feature list.**
+`CounsellorDashboardScreen.tsx`'s Online/Busy/Away toggle is now persisted server-side (`POST
+/api/support/counsellor/availability-status`, optimistic frontend update with revert-on-failure)
+instead of local-only React state. Added a Session History section (past COMPLETED/CANCELLED
+appointments, most recent first) and an Analytics section (see below). **Known gap:** there is no
+`GET` "my own counsellor row" endpoint, so the status pill still defaults to ONLINE on first
+render rather than restoring the last-saved value — a real, documented gap, not an oversight; needs
+a small backend addition if it matters before launch. Also fixed a pre-existing JSX structural bug
+where the Crisis Alerts section was accidentally nested inside the Wellbeing Tip card's
+`LinearGradient` (rendered, but inside the wrong visual container) — now a proper sibling section.
+**Status: ✅ Done, pending the "my own status" backend gap above and a device walkthrough.**
 
 ### Analytics
-Nothing counsellor-specific exists yet (the `moodmate-admin` analytics are platform-wide, not
-per-counsellor). New endpoints needed: total/upcoming/missed appointments, completion rate — can
-live directly in `moodmate-support` since it only needs that service's own `appointments` table,
-no cross-service reads. **Status: ⬜ Not started.**
+`GET /api/support/counsellor/analytics` shipped backend-side
+(`CounsellorAnalyticsResponse`: totalAppointments/upcomingCount/completedCount/missedCount/
+cancelledCount/completionRate — lifetime counts, "missed" computed as CONFIRMED-but-past-due-and-
+never-completed since nothing auto-transitions that state). Frontend: `getCounsellorAnalytics()` in
+`src/api/support.ts`, `CounsellorAnalyticsView` in `src/api/types.ts`, and a 6-card analytics grid
+on `CounsellorDashboardScreen.tsx`. **Status: ✅ Done.**
+
+### Verification done this pass
+`tsc --noEmit` — 0 errors, confirmed with the real process exit code (`REAL_EXIT:0`). The
+`npx expo export --platform android` bundling check called for by the frontend's own `CLAUDE.md`
+house rules could **not** be completed in this session's sandboxed shell — every attempt (direct,
+backgrounded, with `CI=1`/`EXPO_NO_TELEMETRY=1`/`EXPO_OFFLINE=1`, with and without Watchman present)
+produced zero output and hit the shell tool's hard per-call time limit with no error surfaced,
+while a trivial `expo --version` in the same shell returned instantly — pointing at an environment
+constraint (no Watchman, so Metro's file crawl over a 60-screen/2000+-module project likely exceeds
+the sandbox's per-command budget) rather than a code defect. **This still needs a real
+`npx expo export --platform android --output-dir /tmp/export-test` run on your own machine before
+calling this phase's exit criteria met** — do not skip it on the strength of `tsc` alone, per this
+project's own documented lesson that `tsc` passing is necessary but not sufficient.
 
 ---
 
