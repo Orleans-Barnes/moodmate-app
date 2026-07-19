@@ -1,5 +1,6 @@
 package com.moodmate.community.controller;
 
+import com.moodmate.community.client.AuditLogServiceClient;
 import com.moodmate.community.dto.CreateReportRequest;
 import com.moodmate.community.dto.ModerationActionRequest;
 import com.moodmate.community.dto.ReportResponse;
@@ -31,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class ModerationController {
 
     private final ModerationService moderationService;
+    private final AuditLogServiceClient auditLogServiceClient;
 
     @PostMapping("/posts/{id}/report")
     @ResponseStatus(HttpStatus.CREATED)
@@ -64,7 +66,9 @@ public class ModerationController {
                                    @RequestHeader("X-User-Role") String role,
                                    @PathVariable Long id) {
         requireAdmin(role);
-        return moderationService.approve(id, adminId);
+        ReportResponse result = moderationService.approve(id, adminId);
+        auditLogServiceClient.record(adminId, "APPROVE_REPORT", "CONTENT_REPORT", String.valueOf(id), null);
+        return result;
     }
 
     @PostMapping("/moderation/reports/{id}/remove")
@@ -72,24 +76,32 @@ public class ModerationController {
                                   @RequestHeader("X-User-Role") String role,
                                   @PathVariable Long id) {
         requireAdmin(role);
-        return moderationService.remove(id, adminId);
+        ReportResponse result = moderationService.remove(id, adminId);
+        auditLogServiceClient.record(adminId, "REMOVE_REPORTED_CONTENT", "CONTENT_REPORT", String.valueOf(id), null);
+        return result;
     }
 
     @PostMapping("/moderation/reports/{id}/ban")
-    public ResponseEntity<Void> ban(@RequestHeader("X-User-Role") String role,
+    public ResponseEntity<Void> ban(@RequestHeader("X-User-Id") Long adminId,
+                                     @RequestHeader("X-User-Role") String role,
                                      @PathVariable Long id,
                                      @RequestBody(required = false) ModerationActionRequest request) {
         requireAdmin(role);
         moderationService.banAuthor(id, request != null ? request.reason() : null);
+        auditLogServiceClient.record(adminId, "BAN_REPORTED_AUTHOR", "CONTENT_REPORT", String.valueOf(id),
+                request != null ? request.reason() : null);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/moderation/reports/{id}/warn")
-    public ResponseEntity<Void> warn(@RequestHeader("X-User-Role") String role,
+    public ResponseEntity<Void> warn(@RequestHeader("X-User-Id") Long adminId,
+                                      @RequestHeader("X-User-Role") String role,
                                       @PathVariable Long id,
                                       @RequestBody(required = false) ModerationActionRequest request) {
         requireAdmin(role);
         moderationService.warnAuthor(id, request != null ? request.reason() : null);
+        auditLogServiceClient.record(adminId, "WARN_REPORTED_AUTHOR", "CONTENT_REPORT", String.valueOf(id),
+                request != null ? request.reason() : null);
         return ResponseEntity.noContent().build();
     }
 

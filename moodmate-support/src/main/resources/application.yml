@@ -47,6 +47,9 @@ moodmate:
     # names/avatars and student names, and to promote an approved counsellor request's user to
     # the COUNSELLOR role.
     auth-base-url: ${AUTH_SERVICE_URL:http://localhost:8091}
+    # Phase 1H (Audit Logs) - direct (non-gateway) address for admin-service, read by
+    # AuditLogServiceClient.
+    admin-base-url: ${ADMIN_SERVICE_URL:http://localhost:8099}
 
 management:
   endpoints:

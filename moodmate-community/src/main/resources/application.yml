@@ -47,6 +47,9 @@ moodmate:
     # AuthServiceClient's ban/warn calls, same pattern as moodmate-journal/moodmate-ai's
     # wallet-base-url.
     auth-base-url: ${AUTH_SERVICE_URL:http://localhost:8091}
+    # Phase 1H (Audit Logs) - direct (non-gateway) address for admin-service, read by
+    # AuditLogServiceClient.
+    admin-base-url: ${ADMIN_SERVICE_URL:http://localhost:8099}
 
 management:
   endpoints:

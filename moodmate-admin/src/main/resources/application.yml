@@ -76,6 +76,13 @@ management:
       percentiles:
         http.server.requests: 0.5, 0.95, 0.99
 
+# Phase 1H (System Settings - Admin Announcement broadcast) - direct (non-gateway) address for
+# notifications-service, read by NotificationsServiceClient via ServiceClientsProperties. Same
+# pattern as moodmate-crisis's moodmate.services.auth-base-url.
+moodmate:
+  services:
+    notifications-base-url: ${NOTIFICATIONS_SERVICE_URL:http://localhost:8102}
+
 logging:
   pattern:
     # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,

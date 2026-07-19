@@ -1,5 +1,6 @@
 package com.moodmate.auth.controller;
 
+import com.moodmate.auth.client.AuditLogServiceClient;
 import com.moodmate.auth.dto.AdminUserView;
 import com.moodmate.auth.dto.ModerationReasonRequest;
 import com.moodmate.auth.dto.ModerationStatusResponse;
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminUserController {
 
     private final AuthService authService;
+    private final AuditLogServiceClient auditLogServiceClient;
 
     @GetMapping
     public Page<AdminUserView> search(@RequestHeader("X-User-Role") String role,
@@ -45,17 +47,23 @@ public class AdminUserController {
 
     @PatchMapping("/{userId}/suspend")
     public ModerationStatusResponse suspend(@RequestHeader("X-User-Role") String role,
+                                             @RequestHeader("X-User-Id") Long adminUserId,
                                              @PathVariable Long userId,
                                              @RequestBody ModerationReasonRequest request) {
         requireAdmin(role);
-        return authService.adminSuspendUser(userId, request.reason());
+        ModerationStatusResponse result = authService.adminSuspendUser(userId, request.reason());
+        auditLogServiceClient.record(adminUserId, "SUSPEND_USER", "USER", String.valueOf(userId), request.reason());
+        return result;
     }
 
     @PatchMapping("/{userId}/reinstate")
     public ModerationStatusResponse reinstate(@RequestHeader("X-User-Role") String role,
+                                               @RequestHeader("X-User-Id") Long adminUserId,
                                                @PathVariable Long userId) {
         requireAdmin(role);
-        return authService.unbanUser(userId);
+        ModerationStatusResponse result = authService.unbanUser(userId);
+        auditLogServiceClient.record(adminUserId, "REINSTATE_USER", "USER", String.valueOf(userId), null);
+        return result;
     }
 
     private void requireAdmin(String role) {

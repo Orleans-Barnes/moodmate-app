@@ -1,5 +1,6 @@
 package com.moodmate.support.controller;
 
+import com.moodmate.support.client.AuditLogServiceClient;
 import com.moodmate.support.dto.AdminEditCounsellorRequest;
 import com.moodmate.support.dto.AppointmentResponse;
 import com.moodmate.support.dto.BookAppointmentRequest;
@@ -57,6 +58,7 @@ import java.util.List;
 public class SupportController {
 
     private final SupportService supportService;
+    private final AuditLogServiceClient auditLogServiceClient;
 
     @GetMapping("/counsellors")
     public List<CounsellorDto> counsellors() {
@@ -108,24 +110,33 @@ public class SupportController {
 
     @PostMapping("/counsellor-requests/{id}/suspend")
     public CounsellorRequestAdminView suspendCounsellor(@RequestHeader("X-User-Role") String role,
+                                                          @RequestHeader("X-User-Id") Long adminUserId,
                                                           @PathVariable Long id) {
         requireAdmin(role);
-        return supportService.suspendCounsellor(id);
+        CounsellorRequestAdminView result = supportService.suspendCounsellor(id);
+        auditLogServiceClient.record(adminUserId, "SUSPEND_COUNSELLOR", "COUNSELLOR", String.valueOf(id), null);
+        return result;
     }
 
     @PostMapping("/counsellor-requests/{id}/reinstate")
     public CounsellorRequestAdminView reinstateCounsellor(@RequestHeader("X-User-Role") String role,
+                                                            @RequestHeader("X-User-Id") Long adminUserId,
                                                             @PathVariable Long id) {
         requireAdmin(role);
-        return supportService.reinstateCounsellor(id);
+        CounsellorRequestAdminView result = supportService.reinstateCounsellor(id);
+        auditLogServiceClient.record(adminUserId, "REINSTATE_COUNSELLOR", "COUNSELLOR", String.valueOf(id), null);
+        return result;
     }
 
     @PatchMapping("/counsellor-requests/{id}")
     public CounsellorRequestAdminView adminEditCounsellor(@RequestHeader("X-User-Role") String role,
+                                                            @RequestHeader("X-User-Id") Long adminUserId,
                                                             @PathVariable Long id,
                                                             @RequestBody AdminEditCounsellorRequest request) {
         requireAdmin(role);
-        return supportService.adminEditCounsellor(id, request);
+        CounsellorRequestAdminView result = supportService.adminEditCounsellor(id, request);
+        auditLogServiceClient.record(adminUserId, "EDIT_COUNSELLOR", "COUNSELLOR", String.valueOf(id), null);
+        return result;
     }
 
     // ── Phase 1H (Admin Portal - Peer Mentor Management) ─────────────────────────────────────────
@@ -137,15 +148,23 @@ public class SupportController {
     }
 
     @PostMapping("/mentors/{id}/deactivate")
-    public PeerMentorAdminView deactivateMentor(@RequestHeader("X-User-Role") String role, @PathVariable Long id) {
+    public PeerMentorAdminView deactivateMentor(@RequestHeader("X-User-Role") String role,
+                                                 @RequestHeader("X-User-Id") Long adminUserId,
+                                                 @PathVariable Long id) {
         requireAdmin(role);
-        return supportService.setPeerMentorActive(id, false);
+        PeerMentorAdminView result = supportService.setPeerMentorActive(id, false);
+        auditLogServiceClient.record(adminUserId, "DEACTIVATE_MENTOR", "PEER_MENTOR", String.valueOf(id), null);
+        return result;
     }
 
     @PostMapping("/mentors/{id}/activate")
-    public PeerMentorAdminView activateMentor(@RequestHeader("X-User-Role") String role, @PathVariable Long id) {
+    public PeerMentorAdminView activateMentor(@RequestHeader("X-User-Role") String role,
+                                               @RequestHeader("X-User-Id") Long adminUserId,
+                                               @PathVariable Long id) {
         requireAdmin(role);
-        return supportService.setPeerMentorActive(id, true);
+        PeerMentorAdminView result = supportService.setPeerMentorActive(id, true);
+        auditLogServiceClient.record(adminUserId, "ACTIVATE_MENTOR", "PEER_MENTOR", String.valueOf(id), null);
+        return result;
     }
 
     @PostMapping("/appointments")

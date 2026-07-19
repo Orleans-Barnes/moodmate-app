@@ -62,6 +62,11 @@ spring:
     # and Spring reads this property as a literal string, so a value with spaces fails SMTP auth.
 
 moodmate:
+  # Phase 1H (Audit Logs) - direct (non-gateway) address for admin-service, read by
+  # AuditLogServiceClient via ServiceClientsProperties. Same pattern as moodmate-crisis's
+  # moodmate.services.auth-base-url.
+  services:
+    admin-base-url: ${ADMIN_SERVICE_URL:http://localhost:8099}
   jwt:
     # Must be byte-for-byte identical to the gateway's JWT_SECRET (moodmate-gateway/application.yml)
     # - this service signs tokens, the gateway verifies them; a mismatch breaks every login.
