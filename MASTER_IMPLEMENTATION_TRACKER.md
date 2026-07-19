@@ -17,7 +17,7 @@ finished and integrated, so most remaining work is verification + completion, no
 | 1F-A | Counsellor Platform (everything but video) | ~90% (frontend wiring done 2026-07-19: reschedule, availability-status persistence, analytics, directory search/filter, chat read-parity; device walkthrough still outstanding) | Medium | 2nd |
 | 1G | Peer Mentor Platform (request/match workflow) | ~95% (request/accept workflow, MENTOR role + account linkage, mentor dashboard/messaging built and backend-compiled clean 2026-07-19; device walkthrough is the only thing outstanding) | Low–Medium | 3rd |
 | 1F-B | Jitsi Video Sessions | ~70% (8x8 JaaS meeting-window endpoints + WebView call screen built 2026-07-19, AppID-only/no JWT by deliberate scope choice; not compiler/tsc-verified this session, no device walkthrough yet) | Medium (down from High) | 4th |
-| 1H | Admin Portal (as modules, not screens) | ~65% (User Management, Counsellor/Peer Mentor suspend-deactivate, Wellness Content CRUD shipped 2026-07-19 - scoped to these 3 modules by deliberate choice; Community Moderation, System Settings, Audit Logs not started) | Medium (down from High) | 5th |
+| 1H | Admin Portal (as modules, not screens) | ~75% (User Management, Counsellor/Peer Mentor suspend-deactivate, Wellness Content CRUD, Community Moderation shipped 2026-07-19; System Settings and Audit Logs not started) | Medium (down from High) | 5th |
 | 1I | Production Readiness | 0% | High (pre-launch gate) | 6th — separate milestone from feature completion |
 | 2 | AI | Existing groundwork, uncommitted | Low (deliberately deferred) | Last |
 
@@ -549,11 +549,9 @@ JaaS API key (moderator lock, waiting room, recording, per-participant JWT claim
 
 ## Phase 1H — Admin Portal (as modules, not screens)
 
-**Status:** ~65% complete. **Risk: Medium** (down from High). Scoped this pass to the 3 modules
-with the most day-to-day admin value and the clearest ⬜ gap (User Management, Counsellor/Peer
-Mentor Management, Wellness Content) rather than all 8 at once - a deliberate choice made with the
-user given the deadline, not an oversight. Community Moderation, System Settings, and Audit Logs
-remain untouched.
+**Status:** ~75% complete. **Risk: Medium** (down from High). Scoped this pass to 4 of the 8
+modules (User Management, Counsellor/Peer Mentor Management, Wellness Content, Community
+Moderation) - System Settings and Audit Logs remain untouched.
 
 | Module | What it needs | Backend status | Frontend status |
 |---|---|---|---|
@@ -561,7 +559,7 @@ remain untouched.
 | **User Management** | View/search users, suspend/reinstate, role changes | ✅ **Shipped 2026-07-19.** `AdminUserController` (`moodmate-auth`, under `/api/users/admin/**` - deliberately not `/api/admin/**`, which routes to the read-only `moodmate-admin` reporting service, see that service's own doc comment). `GET` search/paginate (name/email, case-insensitive), `PATCH .../suspend` \| `.../reinstate` reusing `AuthService.banUser/unbanUser` from Feature 7's moderation flow exactly - same action, a second general-purpose entry point. `adminSuspendUser` refuses to suspend an ADMIN account. Role changes: not built this pass (the existing internal `updateRole` endpoint isn't gateway-reachable; left for a future pass, not urgent). | ✅ `AdminUserManagementScreen.tsx` - search box, suspend/reinstate per row, banned-reason banner. |
 | **Counsellor Management** | Approve, suspend, edit specialties/availability | ✅ **Suspend + edit shipped 2026-07-19**, on top of the pre-existing approve/reject. `CounsellorStatus` gains `SUSPENDED` (reversible, distinct from `REJECTED` which only applies to `PENDING`). New endpoints under the existing `/counsellor-requests` prefix: list-all (any status), suspend, reinstate, partial-edit (title/bio/specialties/sortOrder). | ✅ `AdminCounsellorMentorManagementScreen.tsx` (Counsellors tab) - full roster with status badges, suspend/reinstate. No edit-fields UI yet (backend PATCH is ready; deliberately deferred). |
 | **Peer Mentor Management** | Approve, deactivate, ratings | ✅ **Deactivate shipped 2026-07-19.** No approval queue by design (Phase 1G already established peer mentor accounts are admin-linked via `linkMentorAccount`, not self-serve-applied-for - offline certification, see that endpoint's doc comment). New: list-all (including deactivated), `POST .../activate` \| `.../deactivate` toggling the existing `available` boolean. Ratings: not built - no rating data model exists anywhere in the system yet, out of scope for this pass. | ✅ Same screen, Mentors tab - roster with active/deactivated badges, shows whether an account is linked yet, activate/deactivate. |
-| **Community Moderation** | Reports, hidden posts, banned users | `User.isBanned`/`bannedReason` fields exist (referenced in `AuthService.login`); actual moderation *actions* (flag review, post takedown) in `moodmate-community` not yet audited in this pass | ⬜ Not started this pass |
+| **Community Moderation** | Reports, hidden posts, banned users | ✅ **Already fully built pre-pass** (Feature 7) - `ModerationController`/`ModerationService` in `moodmate-community`: user-facing report endpoints, admin review queue (`GET /moderation/queue?status=`), approve/remove/ban/warn, automatic dedup-resolution of duplicate reports on the same content. Nothing needed here backend-side - the gap was purely that no frontend had ever called any of it. | ✅ **Shipped 2026-07-19.** `AdminModerationScreen.tsx` - Pending/Dismissed/Removed/All filter, per-report card (content preview + reason), Approve/Remove/Warn/Ban actions. |
 | **Wellness Content** | Articles, events, wellness tips | ✅ **Shipped 2026-07-19.** `HubController` was `GET` + RSVP only - added admin-gated `POST`/`PATCH`/`DELETE` for both articles and events. Article `publishedAt` is set server-side at creation (publish-now, no scheduling UI exists to justify backdating). Event deletion relies on `event_rsvps.event_id`'s existing `ON DELETE CASCADE` - no app-level RSVP cleanup needed. | ✅ `AdminWellnessContentScreen.tsx` - Articles/Events tab toggle, inline create form (event form reuses `SupportScreen`'s day/time chip picker pattern), delete with confirm. No edit UI this pass (backend PATCH ready for one later). |
 | **Analytics** | Retention, engagement, institutions, moods, appointments | 🟡 Institutions/moods/checkins exist; retention/engagement and appointment-specific analytics don't | 🟡 Partial - untouched this pass |
 | **System Settings** | Feature flags, notification broadcasts, logs | ⬜ Nothing found for any of these | ⬜ Not started |
@@ -578,7 +576,8 @@ remain untouched.
   run typecheck` on your machine before calling this phase's exit criteria met.**
 - Device walkthrough - not done (search a user and suspend/reinstate them; suspend/reinstate a
   counsellor; deactivate/reactivate a mentor; publish an article and create an event, then delete
-  both).
+  both; report a post as a student, then approve/remove/warn/ban from the moderation queue as
+  admin).
 
 ---
 
