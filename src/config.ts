@@ -9,4 +9,4 @@
  *
  * This is the ONLY file you need to touch when your IP changes.
  */
-export const BACKEND_BASE_URL = 'http://10.97.195.149:8080';
+export const BACKEND_BASE_URL = 'http://10.94.112.149:8080';
