@@ -57,18 +57,29 @@ export default function App() {
       const screen = data?.screen;
       if (!screen) return;
 
-      const routeMap: Partial<Record<string, keyof RootStackParamList>> = {
-        Home:    'Main',
-        AiChat:  'AiChat',
-        CheckIn: 'CheckIn',
-        Habits:  'HabitTracker',
-        Sleep:   'SleepTracker',
+      // Screens that live inside MainTabParamList (nested under the root's 'Main' screen), not
+      // directly on RootStackParamList - same distinction NotificationCenterScreen's handleTap
+      // makes for in-app taps (see that file's doc comment for the exact symptom this avoids:
+      // navigating to a nested-tab screen name directly from the root fails silently, the same
+      // way SOSScreen's old "Talk to a counsellor" link once did).
+      const NESTED_TAB_SCREENS = new Set(['Home', 'Journal', 'Explore', 'Community', 'Insights', 'Support']);
+      const ROOT_ALIASES: Partial<Record<string, keyof RootStackParamList>> = {
+        AiChat:       'AiChat',
+        CheckIn:      'CheckIn',
+        Habits:       'HabitTracker',
+        HabitTracker: 'HabitTracker',
+        Sleep:        'SleepTracker',
+        SleepTracker: 'SleepTracker',
       };
-      const route = routeMap[screen] ?? 'Main';
 
       const tryNavigate = () => {
         if (navigationRef.current?.isReady()) {
-          navigationRef.current.navigate(route as any);
+          if (NESTED_TAB_SCREENS.has(screen)) {
+            navigationRef.current.navigate('Main' as any, { screen } as any);
+          } else {
+            const route = ROOT_ALIASES[screen] ?? 'Main';
+            navigationRef.current.navigate(route as any);
+          }
         } else {
           setTimeout(tryNavigate, 300);
         }

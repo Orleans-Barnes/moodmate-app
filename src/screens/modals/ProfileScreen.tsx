@@ -288,6 +288,12 @@ export function ProfileScreen({ navigation }: Props) {
                 </View>
               </>
             )}
+            <Pressable
+              style={s.manageNotifLink}
+              onPress={() => navigation.navigate('NotificationPreferences')}
+            >
+              <Text style={s.manageNotifLinkTxt}>Manage reminder types & quiet hours →</Text>
+            </Pressable>
           </View>
         )}
 
@@ -579,5 +585,11 @@ const s = StyleSheet.create({
     color: colors.inkFaint,
     lineHeight: 14,
     flex: 1,
+  },
+  manageNotifLink: { marginTop: spacing.sm, alignSelf: 'flex-start' },
+  manageNotifLinkTxt: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSizes.xs,
+    color: '#6366F1',
   },
 });

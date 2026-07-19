@@ -63,6 +63,8 @@ export type RootStackParamList = {
   SleepTracker: undefined;
   PrivacyData: undefined;
   HelpSupport: undefined;
+  NotificationPreferences: undefined;
+  NotificationCenter: undefined;
 };
 
 export type ProfileSetupStackParamList = {

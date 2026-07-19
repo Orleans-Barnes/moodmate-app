@@ -81,7 +81,7 @@ export function SOSScreen({ navigation }: Props) {
         <Button
           label="💬  Talk to a counsellor"
           fullWidth
-          onPress={() => { navigation.goBack(); setTimeout(() => (navigation as any).navigate('Support'), 300); }}
+          onPress={() => { navigation.goBack(); setTimeout(() => (navigation as any).navigate('Main', { screen: 'Support' }), 300); }}
         />
         {resources.map((resource, i) => (
           <Button

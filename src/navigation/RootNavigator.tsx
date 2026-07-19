@@ -41,6 +41,8 @@ import { ThoughtDiaryScreen } from '@/screens/modals/ThoughtDiaryScreen';
 import { HabitTrackerScreen } from '@/screens/modals/HabitTrackerScreen';
 import { PrivacyDataScreen } from '@/screens/modals/PrivacyDataScreen';
 import { HelpSupportScreen } from '@/screens/modals/HelpSupportScreen';
+import { NotificationPreferencesScreen } from '@/screens/modals/NotificationPreferencesScreen';
+import { NotificationCenterScreen } from '@/screens/modals/NotificationCenterScreen';
 import { SleepTrackerScreen } from '@/screens/modals/SleepTrackerScreen';
 import { CounsellorSignupScreen } from '@/screens/counsellor/CounsellorSignupScreen';
 import { CounsellorOrMentorScreen } from '@/screens/counsellor/CounsellorOrMentorScreen';
@@ -95,6 +97,8 @@ export function RootNavigator() {
         <Stack.Screen name="SleepTracker" component={SleepTrackerScreen} options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="PrivacyData" component={PrivacyDataScreen} options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="NotificationCenter" component={NotificationCenterScreen} options={{ animation: 'slide_from_bottom' }} />
       </Stack.Group>
       <Stack.Screen name="MoodGate" component={MoodGateScreen} />
       <Stack.Screen name="MoodSuggest" component={MoodSuggestScreen} />

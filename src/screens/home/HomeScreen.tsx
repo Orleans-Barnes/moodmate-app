@@ -32,6 +32,13 @@ import { XPGainFloat, type XPGainHandle } from '@/components/gamification/XPGain
 import { LevelUpModal, type LevelUpHandle } from '@/components/gamification/LevelUpModal';
 import { StreakBumpCard, type StreakBumpHandle } from '@/components/gamification/StreakBumpCard';
 import { StreakCalendarWidget } from '@/components/gamification/StreakCalendarWidget';
+import { useDashboardStore } from '@/state/useDashboardStore';
+import { useNotificationStore } from '@/state/useNotificationStore';
+import { RecommendationCard } from '@/components/dashboard/RecommendationCard';
+import { LatestMoodCard } from '@/components/dashboard/LatestMoodCard';
+import { JournalPreviewCard } from '@/components/dashboard/JournalPreviewCard';
+import { SosShortcut } from '@/components/dashboard/SosShortcut';
+import type { RecommendationAction } from '@/utils/recommendationEngine';
 
 
 const { width: SW } = Dimensions.get('window');
@@ -295,6 +302,12 @@ export function HomeScreen({ navigation }: Props) {
   const token          = useAuthStore((s) => s.token);
   const user           = useAuthStore((s) => s.user);
   const isGuest        = user?.guest ?? false;
+  const recommendation   = useDashboardStore((s) => s.recommendation);
+  const latestMood        = useDashboardStore((s) => s.latestMood);
+  const latestJournal     = useDashboardStore((s) => s.latestJournal);
+  const dashboardRefresh  = useDashboardStore((s) => s.refresh);
+  const unreadCount       = useNotificationStore((s) => s.unreadCount);
+  const refreshUnreadCount = useNotificationStore((s) => s.refreshUnreadCount);
   const toast          = useToast();
   const confettiRef    = useRef<ConfettiHandle>(null);
   const xpFloatRef     = useRef<XPGainHandle>(null);
@@ -397,7 +410,17 @@ export function HomeScreen({ navigation }: Props) {
     load(token).catch((err) => {
       toast(err instanceof ApiRequestError ? err.message : 'Could not load wellness data.');
     });
-  }, [token, load, toast]);
+    // Dashboard data (latest mood/journal/preferences/recommendation) fails open - a rejected
+    // call there is already handled inside useDashboardStore (prior data preserved, no throw), so
+    // no .catch()/toast needed here the way the wellness load() above needs one.
+    dashboardRefresh(token, {
+      streakCount,
+      allGoalsDoneToday: goals.length > 0 && goals.every((g) => g.done),
+    });
+    // Notification badge - already fails silently inside the store (see its own doc comment), so
+    // no .catch()/toast needed here, same as the dashboardRefresh call above.
+    refreshUnreadCount(token);
+  }, [token, load, toast, dashboardRefresh, streakCount, goals, refreshUnreadCount]);
 
   // ── Level-up detection ────────────────────────────────────────────────────
   useEffect(() => {
@@ -463,6 +486,12 @@ export function HomeScreen({ navigation }: Props) {
     catch { navigation.navigate('CheckIn'); }
   };
 
+  const handleRecommendationAction = (action: RecommendationAction) => {
+    hapticLight();
+    try { (navigation as any).navigate(action.route, action.params); }
+    catch { navigation.navigate('CheckIn'); }
+  };
+
   return (
     <View style={s.root}>
       <LiquidBackground preset="wellness" opacityScale={0.55} />
@@ -478,13 +507,28 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={s.greeting}>{getGreeting()}, {firstName} 👋</Text>
             <Text style={s.date}>{TODAY_LABEL}</Text>
           </View>
-          {/* Avatar with coral glow ring */}
-          <Pressable
-            style={s.avatarBtn}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <Text style={s.avatarEmoji}>{user?.avatarEmoji ?? '🙂'}</Text>
-          </Pressable>
+          <View style={s.headerActions}>
+            {/* Bell - notification center (Phase 1E, Step 3) */}
+            <Pressable
+              style={s.bellBtn}
+              onPress={() => navigation.navigate('NotificationCenter')}
+              hitSlop={8}
+            >
+              <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+              {unreadCount > 0 && (
+                <View style={s.bellBadge}>
+                  <Text style={s.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </Pressable>
+            {/* Avatar with coral glow ring */}
+            <Pressable
+              style={s.avatarBtn}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <Text style={s.avatarEmoji}>{user?.avatarEmoji ?? '🙂'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Stats pills - glassmorphism */}
@@ -531,6 +575,21 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── SOS shortcut - always visible, never gated on data/auth state ── */}
+        <SosShortcut onPress={() => navigation.navigate('SOS')} />
+
+        {/* ── Phase 1D: personalized recommendation + latest mood/journal ── */}
+        {!isGuest && (
+          <>
+            <RecommendationCard
+              recommendation={recommendation}
+              onAction={() => handleRecommendationAction(recommendation.action)}
+            />
+            <LatestMoodCard mood={latestMood} onPress={() => navigation.navigate('CheckIn')} />
+            <JournalPreviewCard entry={latestJournal} onPress={() => navigation.navigate('Journal')} />
+          </>
+        )}
+
         {/* Guest banner / gamification nudges */}
         {isGuest ? (
           <GuestProgressBanner onCreateAccount={() => navigation.navigate('Signup')} />
@@ -737,6 +796,30 @@ const s = StyleSheet.create({
     elevation: 6,
   },
   avatarEmoji: { fontSize: 22 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  bellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: colors.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#7B3CC9', // matches gradients.header's last stop
+  },
+  bellBadgeText: { fontFamily: fonts.bodyBold, fontSize: 9, color: '#FFFFFF' },
 
   // Stats pills - glassmorphism
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },

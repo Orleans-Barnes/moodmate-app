@@ -418,3 +418,57 @@ export interface ProfileStatusResponse {
   needsGoals: boolean;
   canShowOnboarding: boolean;
 }
+
+// Mirrors com.moodmate.auth.profile.dto.NotificationPreferenceRequest/Response (Phase 1E, Step 1).
+// quietHoursStart/End are "HH:mm" strings, null when not configured - same wire format both ways,
+// server-side format validation happens in NotificationPreferenceService, not here. Sending ""
+// (empty string, not null) for either quiet-hours field clears it; omitting a field (undefined)
+// leaves it untouched server-side - same partial-update semantics as WellnessPreferenceRequest.
+export interface NotificationPreferenceRequest {
+  moodReminders?: boolean;
+  journalReminders?: boolean;
+  habitReminders?: boolean;
+  sleepReminders?: boolean;
+  appointmentReminders?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+}
+
+export interface NotificationPreferenceResponse {
+  moodReminders: boolean;
+  journalReminders: boolean;
+  habitReminders: boolean;
+  sleepReminders: boolean;
+  appointmentReminders: boolean;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  updatedAt: string;
+}
+
+// Mirrors com.moodmate.notifications.entity.NotificationType/NotificationStatus and
+// dto.NotificationResponse (Phase 1E, Step 2 - the moodmate-notifications microservice). Enum
+// constant names below are the literal wire values, same "written together" rule as every other
+// backend-mirroring type in this file.
+export type NotificationTypeKey =
+  | 'MOOD_REMINDER' | 'JOURNAL_REMINDER' | 'HABIT_REMINDER' | 'SLEEP_REMINDER'
+  | 'APPOINTMENT_BOOKED' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_CANCELLED' | 'APPOINTMENT_COMPLETED' | 'APPOINTMENT_REMINDER'
+  | 'MENTOR_REQUEST' | 'MENTOR_ACCEPTED' | 'MENTOR_DECLINED'
+  | 'CRISIS_ALERT' | 'ARTICLE_PUBLISHED' | 'EVENT_REMINDER'
+  | 'ACHIEVEMENT_UNLOCKED' | 'MISSION_COMPLETED' | 'ADMIN_ANNOUNCEMENT' | 'SYSTEM';
+
+export type NotificationStatusKey = 'PENDING' | 'SCHEDULED' | 'DELIVERED' | 'READ' | 'FAILED';
+
+export interface NotificationView {
+  id: number;
+  type: NotificationTypeKey;
+  title: string;
+  body: string;
+  destinationScreen: string | null;
+  destinationParams: string | null;
+  status: NotificationStatusKey;
+  scheduledAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+

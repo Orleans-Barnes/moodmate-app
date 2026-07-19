@@ -124,6 +124,16 @@ export function apiPut<T>(path: string, body?: unknown, token?: string): Promise
   });
 }
 
+// Added for Phase 1E Step 3 (notification center) - PATCH /api/notifications/{id}/read and
+// /read-all needed a verb this client didn't already have (only GET/POST/PUT/DELETE existed).
+export function apiPatch<T>(path: string, body?: unknown, token?: string): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers: authHeader(token),
+  });
+}
+
 function authHeader(token?: string): Record<string, string> {
   // 'guest' is a synthetic local-only token — never send it to the real API
   return token && token !== 'guest' ? { Authorization: `Bearer ${token}` } : {};

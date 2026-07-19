@@ -4,6 +4,7 @@
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": ".",
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["src/*"],
       "@react-native-community/slider": ["node_modules/@react-native-community/slider/typings/index.d.ts"],
