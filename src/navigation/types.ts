@@ -44,6 +44,10 @@ export type RootStackParamList = {
   MentorChat: { conversationId: number; studentName: string };
   Chat: { conversationId: number; otherPartyName: string };
 
+  // Phase 1F-B - the screen itself reads the logged-in role from useAuthStore to decide whether
+  // to call the student or counsellor meeting-credentials endpoint, so no role flag is needed here.
+  VideoSession: { appointmentId: number; otherPartyName: string };
+
   CheckIn: undefined;
   WellnessTree: undefined;
   GratitudeJar: undefined;

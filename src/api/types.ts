@@ -216,6 +216,23 @@ export interface CounsellorAnalyticsView {
   completionRate: number;
 }
 
+// Mirrors com.moodmate.support.dto.MeetingWindowView (Phase 1F-B) - backs
+// GET /api/support/appointments/{id}/meeting and .../counsellor/appointments/{id}/meeting.
+// roomName/joinUrl are only populated when open is true; the backend withholds them entirely
+// outside the authorized join window/identity, since 8x8.vc has no server-side room auth without
+// a signed JWT (not configured yet - see MASTER_IMPLEMENTATION_TRACKER.md Phase 1F-B). When open
+// is false, reason is one of 'NOT_CONFIRMED' | 'TOO_EARLY' | 'EXPIRED' and message is
+// ready-to-display copy.
+export interface MeetingWindowView {
+  open: boolean;
+  roomName: string | null;
+  joinUrl: string | null;
+  reason: 'NOT_CONFIRMED' | 'TOO_EARLY' | 'EXPIRED' | null;
+  message: string | null;
+  windowOpensAt: string;
+  windowClosesAt: string;
+}
+
 export interface ConversationView {
   id: number;
   counsellorId: number | null;

@@ -48,6 +48,7 @@ import { SleepTrackerScreen } from '@/screens/modals/SleepTrackerScreen';
 import { CounsellorSignupScreen } from '@/screens/counsellor/CounsellorSignupScreen';
 import { CounsellorOrMentorScreen } from '@/screens/counsellor/CounsellorOrMentorScreen';
 import { PeerMentorSignupScreen } from '@/screens/counsellor/PeerMentorSignupScreen';
+import { VideoSessionScreen } from '@/screens/support/VideoSessionScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -71,6 +72,7 @@ export function RootNavigator() {
       <Stack.Screen name="CounsellorChat" component={CounsellorChatScreen} />
       <Stack.Screen name="MentorChat" component={MentorChatScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="VideoSession" component={VideoSessionScreen} options={{ animation: 'slide_from_bottom' }} />
 
       <Stack.Group screenOptions={{ presentation: 'modal' }}>
         <Stack.Screen name="CheckIn" component={CheckInScreen} />

@@ -197,6 +197,18 @@ export function CounsellorAppointmentsScreen({ navigation }: Props) {
                     )}
                     {appt.status === 'CONFIRMED' && (
                       <>
+                        {/* Phase 1F-B - the actual join-window time gate (15 min before, per
+                            SupportService.buildMeetingWindow) is re-checked server-side by
+                            VideoSessionScreen itself, not duplicated here. */}
+                        <Pressable
+                          style={[s.btn, s.btnJoin]}
+                          onPress={() => navigation.navigate('VideoSession', {
+                            appointmentId: appt.id,
+                            otherPartyName: appt.studentName,
+                          })}
+                        >
+                          <Text style={[s.btnTxt, s.btnJoinTxt]}>🎥 Join Session</Text>
+                        </Pressable>
                         <Pressable
                           style={[s.btn, s.btnComplete]}
                           onPress={() => act(appt.id, () => completeAppointment(token!, appt.id))}
@@ -272,6 +284,8 @@ const s = StyleSheet.create({
   btnCancelTxt: { color: '#E74C3C' },
   btnComplete: { backgroundColor: '#EBF5FB' },
   btnCompleteTxt: { color: '#2980B9' },
+  btnJoin: { backgroundColor: '#2D6A4F' },
+  btnJoinTxt: { color: '#FFFFFF' },
 
   emptyBox: { alignItems: 'center', paddingVertical: 48, gap: 8 },
   emptyEmoji: { fontSize: 36 },

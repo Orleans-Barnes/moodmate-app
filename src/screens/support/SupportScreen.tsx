@@ -273,9 +273,21 @@ export function SupportScreen({ navigation }: Props) {
             <Button label={rescheduling ? 'Never mind' : 'Reschedule'} onPress={handleToggleReschedule} />
             <Button
               label="Message"
-              variant="primary"
               onPress={() => handleMessage({ counsellorId: upcoming.counsellorId }, upcoming.counsellorName)}
             />
+            {/* Phase 1F-B - only offered once the counsellor has confirmed; the actual join-window
+                time gate (15 min before, per SupportService.buildMeetingWindow) is re-checked
+                server-side by VideoSessionScreen itself, not duplicated here. */}
+            {upcoming.status === 'CONFIRMED' && (
+              <Button
+                label="Join Session"
+                variant="primary"
+                onPress={() => navigation.navigate('VideoSession', {
+                  appointmentId: upcoming.id,
+                  otherPartyName: upcoming.counsellorName,
+                })}
+              />
+            )}
           </View>
 
           {rescheduling && (

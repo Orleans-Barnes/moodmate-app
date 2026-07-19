@@ -8,6 +8,7 @@ import type {
   CounsellorConversationView,
   CounsellorView,
   ConversationView,
+  MeetingWindowView,
   MentorRequestForMentorView,
   MentorRequestView,
   MentorView,
@@ -99,6 +100,15 @@ export function setCounsellorAvailabilityStatus(
 // Phase 1F-A - backs the counsellor dashboard's analytics cards.
 export function getCounsellorAnalytics(token: string): Promise<CounsellorAnalyticsView> {
   return apiGet<CounsellorAnalyticsView>('/api/support/counsellor/analytics', token);
+}
+
+// Phase 1F-B - Jitsi meeting credentials, counsellor side. Only ever returns a real
+// roomName/joinUrl when the backend's join window is open - see MeetingWindowView's doc comment.
+export function getCounsellorAppointmentMeeting(
+  token: string,
+  appointmentId: number
+): Promise<MeetingWindowView> {
+  return apiGet<MeetingWindowView>(`/api/support/counsellor/appointments/${appointmentId}/meeting`, token);
 }
 
 // Student-side endpoints (com.moodmate.backend.support.SupportController, the non-"/counsellor/..."
@@ -200,6 +210,12 @@ export function rescheduleAppointment(
     { scheduledAt },
     token
   );
+}
+
+// Phase 1F-B - Jitsi meeting credentials, student side. Only ever returns a real
+// roomName/joinUrl when the backend's join window is open - see MeetingWindowView's doc comment.
+export function getAppointmentMeeting(token: string, appointmentId: number): Promise<MeetingWindowView> {
+  return apiGet<MeetingWindowView>(`/api/support/appointments/${appointmentId}/meeting`, token);
 }
 
 // Exactly one of counsellorId / peerMentorId must be set on the request - backend validates this.

@@ -16,14 +16,20 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.moodmate.app"
+      "bundleIdentifier": "com.moodmate.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "MoodMate needs camera access so you can be seen during a video counselling/mentor session.",
+        "NSMicrophoneUsageDescription": "MoodMate needs microphone access so you can be heard during a video counselling/mentor session."
+      }
     },
     "android": {
       "package": "com.moodmate.app",
       "permissions": [
         "android.permission.VIBRATE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
