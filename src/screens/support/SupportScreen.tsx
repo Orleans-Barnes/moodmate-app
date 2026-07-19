@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, ScrollView, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text, ScrollView, Pressable, StyleSheet, View, TextInput, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -16,7 +16,7 @@ import { useSupportStore } from '@/state/useSupportStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
 import { ApiRequestError } from '@/api/client';
-import type { ConversationView, CounsellorView, MentorView } from '@/api/types';
+import type { ConversationView, CounsellorAvailabilityStatus, CounsellorView, MentorView } from '@/api/types';
 import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
 
 type Props = CompositeScreenProps<
@@ -55,6 +55,14 @@ function formatApptWhen(iso: string): string {
   })}`;
 }
 
+// Phase 1F-A - maps the counsellor's real-time-ish status to a colored dot, replacing the old
+// boolean available/unavailable text (ONLINE/BUSY/AWAY is a richer signal than a single boolean).
+const AVAILABILITY_META: Record<CounsellorAvailabilityStatus, { label: string; dot: string; bg: string; text: string }> = {
+  ONLINE: { label: 'Online', dot: '#4CAF7D', bg: colors.sageSoft, text: colors.sage },
+  BUSY:   { label: 'Busy',   dot: '#E67E22', bg: '#FEF3E2',        text: '#B9600F' },
+  AWAY:   { label: 'Away',   dot: '#95A5A6', bg: '#F2F3F4',        text: '#6B7373' },
+};
+
 function avatarFor(c: ConversationView, counsellors: CounsellorView[], mentors: MentorView[]): string {
   if (c.counsellorId) return counsellors.find((x) => x.id === c.counsellorId)?.avatarEmoji ?? '🧑‍⚕️';
   if (c.peerMentorId) return mentors.find((x) => x.id === c.peerMentorId)?.avatarEmoji ?? '🧑';
@@ -89,12 +97,23 @@ export function SupportScreen({ navigation }: Props) {
   const load = useSupportStore((s) => s.load);
   const book = useSupportStore((s) => s.book);
   const cancelAppt = useSupportStore((s) => s.cancel);
+  const rescheduleAppt = useSupportStore((s) => s.reschedule);
   const openConversation = useSupportStore((s) => s.openConversation);
 
   const [bookingId, setBookingId] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [selectedTime, setSelectedTime] = useState(TIME_SLOTS[0]);
   const [booking, setBooking] = useState(false);
+
+  // Phase 1F-A - client-side search/filter over the already-loaded roster.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [kindFilter, setKindFilter] = useState<'all' | 'counsellor' | 'mentor'>('all');
+
+  // Phase 1F-A - reschedule panel for the "Upcoming appointment" card, mirrors the booking panel.
+  const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleDay, setRescheduleDay] = useState(() => new Date());
+  const [rescheduleTime, setRescheduleTime] = useState(TIME_SLOTS[0]);
+  const [reschedulingBusy, setReschedulingBusy] = useState(false);
 
   const refresh = useCallback(() => {
     if (!token) return;
@@ -150,14 +169,49 @@ export function SupportScreen({ navigation }: Props) {
     }
   };
 
+  const handleToggleReschedule = () => {
+    setRescheduling((v) => !v);
+    setRescheduleDay(new Date());
+    setRescheduleTime(TIME_SLOTS[0]);
+  };
+
+  const handleConfirmReschedule = async (appointmentId: number) => {
+    if (!token) return;
+    const scheduledAt = new Date(rescheduleDay);
+    const [hh, mm] = rescheduleTime.split(':').map(Number);
+    scheduledAt.setHours(hh, mm, 0, 0);
+    setReschedulingBusy(true);
+    try {
+      await rescheduleAppt(token, appointmentId, scheduledAt.toISOString());
+      toast('Appointment rescheduled ✓');
+      setRescheduling(false);
+    } catch (err) {
+      toast(err instanceof ApiRequestError ? err.message : 'Could not reschedule that appointment.');
+    } finally {
+      setReschedulingBusy(false);
+    }
+  };
+
   const upcoming = appointments
     .filter((a) => (a.status === 'PENDING' || a.status === 'CONFIRMED') && new Date(a.scheduledAt).getTime() > Date.now())
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
 
-  const roster: RosterItem[] = [
+  const fullRoster: RosterItem[] = [
     ...counsellors.map((c): RosterItem => ({ kind: 'counsellor', data: c })),
     ...mentors.map((m): RosterItem => ({ kind: 'mentor', data: m })),
   ];
+
+  // Phase 1F-A - client-side search/filter over the already-loaded roster (no new endpoint).
+  const query = searchQuery.trim().toLowerCase();
+  const roster = fullRoster.filter((item) => {
+    if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
+    if (!query) return true;
+    const { name } = item.data;
+    const subtitle = item.kind === 'counsellor' ? item.data.title : item.data.focusArea;
+    const specialties = item.kind === 'counsellor' ? item.data.specialties : [];
+    const haystack = [name, subtitle, ...specialties].join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
   const showSkeleton = loading && roster.length === 0;
@@ -192,18 +246,85 @@ export function SupportScreen({ navigation }: Props) {
           </View>
           <View style={styles.apptActions}>
             <Button label="Cancel" onPress={() => handleCancel(upcoming.id)} />
+            <Button label={rescheduling ? 'Never mind' : 'Reschedule'} onPress={handleToggleReschedule} />
             <Button
               label="Message"
               variant="primary"
               onPress={() => handleMessage({ counsellorId: upcoming.counsellorId }, upcoming.counsellorName)}
             />
           </View>
+
+          {rescheduling && (
+            <View style={styles.bookingPanel}>
+              <Text style={styles.bookingLabel}>Pick a new day</Text>
+              <View style={styles.dayRow}>
+                {visibleDays.map((day) => {
+                  const active = isSameDay(day, rescheduleDay);
+                  return (
+                    <Pressable
+                      key={day.toISOString()}
+                      style={[styles.dayChip, active && styles.dayChipActive]}
+                      onPress={() => setRescheduleDay(day)}
+                    >
+                      <Text style={[styles.dayChipWeekday, active && styles.dayChipTextActive]}>
+                        {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </Text>
+                      <Text style={[styles.dayChipNum, active && styles.dayChipTextActive]}>
+                        {day.getDate()}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.bookingLabel}>Pick a new time</Text>
+              <View style={styles.timeRow}>
+                {TIME_SLOTS.map((slot) => {
+                  const active = slot === rescheduleTime;
+                  return (
+                    <Pressable
+                      key={slot}
+                      style={[styles.timeChip, active && styles.timeChipActive]}
+                      onPress={() => setRescheduleTime(slot)}
+                    >
+                      <Text style={[styles.timeChipText, active && styles.timeChipTextActive]}>
+                        {formatTimeLabel(slot)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Button
+                label={reschedulingBusy ? 'Rescheduling…' : 'Confirm new time'}
+                variant="primary"
+                fullWidth
+                disabled={reschedulingBusy}
+                onPress={() => handleConfirmReschedule(upcoming.id)}
+                style={styles.confirmBtn}
+              />
+            </View>
+          )}
         </Card>
       )}
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Counsellors & mentors</Text>
-        <Text style={styles.sectionMeta}>swipe to see all</Text>
+        <Text style={styles.sectionMeta}>{roster.length} of {fullRoster.length}</Text>
+      </View>
+
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by name or specialty…"
+          placeholderTextColor={colors.inkFaint}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+      </View>
+      <View style={styles.filterRow}>
+        <Chip label="All" active={kindFilter === 'all'} onPress={() => setKindFilter('all')} />
+        <Chip label="Counsellors" active={kindFilter === 'counsellor'} onPress={() => setKindFilter('counsellor')} />
+        <Chip label="Mentors" active={kindFilter === 'mentor'} onPress={() => setKindFilter('mentor')} />
       </View>
 
       {showSkeleton ? (
@@ -212,9 +333,13 @@ export function SupportScreen({ navigation }: Props) {
           <Skeleton width="60%" height={14} style={styles.skeletonGap} />
           <Skeleton width="80%" height={11} />
         </View>
-      ) : roster.length === 0 ? (
+      ) : fullRoster.length === 0 ? (
         <Card>
           <Text style={styles.emptyText}>No counsellors or mentors available right now.</Text>
+        </Card>
+      ) : roster.length === 0 ? (
+        <Card>
+          <Text style={styles.emptyText}>No matches for "{searchQuery}". Try a different search.</Text>
         </Card>
       ) : (
         <ScrollView
@@ -240,7 +365,17 @@ export function SupportScreen({ navigation }: Props) {
                   <View style={styles.mentorBigAvatar}>
                     <Text style={styles.mentorBigAvatarEmoji}>{avatarEmoji}</Text>
                   </View>
-                  {available ? (
+                  {isCounsellor ? (
+                    (() => {
+                      const meta = AVAILABILITY_META[(item.data as CounsellorView).availabilityStatus];
+                      return (
+                        <View style={[styles.onlineBadge, { backgroundColor: meta.bg }]}>
+                          <View style={[styles.onlineDot, { backgroundColor: meta.dot }]} />
+                          <Text style={[styles.onlineBadgeText, { color: meta.text }]}>{meta.label}</Text>
+                        </View>
+                      );
+                    })()
+                  ) : available ? (
                     <View style={styles.onlineBadge}>
                       <View style={styles.onlineDot} />
                       <Text style={styles.onlineBadgeText}>Available</Text>
@@ -413,6 +548,19 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: spacing.sm, marginTop: spacing.md },
   sectionTitle: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base + 2, color: colors.ink },
   sectionMeta: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkFaint },
+  searchRow: { marginBottom: spacing.sm },
+  searchInput: {
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    backgroundColor: colors.surface,
+    color: colors.ink,
+  },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.sm },
   carouselOuter: { marginHorizontal: -spacing.lg, marginBottom: spacing.xs },
   carousel: { paddingHorizontal: spacing.lg, gap: spacing.md },
   emptyText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.inkFaint, textAlign: 'center' },

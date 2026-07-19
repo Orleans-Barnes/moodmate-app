@@ -2,7 +2,9 @@ import { apiDelete, apiGet, apiPost } from './client';
 import type {
   AppointmentView,
   BookAppointmentRequest,
+  CounsellorAnalyticsView,
   CounsellorAppointmentView,
+  CounsellorAvailabilityStatus,
   CounsellorConversationView,
   CounsellorView,
   ConversationView,
@@ -78,6 +80,24 @@ export function markCounsellorRead(token: string, conversationId: number): Promi
   return apiPost<void>(`/api/support/counsellor/conversations/${conversationId}/read`, undefined, token);
 }
 
+// Phase 1F-A - persists the dashboard's Online/Busy/Away toggle (previously local-only React
+// state, never seen by students). Read back via GET /api/support/counsellors' availabilityStatus.
+export function setCounsellorAvailabilityStatus(
+  token: string,
+  availabilityStatus: CounsellorAvailabilityStatus
+): Promise<CounsellorAvailabilityStatus> {
+  return apiPost<CounsellorAvailabilityStatus>(
+    '/api/support/counsellor/availability-status',
+    { availabilityStatus },
+    token
+  );
+}
+
+// Phase 1F-A - backs the counsellor dashboard's analytics cards.
+export function getCounsellorAnalytics(token: string): Promise<CounsellorAnalyticsView> {
+  return apiGet<CounsellorAnalyticsView>('/api/support/counsellor/analytics', token);
+}
+
 // Student-side endpoints (com.moodmate.backend.support.SupportController, the non-"/counsellor/..."
 // routes) - Phase 3, Task #7. A Counsellor can be booked AND messaged; a PeerMentor can only be
 // messaged (no booking endpoint exists for mentors - mirrors the backend, which has none either).
@@ -100,6 +120,19 @@ export function listAppointments(token: string): Promise<AppointmentView[]> {
 
 export function cancelAppointment(token: string, appointmentId: number): Promise<AppointmentView> {
   return apiPost<AppointmentView>(`/api/support/appointments/${appointmentId}/cancel`, undefined, token);
+}
+
+// Phase 1F-A - student-initiated reschedule. scheduledAt must be a future ISO instant.
+export function rescheduleAppointment(
+  token: string,
+  appointmentId: number,
+  scheduledAt: string
+): Promise<AppointmentView> {
+  return apiPost<AppointmentView>(
+    `/api/support/appointments/${appointmentId}/reschedule`,
+    { scheduledAt },
+    token
+  );
 }
 
 // Exactly one of counsellorId / peerMentorId must be set on the request - backend validates this.

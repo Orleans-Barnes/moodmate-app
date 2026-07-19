@@ -25,6 +25,10 @@ import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
+function formatBubbleTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 export function ChatScreen({ route, navigation }: Props) {
   const { conversationId, otherPartyName } = route.params;
   const insets   = useSafeAreaInsets();
@@ -148,6 +152,10 @@ export function ChatScreen({ route, navigation }: Props) {
                     <Text style={fromMe ? styles.bubbleTextRight : styles.bubbleTextLeft}>
                       {m.body}
                     </Text>
+                    <Text style={fromMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft}>
+                      {formatBubbleTime(m.createdAt)}
+                      {fromMe && m.readAt ? ' · Read' : ''}
+                    </Text>
                   </View>
                 </View>
               );
@@ -232,6 +240,8 @@ const styles = StyleSheet.create({
   },
   bubbleTextRight: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: '#FFFFFF' },
   bubbleTextLeft:  { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.ink },
+  bubbleTimeRight: { fontFamily: fonts.bodyMedium, fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 4, textAlign: 'right' },
+  bubbleTimeLeft:  { fontFamily: fonts.bodyMedium, fontSize: 9, color: colors.inkFaint, marginTop: 4 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

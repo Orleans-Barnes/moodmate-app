@@ -157,6 +157,11 @@ export interface SosResourceView {
 // wiring (Phase 3, Task #7). The counsellor-perspective types above (CounsellorAppointmentView,
 // CounsellorConversationView) already existed from Phase 2 Part B; these are the matching
 // student-perspective shapes for the same backend domain.
+// Mirrors com.moodmate.support.entity.CounsellorAvailabilityStatus (Phase 1F-A) - a counsellor's
+// real-time-ish self-reported status, distinct from CounsellorStatus (the PENDING/APPROVED/
+// REJECTED account-request workflow, an unrelated concept on the same entity).
+export type CounsellorAvailabilityStatus = 'ONLINE' | 'BUSY' | 'AWAY';
+
 export interface CounsellorView {
   id: number;
   name: string;
@@ -165,6 +170,7 @@ export interface CounsellorView {
   avatarEmoji: string;
   specialties: string[];
   available: boolean;
+  availabilityStatus: CounsellorAvailabilityStatus;
 }
 
 export interface MentorView {
@@ -190,6 +196,23 @@ export interface BookAppointmentRequest {
   counsellorId: number;
   scheduledAt: string;
   notes?: string;
+}
+
+// Mirrors com.moodmate.support.dto.RescheduleAppointmentRequest (Phase 1F-A) - scheduledAt must
+// be a future ISO instant, validated backend-side (@Future).
+export interface RescheduleAppointmentRequest {
+  scheduledAt: string;
+}
+
+// Mirrors com.moodmate.support.dto.CounsellorAnalyticsResponse (Phase 1F-A) - backs
+// GET /api/support/counsellor/analytics. All counts are lifetime, not windowed.
+export interface CounsellorAnalyticsView {
+  totalAppointments: number;
+  upcomingCount: number;
+  completedCount: number;
+  missedCount: number;
+  cancelledCount: number;
+  completionRate: number;
 }
 
 export interface ConversationView {

@@ -6,6 +6,7 @@ import {
   listConversations,
   listCounsellors,
   listMentors,
+  rescheduleAppointment,
   startConversation,
 } from '@/api/support';
 import type { AppointmentView, ConversationView, CounsellorView, MentorView } from '@/api/types';
@@ -19,6 +20,8 @@ interface SupportState {
   load: (token: string) => Promise<void>;
   book: (token: string, counsellorId: number, scheduledAt: string, notes?: string) => Promise<AppointmentView>;
   cancel: (token: string, appointmentId: number) => Promise<void>;
+  /** Phase 1F-A - student-initiated reschedule of an existing appointment. */
+  reschedule: (token: string, appointmentId: number, scheduledAt: string) => Promise<AppointmentView>;
   /** Reuses an existing conversation with this counsellor/mentor if one exists, otherwise starts one. */
   openConversation: (
     token: string,
@@ -62,6 +65,11 @@ export const useSupportStore = create<SupportState>((set, get) => ({
   cancel: async (token, appointmentId) => {
     const updated = await cancelAppointment(token, appointmentId);
     set({ appointments: get().appointments.map((a) => (a.id === appointmentId ? updated : a)) });
+  },
+  reschedule: async (token, appointmentId, scheduledAt) => {
+    const updated = await rescheduleAppointment(token, appointmentId, scheduledAt);
+    set({ appointments: get().appointments.map((a) => (a.id === appointmentId ? updated : a)) });
+    return updated;
   },
   openConversation: async (token, target) => {
     const existing = get().conversations.find((c) =>

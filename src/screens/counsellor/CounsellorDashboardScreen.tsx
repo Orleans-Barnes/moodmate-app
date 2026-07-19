@@ -13,10 +13,17 @@ import type { CounsellorTabParamList, RootStackParamList } from '@/navigation/ty
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
 import {
+  getCounsellorAnalytics,
   listCounsellorAppointments,
   listCounsellorConversations,
+  setCounsellorAvailabilityStatus,
 } from '@/api/support';
-import type { CounsellorAppointmentView, CounsellorConversationView } from '@/api/types';
+import type {
+  CounsellorAnalyticsView,
+  CounsellorAppointmentView,
+  CounsellorAvailabilityStatus,
+  CounsellorConversationView,
+} from '@/api/types';
 import { hapticLight } from '@/utils/haptics';
 import { listOpenAlerts, updateAlert, type CrisisAlertDto } from '@/api/crisis';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
@@ -26,7 +33,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-type StatusKey = 'ONLINE' | 'BUSY' | 'AWAY';
+type StatusKey = CounsellorAvailabilityStatus;
 const STATUS_OPTIONS: { key: StatusKey; label: string; color: string; bg: string }[] = [
   { key: 'ONLINE', label: '● Online',   color: '#27AE60', bg: '#E8F8EF' },
   { key: 'BUSY',   label: '● Busy',     color: '#E67E22', bg: '#FEF3E2' },
@@ -51,30 +58,55 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
   const user    = useAuthStore((s) => s.user);
   const toast   = useToast();
 
+  // Phase 1F-A - this toggle is now persisted server-side (POST .../availability-status), read
+  // back via GET /api/support/counsellors' availabilityStatus field. There is no "get my own
+  // counsellor row" endpoint yet, so the very first render still defaults to ONLINE rather than
+  // restoring whatever was last saved - a known, documented gap, not an oversight.
   const [status, setStatus]       = useState<StatusKey>('ONLINE');
   const [statusOpen, setStatusOpen] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [appointments, setAppointments] = useState<CounsellorAppointmentView[]>([]);
   const [convos, setConvos]       = useState<CounsellorConversationView[]>([]);
   const [loading, setLoading]     = useState(true);
   const [crisisAlerts, setCrisisAlerts] = useState<CrisisAlertDto[]>([]);
+  const [analytics, setAnalytics] = useState<CounsellorAnalyticsView | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const [appts, msgs, crisisData] = await Promise.all([
+      const [appts, msgs, crisisData, analyticsData] = await Promise.all([
         listCounsellorAppointments(token),
         listCounsellorConversations(token),
         listOpenAlerts(token),
+        getCounsellorAnalytics(token),
       ]);
       setAppointments(appts);
       setConvos(msgs);
       setCrisisAlerts(crisisData);
+      setAnalytics(analyticsData);
     } catch {
       toast('Could not load dashboard');
     } finally {
       setLoading(false);
     }
   }, [token, toast]);
+
+  const handleStatusChange = async (next: StatusKey) => {
+    setStatusOpen(false);
+    if (next === status || !token) return;
+    const previous = status;
+    setStatus(next); // optimistic
+    setStatusSaving(true);
+    hapticLight();
+    try {
+      await setCounsellorAvailabilityStatus(token, next);
+    } catch {
+      setStatus(previous); // revert on failure
+      toast('Could not update your status. Try again.');
+    } finally {
+      setStatusSaving(false);
+    }
+  };
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -91,6 +123,12 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
     .filter(a => a.status === 'CONFIRMED' || a.status === 'PENDING')
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     .slice(0, 4);
+
+  // Phase 1F-A - session history: past appointments (completed or cancelled), most recent first.
+  const sessionHistory = appointments
+    .filter(a => a.status === 'COMPLETED' || a.status === 'CANCELLED')
+    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
+    .slice(0, 5);
 
   const firstName = user?.fullName?.split(' ')[0] ?? 'Counsellor';
 
@@ -137,8 +175,8 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
           {/* Status toggle */}
           <View>
             <Pressable
-              style={[s.statusPill, { backgroundColor: currentStatus.bg }]}
-              onPress={() => { hapticLight(); setStatusOpen(v => !v); }}
+              style={[s.statusPill, { backgroundColor: currentStatus.bg }, statusSaving && s.statusPillSaving]}
+              onPress={() => { if (statusSaving) return; hapticLight(); setStatusOpen(v => !v); }}
             >
               <Text style={[s.statusLabel, { color: currentStatus.color }]}>{currentStatus.label}</Text>
               <Text style={[s.statusCaret, { color: currentStatus.color }]}>▾</Text>
@@ -149,7 +187,7 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
                   <Pressable
                     key={opt.key}
                     style={[s.statusOption, opt.key === status && s.statusOptionActive]}
-                    onPress={() => { setStatus(opt.key); setStatusOpen(false); hapticLight(); }}
+                    onPress={() => handleStatusChange(opt.key)}
                   >
                     <Text style={[s.statusOptionLabel, { color: opt.color }]}>{opt.label}</Text>
                   </Pressable>
@@ -288,16 +326,71 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
           </>
         )}
 
-        {/* Wellbeing tip card */}
-        <View style={s.tipCard}>
-          <LinearGradient colors={['#1B4F72', '#2980B9']} style={s.tipGrad} start={{x:0,y:0}} end={{x:1,y:1}}>
-            <Text style={s.tipEmoji}>💡</Text>
-            <Text style={s.tipTitle}>Counsellor Tip</Text>
-            <Text style={s.tipBody}>
-              Remember to check in on your own wellbeing too. Peer supporters are most effective when they feel supported themselves.
-            </Text>
+        {/* Analytics */}
+        <View style={s.sectionRow}>
+          <Text style={s.sectionTitle}>Your Analytics</Text>
+        </View>
+        {analytics && (
+          <View style={s.analyticsGrid}>
+            <View style={s.analyticsCard}>
+              <Text style={s.analyticsNum}>{analytics.totalAppointments}</Text>
+              <Text style={s.analyticsLbl}>Total sessions</Text>
+            </View>
+            <View style={s.analyticsCard}>
+              <Text style={s.analyticsNum}>{analytics.upcomingCount}</Text>
+              <Text style={s.analyticsLbl}>Upcoming</Text>
+            </View>
+            <View style={s.analyticsCard}>
+              <Text style={s.analyticsNum}>{analytics.completedCount}</Text>
+              <Text style={s.analyticsLbl}>Completed</Text>
+            </View>
+            <View style={s.analyticsCard}>
+              <Text style={[s.analyticsNum, analytics.missedCount > 0 && s.analyticsNumWarn]}>{analytics.missedCount}</Text>
+              <Text style={s.analyticsLbl}>Missed</Text>
+            </View>
+            <View style={s.analyticsCard}>
+              <Text style={s.analyticsNum}>{analytics.cancelledCount}</Text>
+              <Text style={s.analyticsLbl}>Cancelled</Text>
+            </View>
+            <View style={s.analyticsCard}>
+              <Text style={s.analyticsNum}>{Math.round(analytics.completionRate * 100)}%</Text>
+              <Text style={s.analyticsLbl}>Completion rate</Text>
+            </View>
+          </View>
+        )}
 
-        {/* ── Crisis Alerts ── */}
+        {/* Session history */}
+        {sessionHistory.length > 0 && (
+          <>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionTitle}>Session History</Text>
+            </View>
+            {sessionHistory.map(appt => (
+              <View key={appt.id} style={s.apptCard}>
+                <View style={s.apptLeft}>
+                  <View style={s.apptDateBox}>
+                    <Text style={s.apptDayName}>{formatDate(appt.scheduledAt)}</Text>
+                    <Text style={s.apptTime}>{formatTime(appt.scheduledAt)}</Text>
+                  </View>
+                </View>
+                <View style={s.apptRight}>
+                  <Text style={s.apptStudent}>{appt.studentName}</Text>
+                  <View style={[s.apptBadge,
+                    appt.status === 'COMPLETED' && s.badgeConfirmed,
+                    appt.status === 'CANCELLED' && s.badgeCancelled,
+                  ]}>
+                    <Text style={[s.apptBadgeTxt,
+                      appt.status === 'COMPLETED' && s.badgeConfirmedTxt,
+                      appt.status === 'CANCELLED' && s.badgeCancelledTxt,
+                    ]}>{appt.status}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
+        {/* Crisis Alerts */}
         {crisisAlerts.length > 0 && (
           <View style={s.crisisSection}>
             <View style={s.crisisTitleRow}>
@@ -332,6 +425,14 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
           </View>
         )}
 
+        {/* Wellbeing tip card */}
+        <View style={s.tipCard}>
+          <LinearGradient colors={['#1B4F72', '#2980B9']} style={s.tipGrad} start={{x:0,y:0}} end={{x:1,y:1}}>
+            <Text style={s.tipEmoji}>💡</Text>
+            <Text style={s.tipTitle}>Counsellor Tip</Text>
+            <Text style={s.tipBody}>
+              Remember to check in on your own wellbeing too. Peer supporters are most effective when they feel supported themselves.
+            </Text>
           </LinearGradient>
         </View>
       </ScrollView>
@@ -364,6 +465,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: radii.pill,
   },
+  statusPillSaving: { opacity: 0.6 },
   statusLabel: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs },
   statusCaret: { fontFamily: fonts.bodyBold, fontSize: 10 },
   statusDropdown: {
@@ -442,7 +544,21 @@ const s = StyleSheet.create({
   badgePendingTxt:  { color: '#E67E22' },
   badgeConfirmed:   { backgroundColor: '#E8F8EF' },
   badgeConfirmedTxt:{ color: '#27AE60' },
+  badgeCancelled:   { backgroundColor: '#FDEDEC' },
+  badgeCancelledTxt:{ color: '#C0392B' },
   apptChevron: { fontSize: 22, color: colors.inkFaint },
+
+  // Analytics
+  analyticsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  analyticsCard: {
+    flexBasis: '31%', flexGrow: 1,
+    backgroundColor: '#FFFFFF', borderRadius: 14,
+    paddingVertical: spacing.md, alignItems: 'center',
+    ...shadow.sm,
+  },
+  analyticsNum: { fontFamily: fonts.display, fontSize: fontSizes.lg, color: '#1B4F72' },
+  analyticsNumWarn: { color: '#C0392B' },
+  analyticsLbl: { fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.inkFaint, marginTop: 2, textAlign: 'center' },
 
   // Empty
   emptyBox: { alignItems: 'center', paddingVertical: spacing.xl, gap: 8 },
