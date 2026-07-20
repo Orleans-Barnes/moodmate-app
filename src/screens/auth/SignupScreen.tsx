@@ -27,7 +27,7 @@ import { ApiRequestError } from '@/api/client';
 import { colors, fonts, fontSizes, radii, spacing, shadow, gradients, glow } from '@/theme/tokens';
 import { Ionicons } from '@expo/vector-icons';
 import { InstitutionPicker } from '@/components/InstitutionPicker';
-import type { Institution } from '@/data/institutions';
+import { loadInstitutions, type Institution, type InstitutionSource } from '@/data/institutions';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Signup'>;
 
@@ -73,6 +73,15 @@ export function SignupScreen({ navigation }: Props) {
   const loginAsGuest = useAuthStore((s) => s.loginAsGuest);
   const insets     = useSafeAreaInsets();
   const btnScale   = useRef(new Animated.Value(1)).current;
+
+  // Institution Management (Milestone) - loads the live backend catalogue once on mount; falls
+  // back to a local cache, then the bundled list, if the network is unavailable (see
+  // src/data/institutions/index.ts's loadInstitutions doc comment for the full fallback chain).
+  // null while the very first attempt is in flight so the offline notice below doesn't flash
+  // before we actually know whether it's needed.
+  const [institutionsSource, setInstitutionsSource] = useState<InstitutionSource | null>(null);
+  const refreshInstitutions = () => { loadInstitutions().then(setInstitutionsSource); };
+  React.useEffect(() => { refreshInstitutions(); }, []);
 
   const mismatch  = password.length > 0 && confirm.length > 0 && password !== confirm;
   const canSubmit =
@@ -199,6 +208,15 @@ export function SignupScreen({ navigation }: Props) {
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
           </Pressable>
+          {institutionsSource && institutionsSource !== 'live' && (
+            <Pressable style={s.offlineRow} onPress={refreshInstitutions} accessibilityRole="button">
+              <Ionicons name="cloud-offline-outline" size={13} color={colors.inkFaint} />
+              <Text style={s.offlineTxt}>
+                {institutionsSource === 'cached' ? 'Showing saved institution list · ' : 'Showing offline institution list · '}
+                <Text style={s.offlineRetry}>Retry</Text>
+              </Text>
+            </Pressable>
+          )}
         </BlurView>
 
         {/* Security card */}
@@ -371,6 +389,9 @@ const s = StyleSheet.create({
   pickerTxt: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.ink },
   pickerPlaceholder: { color: colors.inkFaint },
   pickerChev: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.inkFaint },
+  offlineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  offlineTxt: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.inkFaint },
+  offlineRetry: { fontFamily: fonts.bodyBold, color: colors.coral },
 
   errorRow: {
     backgroundColor: colors.coralSoft, borderRadius: 10,

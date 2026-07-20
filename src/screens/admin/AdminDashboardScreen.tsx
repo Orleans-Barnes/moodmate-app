@@ -374,6 +374,12 @@ export function AdminDashboardScreen({ navigation }: Props) {
             <Text style={s.quickActionText}>Audit{'\n'}Log</Text>
           </Pressable>
         </View>
+        <View style={[s.quickActionRow, { marginTop: spacing.sm }]}>
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminInstitutionManagement')}>
+            <Ionicons name="school-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Institutions</Text>
+          </Pressable>
+        </View>
 
         {/* ── Counsellor Approval Queue ── */}
         <Text style={s.sectionTitle}>Counsellor Requests</Text>

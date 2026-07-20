@@ -101,7 +101,12 @@ export function InstitutionPicker({ visible, selectedId, onSelect, onClose }: Pr
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
-  const results = useMemo(() => searchInstitutions(query), [query]);
+  // Institution Management (Milestone) - `visible` is in the dependency list (not just `query`) so
+  // that re-opening the sheet always re-reads the module-level INSTITUTIONS array, picking up a
+  // loadInstitutions() swap (live/cached/bundled) that may have completed since the sheet was last
+  // opened. Without this, a sheet opened before the live fetch resolved would keep showing its
+  // first memoized (bundled) result forever, even after INSTITUTIONS was updated in place.
+  const results = useMemo(() => searchInstitutions(query), [query, visible]);
   const hasRealMatches = results.some((i) => i.id !== OTHER_INSTITUTION_ID);
 
   const handleClose = () => {

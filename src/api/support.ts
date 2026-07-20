@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './client';
 import type {
   AppointmentView,
   BookAppointmentRequest,
@@ -488,4 +488,62 @@ export interface AuditLogView {
 export function getAuditLogs(token: string, page = 0, size = 30): Promise<PageResponse<AuditLogView>> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   return apiGet<PageResponse<AuditLogView>>(`/api/admin/audit-logs?${params.toString()}`, token);
+}
+
+// ── Institution Management (Milestone) ──────────────────────────────────────
+// Same CRUD shape as Feature Flags above. See moodmate-admin's InstitutionService/Institution.java
+// for why website/logoUrl/licenseType/licenseExpiry/studentLimit exist now but aren't editable via
+// any endpoint yet - future Institution Licensing & Premium Access milestone, not built today.
+
+export type InstitutionType = 'UNIVERSITY' | 'UNIVERSITY_COLLEGE' | 'INSTITUTE';
+
+export interface InstitutionView {
+  id: number;
+  name: string;
+  shortName: string;
+  city: string | null;
+  country: string;
+  type: InstitutionType;
+  active: boolean;
+  website: string | null;
+  logoUrl: string | null;
+  licenseType: string | null;
+  licenseExpiry: string | null;
+  studentLimit: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstitutionInput {
+  name: string;
+  shortName: string;
+  city?: string;
+  country: string;
+  type: InstitutionType;
+  website?: string;
+  logoUrl?: string;
+}
+
+export function listInstitutions(token: string): Promise<InstitutionView[]> {
+  return apiGet<InstitutionView[]>('/api/admin/institutions', token);
+}
+
+export function createInstitution(token: string, input: InstitutionInput): Promise<InstitutionView> {
+  return apiPost<InstitutionView>('/api/admin/institutions', input, token);
+}
+
+export function updateInstitution(token: string, id: number, input: InstitutionInput): Promise<InstitutionView> {
+  return apiPut<InstitutionView>(`/api/admin/institutions/${id}`, input, token);
+}
+
+export function setInstitutionActive(token: string, id: number, active: boolean): Promise<InstitutionView> {
+  return apiPatch<InstitutionView>(`/api/admin/institutions/${id}/active`, { active }, token);
+}
+
+// Unauthenticated - backs the signup institution picker (see src/data/institutions/index.ts's
+// loadInstitutions, which owns the live/cached/bundled fallback chain). Deliberately called with
+// no token, mirroring src/api/sos.ts's public calls - /api/public/institutions has its own gateway
+// route that bypasses JwtAuthFilter (see moodmate-gateway's application.yml comment).
+export function fetchPublicInstitutions(): Promise<InstitutionView[]> {
+  return apiGet<InstitutionView[]>('/api/public/institutions');
 }

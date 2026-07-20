@@ -45,6 +45,7 @@ export type RootStackParamList = {
   AdminModeration: undefined;
   AdminSystemSettings: undefined;
   AdminAuditLog: undefined;
+  AdminInstitutionManagement: undefined;
 
   CounsellorChat: { conversationId: number; studentName: string };
   MentorChat: { conversationId: number; studentName: string };
