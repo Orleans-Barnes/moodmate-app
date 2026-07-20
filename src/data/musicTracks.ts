@@ -9,6 +9,11 @@ export interface MusicTrack {
   description: string;
   color: string;
   asset: number;
+  // Premium gating breadth (Milestone item 7) - backs ProScreen's "Full meditation & soundscape
+  // library" line: free users get a starter subset (one per broad category - sleep, focus, nature,
+  // noise), the rest require Pro. Checked client-side only in ExploreScreen/useMusicStore - there's
+  // no server write to protect here (tracks are bundled local assets via require(), not fetched).
+  proOnly: boolean;
 }
 
 export const MUSIC_TRACKS: MusicTrack[] = [
@@ -20,6 +25,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Gentle piano arpeggios — great for winding down before sleep',
     color: '#818CF8',
     asset: require('../../assets/music/moonlight.mp3'),
+    proOnly: false,
   },
   {
     id: 'serenity',
@@ -29,6 +35,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Soft lo-fi beats to keep you calm and focused',
     color: '#60A5FA',
     asset: require('../../assets/music/serenity.mp3'),
+    proOnly: false,
   },
   {
     id: 'binaural_calm',
@@ -38,6 +45,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Binaural beats at 7Hz theta — reduces anxiety, promotes calm',
     color: '#34D399',
     asset: require('../../assets/music/binaural_calm.mp3'),
+    proOnly: true,
   },
   {
     id: 'morning_bloom',
@@ -47,6 +55,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Uplifting acoustic strings to start your day with intention',
     color: '#FBBF24',
     asset: require('../../assets/music/morning_bloom.mp3'),
+    proOnly: true,
   },
   {
     id: 'deep_space',
@@ -56,6 +65,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Ambient harmonic drone — perfect for deep meditation sessions',
     color: '#C084FC',
     asset: require('../../assets/music/deep_space.mp3'),
+    proOnly: true,
   },
   {
     id: 'lullaby',
@@ -65,6 +75,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Gentle music-box melody on a pentatonic scale for restful sleep',
     color: '#F9A8D4',
     asset: require('../../assets/music/lullaby.mp3'),
+    proOnly: true,
   },
   {
     id: 'brown_noise',
@@ -74,6 +85,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Deep brown noise for studying, blocking distractions and ADHD focus',
     color: '#92400E',
     asset: require('../../assets/music/brown_noise.mp3'),
+    proOnly: true,
   },
   {
     id: 'adhd_focus',
@@ -83,6 +95,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: '40 Hz gamma binaural beats — clinically studied for concentration and cognitive clarity',
     color: '#4F46E5',
     asset: require('../../assets/music/adhd_focus.mp3'),
+    proOnly: true,
   },
   {
     id: 'rain_focus',
@@ -92,6 +105,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Gentle rainfall with low rumble — perfect for calm focus sessions',
     color: '#0369A1',
     asset: require('../../assets/music/rain_focus.mp3'),
+    proOnly: false,
   },
   {
     id: 'white_noise',
@@ -101,6 +115,7 @@ export const MUSIC_TRACKS: MusicTrack[] = [
     description: 'Pure white noise to mask background sounds and improve sleep quality',
     color: '#6B7280',
     asset: require('../../assets/music/white_noise.mp3'),
+    proOnly: false,
   },
 ];
 

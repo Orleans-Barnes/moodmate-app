@@ -14,6 +14,8 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { WaveformVisualizer } from '@/components/WaveformVisualizer';
 import { useToast } from '@/state/useToast';
 import { useMusicStore } from '@/state/useMusicStore';
+import { usePaymentsStore } from '@/state/usePaymentsStore';
+import { useAuthStore } from '@/state/useAuthStore';
 import { MUSIC_TRACKS } from '@/data/musicTracks';
 import { hapticLight } from '@/utils/haptics';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
@@ -109,6 +111,16 @@ export function ExploreScreen({ navigation }: Props) {
   const { currentTrackId, isPlaying, timerMinutes, play, pause, resume, stop, setTimer, toggleFavorite, isFavorite } = useMusicStore();
   const [musicFilter, setMusicFilter] = useState<'all' | 'favorites'>('all');
 
+  // Premium gating breadth (Milestone item 7) - "Full meditation & soundscape library" is a
+  // Pro perk; free users get the 4 tracks tagged proOnly:false in musicTracks.ts. Loads fresh
+  // subscription state on mount since ProScreen is the only other place that loads it.
+  const token = useAuthStore((s) => s.token);
+  const isPro = usePaymentsStore((s) => s.subscription.pro);
+  const loadPayments = usePaymentsStore((s) => s.load);
+  useEffect(() => {
+    if (token && token !== 'guest') loadPayments(token);
+  }, [token, loadPayments]);
+
   // Stretch break
   const [stretchStep, setStretchStep]     = useState(0);
   const [stretchActive, setStretchActive] = useState(false);
@@ -121,6 +133,13 @@ export function ExploreScreen({ navigation }: Props) {
   const affirmation = AFFIRMATIONS[dayOfYear % AFFIRMATIONS.length];
 
   const handleMusicPress = (trackId: string) => {
+    const track = MUSIC_TRACKS.find((t) => t.id === trackId);
+    if (track?.proOnly && !isPro) {
+      hapticLight();
+      toast('This track is Pro-exclusive. Upgrade to unlock the full library.');
+      navigation.navigate('Pro');
+      return;
+    }
     hapticLight();
     if (currentTrackId === trackId) {
       // Same track — toggle play/pause
@@ -278,13 +297,19 @@ export function ExploreScreen({ navigation }: Props) {
                     />
                   )}
                 </View>
-                {/* Play/pause button */}
+                {/* Play/pause button - Premium gating breadth: locked tracks show a lock icon
+                    instead of play/pause, tapping still routes through handleMusicPress's Pro
+                    check above. */}
                 <Pressable
-                  style={[s.playBtn, { backgroundColor: active ? track.color : colors.line }]}
+                  style={[s.playBtn, { backgroundColor: track.proOnly && !isPro ? colors.sunSoft : active ? track.color : colors.line }]}
                   onPress={() => handleMusicPress(track.id)}
                   hitSlop={6}
                 >
-                  <Ionicons name={playing ? 'pause' : 'play'} size={14} color={active ? '#fff' : '#888'} style={playing ? undefined : { marginLeft: 2 }} />
+                  {track.proOnly && !isPro ? (
+                    <Ionicons name="lock-closed" size={12} color={colors.sun} />
+                  ) : (
+                    <Ionicons name={playing ? 'pause' : 'play'} size={14} color={active ? '#fff' : '#888'} style={playing ? undefined : { marginLeft: 2 }} />
+                  )}
                 </Pressable>
                 <Pressable style={s.heartBtn} onPress={() => toggleFavorite(track.id)} hitSlop={8}>
                   <Ionicons name={isFavorite(track.id) ? 'heart' : 'heart-outline'} size={18} color={isFavorite(track.id) ? '#F43F5E' : '#aaa'} />

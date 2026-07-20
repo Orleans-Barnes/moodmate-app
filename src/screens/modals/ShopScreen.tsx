@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import { ConfettiBurst, ConfettiHandle } from '@/components/Confetti';
 import { useWalletStore } from '@/state/useWalletStore';
 import { useWellnessStore } from '@/state/useWellnessStore';
 import { useAuthStore } from '@/state/useAuthStore';
+import { usePaymentsStore } from '@/state/usePaymentsStore';
 import { useToast } from '@/state/useToast';
 import { ApiRequestError } from '@/api/client';
 import type { SkinView } from '@/api/types';
@@ -28,14 +29,25 @@ function formatPesewas(pesewas: number): string {
 
 function SkinTile({
   skin,
+  locked,
   onPress,
+  onLockedPress,
 }: {
   skin: SkinView;
+  // Premium gating breadth (Milestone item 7) - true when this skin is proOnly and the user isn't
+  // Pro right now. Distinct from skin.owned: a lapsed Pro user can still "own" (have previously
+  // purchased) a proOnly skin but be locked out of equipping it - see WalletService.equipSkin.
+  locked: boolean;
   onPress: () => Promise<boolean>; // resolves true if purchase/equip succeeded
+  onLockedPress: () => void;
 }) {
   const shake = useRef(new Animated.Value(0)).current;
 
   const handlePress = async () => {
+    if (locked) {
+      onLockedPress();
+      return;
+    }
     const success = await onPress();
     if (!success) {
       Animated.sequence([
@@ -56,12 +68,17 @@ function SkinTile({
     >
       <Pressable
         onPress={handlePress}
-        style={[styles.skinTile, skin.equipped && styles.skinTileActive]}
+        style={[styles.skinTile, skin.equipped && styles.skinTileActive, locked && styles.skinTileLocked]}
       >
-        <Text style={styles.skinEmoji}>{skin.emoji}</Text>
+        {locked && (
+          <View style={styles.skinLockBadge}>
+            <Text style={styles.skinLockBadgeTxt}>PRO</Text>
+          </View>
+        )}
+        <Text style={[styles.skinEmoji, locked && styles.skinEmojiLocked]}>{skin.emoji}</Text>
         <Text style={styles.skinName}>{skin.name}</Text>
         <Text style={[styles.skinPrice, skin.equipped && styles.skinPriceActive]}>
-          {skin.equipped ? 'Equipped' : skin.cost > 0 ? (skin.owned ? 'Owned' : `🌱 ${skin.cost}`) : 'Free'}
+          {locked ? 'Pro only' : skin.equipped ? 'Equipped' : skin.cost > 0 ? (skin.owned ? 'Owned' : `🌱 ${skin.cost}`) : 'Free'}
         </Text>
       </Pressable>
     </Animated.View>
@@ -81,10 +98,22 @@ export function ShopScreen({ navigation }: Props) {
   const buyStreakShield = useWellnessStore((s) => s.buyStreakShield);
   const buyDoubleXpBoost = useWellnessStore((s) => s.buyDoubleXpBoost);
   const token = useAuthStore((s) => s.token);
+  // Premium gating breadth (Milestone item 7) - "Exclusive tree skins" is one of the 5 gated
+  // features. proOnly skins (PALM, GOLDEN - see WalletService.equipSkin) show a lock badge and
+  // route to ProScreen on tap instead of attempting to equip, mirroring the pattern used in
+  // ExploreScreen.handleMusicPress / BubblePopScreen for the other gated features.
+  const isPro = usePaymentsStore((s) => s.subscription.pro);
+  const loadPayments = usePaymentsStore((s) => s.load);
   const toast = useToast();
   const confettiRef = useRef<ConfettiHandle>(null);
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
   const [buyingBoost, setBuyingBoost] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (token && token !== 'guest') {
+      loadPayments(token).catch(() => {});
+    }
+  }, [token, loadPayments]);
 
   const doubleXpActive = doubleXpActiveUntil ? new Date(doubleXpActiveUntil) > new Date() : false;
 
@@ -162,6 +191,11 @@ export function ShopScreen({ navigation }: Props) {
     }
   };
 
+  const handleLockedSkin = () => {
+    toast('That skin is Pro-exclusive. Upgrade to unlock it.');
+    navigation.navigate('Pro');
+  };
+
   // Real Paystack checkout (Task #26): opens the hosted checkout page in the system browser,
   // then refresh() verifies + credits leaves once the user returns to this screen.
   const handleBuyLeaves = async (packCode: string) => {
@@ -197,7 +231,13 @@ export function ShopScreen({ navigation }: Props) {
         </View>
         <View style={styles.skinGrid}>
           {skins.map((skin) => (
-            <SkinTile key={skin.code} skin={skin} onPress={() => handleEquip(skin.code)} />
+            <SkinTile
+              key={skin.code}
+              skin={skin}
+              locked={skin.proOnly && !isPro}
+              onPress={() => handleEquip(skin.code)}
+              onLockedPress={handleLockedSkin}
+            />
           ))}
           {skins.length === 0 && <Text style={styles.emptyText}>No skins available yet.</Text>}
         </View>
@@ -269,9 +309,22 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    position: 'relative',
   },
   skinTileActive: { borderColor: colors.sage, backgroundColor: colors.sageSoft },
+  skinTileLocked: { backgroundColor: colors.sunSoft, borderColor: colors.sunSoft },
+  skinLockBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: colors.sun,
+    borderRadius: radii.pill,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  skinLockBadgeTxt: { fontFamily: fonts.bodyBold, fontSize: 8, color: colors.surface },
   skinEmoji: { fontSize: 24, marginBottom: 5 },
+  skinEmojiLocked: { opacity: 0.5 },
   skinName: { fontFamily: fonts.bodyBold, fontSize: 10.5, color: colors.ink },
   skinPrice: { fontFamily: fonts.bodyBold, fontSize: 9, color: colors.inkFaint, marginTop: 3 },
   skinPriceActive: { color: colors.sage },

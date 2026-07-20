@@ -8,6 +8,8 @@ import { ConfettiBurst, ConfettiHandle } from '@/components/Confetti';
 import { useGamificationStore, XP_VALUES } from '@/state/useGamificationStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useWellnessStore } from '@/state/useWellnessStore';
+import { usePaymentsStore } from '@/state/usePaymentsStore';
+import { Button } from '@/components/Button';
 import { hapticLight, hapticSuccess } from '@/utils/haptics';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
@@ -68,9 +70,21 @@ export function BubblePopScreen({ navigation }: Props) {
   const confettiRef     = useRef<ConfettiHandle>(null);
 
   const isGuest     = useAuthStore((s) => s.user?.guest ?? false);
+  const token       = useAuthStore((s) => s.token);
   const awardXp     = useGamificationStore((s) => s.awardXp);
   const recordAction = useGamificationStore((s) => s.recordAction);
   const streakCount  = useWellnessStore((s) => s.streakCount);
+
+  // Premium gating breadth (Milestone item 7) - Bubble Pop is Pro-exclusive. Gated here (not at
+  // every navigate('BubblePop') call site) so the lock applies no matter which of this screen's
+  // several entry points (ExploreScreen's tools grid, MoodSuggestScreen's post-check-in
+  // suggestions) was used. Loads fresh subscription state on mount rather than trusting whatever
+  // usePaymentsStore already had cached, since ProScreen is the only other place that loads it.
+  const isPro         = usePaymentsStore((s) => s.subscription.pro);
+  const loadPayments  = usePaymentsStore((s) => s.load);
+  useEffect(() => {
+    if (token && token !== 'guest') loadPayments(token);
+  }, [token, loadPayments]);
 
   // ── Spawn ──────────────────────────────────────────────────────────────
   const spawnBubble = useCallback(() => {
@@ -92,6 +106,7 @@ export function BubblePopScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
+    if (!isPro) return; // Locked - don't spawn bubbles behind the upsell screen.
     spawnBubble();
     intervalRef.current = setInterval(spawnBubble, SPAWN_INTERVAL);
     return () => {
@@ -99,7 +114,7 @@ export function BubblePopScreen({ navigation }: Props) {
       activeAnimations.current.forEach((a) => a.stop());
       activeAnimations.current.clear();
     };
-  }, [spawnBubble]);
+  }, [spawnBubble, isPro]);
 
   // ── End game ──────────────────────────────────────────────────────────
   const endGame = useCallback(() => {
@@ -152,6 +167,25 @@ export function BubblePopScreen({ navigation }: Props) {
     spawnBubble();
     intervalRef.current = setInterval(spawnBubble, SPAWN_INTERVAL);
   };
+
+  // ── Locked (Premium gating breadth, Milestone item 7) ───────────────────
+  if (!isPro) {
+    return (
+      <View style={styles.container}>
+        <ScreenHeader title="Bubble Pop" onClose={() => navigation.goBack()} />
+        <View style={styles.celebCenter}>
+          <Text style={styles.celebEmoji}>🔒</Text>
+          <Text style={styles.celebTitle}>Bubble Pop is a Pro game</Text>
+          <Text style={styles.celebSub}>
+            Upgrade to MoodMate Pro to unlock Bubble Pop and other exclusive calming games.
+          </Text>
+          <View style={styles.btnsRow}>
+            <Button label="Upgrade to Pro" variant="primary" onPress={() => navigation.navigate('Pro')} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   // ── Game over screen ──────────────────────────────────────────────────
   if (gameOver) {

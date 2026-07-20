@@ -164,8 +164,18 @@ export function CounsellorAppointmentsScreen({ navigation }: Props) {
                   </View>
                   <View style={s.cardMeta}>
                     <Text style={s.studentName}>{appt.studentName}</Text>
-                    <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
-                      <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
+                    <View style={s.badgeRow}>
+                      {/* Premium gating breadth (Milestone item 7) - list is already ordered
+                          priority-first server-side (SupportService.listCounsellorAppointments);
+                          this badge just makes that ordering visible/legible. */}
+                      {appt.priority && (
+                        <View style={s.priorityBadge}>
+                          <Text style={s.priorityBadgeTxt}>⚡ Priority</Text>
+                        </View>
+                      )}
+                      <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
+                        <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -268,6 +278,12 @@ const s = StyleSheet.create({
   dateBadgeTime: { fontFamily: fonts.display, fontSize: fontSizes.md, color: '#1B4F72', marginTop: 2 },
   cardMeta: { flex: 1, gap: 4 },
   studentName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink },
+  badgeRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  priorityBadge: {
+    backgroundColor: colors.sunSoft, paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: radii.pill,
+  },
+  priorityBadgeTxt: { fontFamily: fonts.bodyBold, fontSize: 9, color: colors.sun },
   statusBadge: {
     alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3,
     borderRadius: radii.pill,

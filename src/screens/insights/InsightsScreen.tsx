@@ -327,7 +327,11 @@ export function InsightsScreen() {
             <Text style={styles.limitBannerText}>
               Daily limit reached · Resets at midnight
             </Text>
-            <TouchableOpacity style={styles.upgradeBtn} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.upgradeBtn}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Pro' as never)}
+            >
               <Text style={styles.upgradeBtnText}>Upgrade</Text>
             </TouchableOpacity>
           </View>

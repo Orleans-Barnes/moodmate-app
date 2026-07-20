@@ -19,8 +19,8 @@ const FEATURES = [
   { icon: '🧘', text: 'Full meditation & soundscape library' },
   { icon: '📊', text: 'Deep wellness history & analytics' },
   { icon: '🩺', text: 'Priority counsellor booking' },
-  { icon: '🎨', text: 'Exclusive tree skins & avatar frames' },
-  { icon: '🎮', text: '3 exclusive calming games' },
+  { icon: '🎨', text: 'Exclusive tree skins' },
+  { icon: '🎮', text: 'Exclusive calming games' },
 ];
 
 function formatPrice(pesewas: number): string {

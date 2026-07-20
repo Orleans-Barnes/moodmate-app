@@ -41,6 +41,11 @@ export interface CounsellorAppointmentView {
   status: AppointmentStatus;
   notes: string | null;
   createdAt: string;
+  // Premium gating breadth (Milestone item 7) - true when the booking student was Pro at the
+  // time of booking. Counsellor's appointment list is ordered priority-first (see
+  // SupportService.listCounsellorAppointments), and this field backs a "Priority" badge in
+  // CounsellorDashboardScreen so counsellors can see why the ordering is what it is.
+  priority: boolean;
 }
 
 export interface CounsellorConversationView {
@@ -218,6 +223,11 @@ export interface AppointmentView {
   // Fix #5 - true only once this appointment is COMPLETED and has been rated; tells the UI
   // whether to show "Rate this session" vs. a already-rated state.
   rated: boolean;
+  // Premium gating breadth (Milestone item 7) - "Priority booking" feature: true when this
+  // student was Pro at the time of booking (see WalletService/PaymentsService + SupportService
+  // .bookAppointment). Shown as a small badge on the student's own appointment card too, so Pro
+  // users can see the perk is actually applied, not just advertised.
+  priority: boolean;
 }
 
 export interface BookAppointmentRequest {
@@ -360,6 +370,10 @@ export interface SkinView {
   cost: number;
   owned: boolean;
   equipped: boolean;
+  // Premium gating breadth (Milestone item 7) - requires an active Pro subscription to equip
+  // (checked server-side every time, not just at purchase - see WalletService.equipSkin's doc
+  // comment in the backend).
+  proOnly: boolean;
 }
 
 export interface WalletStateView {

@@ -311,7 +311,17 @@ export function SupportScreen({ navigation }: Props) {
 
       {upcoming && (
         <Card tint="coral">
-          <Text style={styles.apptTop}>Upcoming appointment</Text>
+          <View style={styles.apptTopRow}>
+            <Text style={styles.apptTop}>Upcoming appointment</Text>
+            {/* Premium gating breadth (Milestone item 7) - reflects SupportService.bookAppointment
+                setting priority=true for Pro users at booking time; confirms the perk actually did
+                something rather than just being advertised on ProScreen. */}
+            {upcoming.priority && (
+              <View style={styles.priorityBadge}>
+                <Text style={styles.priorityBadgeTxt}>⚡ Priority</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.apptRow}>
             <Text style={styles.apptName}>{upcoming.counsellorName}</Text>
             <Text style={styles.apptTime}>{formatApptWhen(upcoming.scheduledAt)}</Text>
@@ -717,6 +727,15 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl * 2 },
   apptTop: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft, marginBottom: 5 },
+  apptTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  priorityBadge: {
+    backgroundColor: colors.sunSoft,
+    borderRadius: radii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 5,
+  },
+  priorityBadgeTxt: { fontFamily: fonts.bodyBold, fontSize: 9.5, color: colors.sun },
   apptRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm + 2 },
   apptName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink },
   apptTime: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.inkSoft },
