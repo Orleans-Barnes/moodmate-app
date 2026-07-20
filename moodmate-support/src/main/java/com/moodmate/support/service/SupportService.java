@@ -1,6 +1,7 @@
 package com.moodmate.support.service;
 
 import com.moodmate.support.client.AuthServiceClient;
+import com.moodmate.support.client.PaymentsServiceClient;
 import com.moodmate.support.client.UserSummary;
 import com.moodmate.support.dto.AdminEditCounsellorRequest;
 import com.moodmate.support.dto.AppointmentResponse;
@@ -81,6 +82,7 @@ public class SupportService {
     private final MentorRequestRepository mentorRequestRepository;
     private final CounsellorRatingRepository counsellorRatingRepository;
     private final AuthServiceClient authServiceClient;
+    private final PaymentsServiceClient paymentsServiceClient;
 
     @Transactional(readOnly = true)
     public List<CounsellorDto> listCounsellors() {
@@ -293,6 +295,8 @@ public class SupportService {
         Counsellor counsellor = counsellorRepository.findById(request.counsellorId())
                 .orElseThrow(() -> new ApiException("Counsellor not found: " + request.counsellorId(), HttpStatus.NOT_FOUND));
 
+        // Premium gating breadth (Milestone item 7) - "priority" is set once, at booking time, from
+        // whether the student is Pro right now. See Appointment.priority's doc comment.
         Appointment appointment = Appointment.builder()
                 .userId(userId)
                 .counsellorId(counsellor.getId())
@@ -300,6 +304,7 @@ public class SupportService {
                 .status(AppointmentStatus.PENDING)
                 .notes(request.notes())
                 .jitsiRoomName(generateJitsiRoomName())
+                .priority(paymentsServiceClient.isPro(userId))
                 .build();
 
         appointment = appointmentRepository.save(appointment);
@@ -382,7 +387,9 @@ public class SupportService {
     @Transactional(readOnly = true)
     public List<CounsellorAppointmentView> listCounsellorAppointments(Long counsellorUserId) {
         Counsellor counsellor = findLinkedCounsellor(counsellorUserId);
-        List<Appointment> appointments = appointmentRepository.findByCounsellorIdOrderByScheduledAtDesc(counsellor.getId());
+        // Premium gating breadth (Milestone item 7) - priority requests surface first regardless
+        // of status, matching the repository method's doc comment.
+        List<Appointment> appointments = appointmentRepository.findByCounsellorIdOrderByPriorityDescScheduledAtDesc(counsellor.getId());
         Map<Long, UserSummary> students = authServiceClient.getUserSummaries(
                 appointments.stream().map(Appointment::getUserId).distinct().toList());
         return appointments.stream().map(a -> toCounsellorView(a, students)).toList();
@@ -950,7 +957,8 @@ public class SupportService {
         boolean rated = appointment.getStatus() == AppointmentStatus.COMPLETED
                 && counsellorRatingRepository.existsByAppointmentId(appointment.getId());
         return new AppointmentResponse(appointment.getId(), appointment.getCounsellorId(), counsellorName,
-                appointment.getScheduledAt(), appointment.getStatus(), appointment.getNotes(), appointment.getCreatedAt(), rated);
+                appointment.getScheduledAt(), appointment.getStatus(), appointment.getNotes(), appointment.getCreatedAt(),
+                rated, appointment.isPriority());
     }
 
     // ── Fix #5 (rating/review system) ────────────────────────────────────────────────────────────
@@ -981,7 +989,7 @@ public class SupportService {
     private CounsellorAppointmentView toCounsellorView(Appointment a, Map<Long, UserSummary> students) {
         UserSummary student = students.get(a.getUserId());
         return new CounsellorAppointmentView(a.getId(), a.getUserId(), student != null ? student.fullName() : "Student",
-                a.getScheduledAt(), a.getStatus(), a.getNotes(), a.getCreatedAt());
+                a.getScheduledAt(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.isPriority());
     }
 
     private CounsellorConversationView toCounsellorConversationView(Conversation c, Map<Long, UserSummary> students) {

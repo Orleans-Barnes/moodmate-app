@@ -14,6 +14,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     List<Appointment> findByCounsellorIdOrderByScheduledAtDesc(Long counsellorId);
 
+    // Premium gating breadth (Milestone item 7) - counsellor's queue view, priority appointments
+    // (booked by a Pro student) surfaced first regardless of status, most recent within each group.
+    List<Appointment> findByCounsellorIdOrderByPriorityDescScheduledAtDesc(Long counsellorId);
+
     Optional<Appointment> findByIdAndCounsellorId(Long id, Long counsellorId);
 
     // Phase 1E, Step 4 (Scheduling Rules) - feeds GET /internal/support/appointments/confirmed.

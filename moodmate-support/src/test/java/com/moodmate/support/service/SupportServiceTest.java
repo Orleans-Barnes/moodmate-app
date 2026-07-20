@@ -1,6 +1,7 @@
 package com.moodmate.support.service;
 
 import com.moodmate.support.client.AuthServiceClient;
+import com.moodmate.support.client.PaymentsServiceClient;
 import com.moodmate.support.dto.BookAppointmentRequest;
 import com.moodmate.support.dto.SendMessageRequest;
 import com.moodmate.support.entity.Appointment;
@@ -63,10 +64,15 @@ class SupportServiceTest {
         // (existsByAppointmentId defaults to false, countByCounsellorId to 0, both fine unstubbed).
         CounsellorRatingRepository counsellorRatingRepository = mock(CounsellorRatingRepository.class);
         authServiceClient = mock(AuthServiceClient.class);
+        // Premium gating breadth (Milestone item 7) added paymentsServiceClient the same way Fix #5
+        // added counsellorRatingRepository above - bookAppointmentNotifiesCounsellor below calls
+        // bookAppointment(), which now calls paymentsServiceClient.isPro(), so this needs at least
+        // an unstubbed mock (defaults to false) to avoid an NPE, even though no test asserts on it.
+        PaymentsServiceClient paymentsServiceClient = mock(PaymentsServiceClient.class);
 
         service = new SupportService(counsellorRepository, peerMentorRepository, appointmentRepository,
                 conversationRepository, supportMessageRepository, mentorRequestRepository,
-                counsellorRatingRepository, authServiceClient);
+                counsellorRatingRepository, authServiceClient, paymentsServiceClient);
 
         when(supportMessageRepository.save(any(SupportMessage.class))).thenAnswer(inv -> {
             SupportMessage m = inv.getArgument(0);

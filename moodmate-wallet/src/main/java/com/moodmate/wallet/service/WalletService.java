@@ -34,6 +34,10 @@ public class WalletService {
     private final TreeSkinRepository treeSkinRepository;
     private final UserOwnedSkinRepository userOwnedSkinRepository;
     private final LeafTransactionRepository leafTransactionRepository;
+    // Premium gating breadth (Milestone item 7) - same service, same JVM as PaymentsService (both
+    // live in moodmate-wallet), so this is a plain in-process call, not a network hop like
+    // PaymentsServiceClient.isPro() in moodmate-ai/moodmate-journal/moodmate-support.
+    private final PaymentsService paymentsService;
 
     @Transactional
     public WalletStateResponse getWalletState(Long userId) {
@@ -72,6 +76,19 @@ public class WalletService {
         LeafWallet wallet = getOrCreateWallet(userId);
         TreeSkin skin = treeSkinRepository.findByCode(skinCode)
                 .orElseThrow(() -> new ApiException("Unknown tree skin: " + skinCode, HttpStatus.NOT_FOUND));
+
+        // Premium gating breadth (Milestone item 7) - a Pro-only skin requires an ACTIVE Pro
+        // subscription to equip, checked every time (not just at first purchase). This is a
+        // deliberate "requires active Pro" design, not "requires having purchased it once" - if a
+        // Pro user buys GOLDEN then lets their subscription lapse, they keep ownership (still
+        // counted in userOwnedSkinRepository, no refund) but can't re-equip it until Pro is active
+        // again. Checked before the cost/ownership logic below so it blocks unconditionally,
+        // whether or not the skin is already owned.
+        if (skin.isProOnly() && !paymentsService.getSubscriptionState(userId).pro()) {
+            throw new ApiException(
+                    "\"" + skin.getName() + "\" is exclusive to MoodMate Pro. Upgrade to unlock it.",
+                    HttpStatus.PAYMENT_REQUIRED);
+        }
 
         UserOwnedSkinId ownershipId = new UserOwnedSkinId(userId, skin.getId());
         boolean alreadyOwned = skin.getCost() == 0 || userOwnedSkinRepository.existsById(ownershipId);
@@ -171,7 +188,8 @@ public class WalletService {
                         skin.getName(),
                         skin.getCost(),
                         skin.getCost() == 0 || ownedSkinIds.contains(skin.getId()),
-                        skin.getId().equals(wallet.getEquippedSkinId())
+                        skin.getId().equals(wallet.getEquippedSkinId()),
+                        skin.isProOnly()
                 ))
                 .toList();
 

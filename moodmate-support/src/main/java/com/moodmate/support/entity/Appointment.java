@@ -65,6 +65,15 @@ public class Appointment {
     @Column(name = "jitsi_room_name", length = 100)
     private String jitsiRoomName;
 
+    // Premium gating breadth (Milestone item 7) - set once, at booking time, from whether the
+    // student was Pro at that moment (SupportService.bookAppointment). Not re-evaluated later
+    // (unlike WalletService's proOnly skin check, which is live) - a real minimal "priority
+    // booking" perk: priority appointments sort first in the counsellor's queue regardless of
+    // status, see AppointmentRepository.findByCounsellorIdOrderByPriorityDescScheduledAtDesc.
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean priority = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

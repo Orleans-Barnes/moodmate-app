@@ -50,6 +50,23 @@ moodmate:
     # Phase 1H (Audit Logs) - direct (non-gateway) address for admin-service, read by
     # AuditLogServiceClient.
     admin-base-url: ${ADMIN_SERVICE_URL:http://localhost:8099}
+    # Premium gating breadth (Milestone item 7) - direct (non-gateway) address for wallet-service,
+    # read by PaymentsServiceClient to check Pro status before flagging a booking as priority.
+    wallet-base-url: ${WALLET_SERVICE_URL:http://localhost:8096}
+
+# Premium gating breadth (Milestone item 7) - Circuit Breaker for PaymentsServiceClient.isPro().
+# Same settings/rationale as moodmate-journal's identical "walletService" breaker config.
+resilience4j:
+  circuitbreaker:
+    instances:
+      walletService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
 
 management:
   endpoints:
