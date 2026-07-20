@@ -200,6 +200,21 @@ spring:
               filters:
                 - JwtAuthFilter
 
+            # ── Admin Service: public institution catalogue ─────────────────────
+            # Institution Management (Milestone). MUST be listed before admin-service below - same
+            # "narrower unauthenticated path has to win against a broader authenticated route"
+            # ordering reason as sos-public/wallet-webhook-public above. PublicInstitutionController
+            # lives in moodmate-admin but is intentionally NOT under /api/admin/**, since that whole
+            # path carries JwtAuthFilter and signup needs this list before the user has a token.
+            - id: institutions-public
+              uri: http://localhost:8099
+              predicates:
+                - Path=/api/public/institutions/**
+              filters:
+                - name: RemoveRequestHeader
+                  args:
+                    name: X-User-Id
+
             # ── Admin Service ───────────────────────────────────────────────────
             - id: admin-service
               uri: http://localhost:8099

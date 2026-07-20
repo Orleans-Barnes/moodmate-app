@@ -5,6 +5,7 @@ import com.moodmate.admin.service.AdminService;
 import com.moodmate.admin.service.AnnouncementService;
 import com.moodmate.admin.service.AuditLogService;
 import com.moodmate.admin.service.FeatureFlagService;
+import com.moodmate.admin.service.InstitutionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ public class AdminController {
     private final FeatureFlagService featureFlagService;
     private final AuditLogService auditLogService;
     private final AnnouncementService announcementService;
+    private final InstitutionService institutionService;
 
     @GetMapping("/stats")
     public AdminStatsResponse stats(@RequestHeader("X-User-Role") String role) {
@@ -120,6 +122,44 @@ public class AdminController {
                                          @RequestParam(defaultValue = "20") int size) {
         requireAdmin(role);
         return auditLogService.list(PageRequest.of(page, size, Sort.by("createdAt").descending()));
+    }
+
+    // ── Institution Management ──────────────────────────────────────────────────────────────────
+
+    @GetMapping("/institutions")
+    public List<InstitutionView> institutionList(@RequestHeader("X-User-Role") String role) {
+        requireAdmin(role);
+        return institutionService.list();
+    }
+
+    @GetMapping("/institutions/{id}")
+    public InstitutionView institutionGet(@RequestHeader("X-User-Role") String role, @PathVariable Long id) {
+        requireAdmin(role);
+        return institutionService.get(id);
+    }
+
+    @PostMapping("/institutions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InstitutionView institutionCreate(@RequestHeader("X-User-Role") String role,
+                                              @Valid @RequestBody InstitutionInput input) {
+        requireAdmin(role);
+        return institutionService.create(input);
+    }
+
+    @PutMapping("/institutions/{id}")
+    public InstitutionView institutionUpdate(@RequestHeader("X-User-Role") String role,
+                                              @PathVariable Long id,
+                                              @Valid @RequestBody InstitutionInput input) {
+        requireAdmin(role);
+        return institutionService.update(id, input);
+    }
+
+    @PatchMapping("/institutions/{id}/active")
+    public InstitutionView institutionSetActive(@RequestHeader("X-User-Role") String role,
+                                                 @PathVariable Long id,
+                                                 @RequestBody SetInstitutionActiveRequest request) {
+        requireAdmin(role);
+        return institutionService.setActive(id, request.active());
     }
 
     private void requireAdmin(String role) {
