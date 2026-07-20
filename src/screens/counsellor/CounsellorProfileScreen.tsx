@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, Pressable, StyleSheet, ScrollView,
   Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { CounsellorTabParamList, RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useToast } from '@/state/useToast';
+import {
+  getCounsellorAnalytics,
+  listCounsellorConversations,
+  setCounsellorAvailabilityStatus,
+} from '@/api/support';
+import type { CounsellorAnalyticsView, CounsellorAvailabilityStatus } from '@/api/types';
 import { hapticLight } from '@/utils/haptics';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
 
@@ -28,14 +36,72 @@ const HOURS = [
   { day: 'Saturday', time: 'Unavailable', active: false },
   { day: 'Sunday', time: 'Unavailable', active: false },
 ];
+// Specialties and Hours above are still static placeholders - the backend Counsellor entity has
+// no self-profile GET endpoint yet (only listCounsellors, a public directory read), so this screen
+// can't reliably resolve "my own" record's specialties/bio/hours without a new endpoint. Left as a
+// documented follow-up rather than in scope for this pass (see Fix #3 scoping decision).
+
+type StatusKey = CounsellorAvailabilityStatus;
+// Mirrors CounsellorDashboardScreen.tsx's STATUS_OPTIONS/handleStatusChange exactly - this screen
+// used to have its own separate, non-persisted "Accepting new clients" switch that duplicated (and
+// contradicted) the real ONLINE/BUSY/AWAY status already wired up on the Dashboard. Replaced with
+// the same real control so there's one source of truth for a counsellor's availability, not two.
+const STATUS_OPTIONS: { key: StatusKey; label: string; color: string; bg: string }[] = [
+  { key: 'ONLINE', label: '● Online', color: '#27AE60', bg: '#E8F8EF' },
+  { key: 'BUSY',   label: '● Busy',   color: '#E67E22', bg: '#FEF3E2' },
+  { key: 'AWAY',   label: '● Away',   color: '#95A5A6', bg: '#F2F3F4' },
+];
 
 export function CounsellorProfileScreen({ navigation }: Props) {
   const insets  = useSafeAreaInsets();
   const user    = useAuthStore((s) => s.user);
+  const token   = useAuthStore((s) => s.token);
   const logout  = useAuthStore((s) => s.logout);
+  const toast   = useToast();
 
-  const [accepting, setAccepting]     = useState(true);
-  const [notifications, setNotifs]    = useState(true);
+  // Same known gap as the Dashboard: no "get my own counsellor row" endpoint yet, so this always
+  // starts at ONLINE on load rather than restoring the last-saved value (documented, not a bug).
+  const [status, setStatus]             = useState<StatusKey>('ONLINE');
+  const [statusOpen, setStatusOpen]     = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [notifications, setNotifs]      = useState(true);
+  const [analytics, setAnalytics]       = useState<CounsellorAnalyticsView | null>(null);
+  const [clientCount, setClientCount]   = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [analyticsData, convos] = await Promise.all([
+        getCounsellorAnalytics(token),
+        listCounsellorConversations(token),
+      ]);
+      setAnalytics(analyticsData);
+      setClientCount(convos.length);
+    } catch {
+      toast('Could not load your stats');
+    }
+  }, [token, toast]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const handleStatusChange = async (next: StatusKey) => {
+    setStatusOpen(false);
+    if (next === status || !token) return;
+    const previous = status;
+    setStatus(next); // optimistic
+    setStatusSaving(true);
+    hapticLight();
+    try {
+      await setCounsellorAvailabilityStatus(token, next);
+    } catch {
+      setStatus(previous);
+      toast('Could not update your status. Try again.');
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  const currentStatus = STATUS_OPTIONS.find((o) => o.key === status)!;
 
   const fullName  = user?.fullName ?? 'Counsellor';
   const initials  = fullName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -57,7 +123,7 @@ export function CounsellorProfileScreen({ navigation }: Props) {
           <View style={s.avatar}>
             <Text style={s.avatarTxt}>{initials}</Text>
           </View>
-          <View style={[s.onlineDot, { backgroundColor: accepting ? '#27AE60' : '#95A5A6' }]} />
+          <View style={[s.onlineDot, { backgroundColor: currentStatus.color }]} />
         </View>
         <Text style={s.name}>{fullName}</Text>
         <View style={s.rolePill}>
@@ -110,15 +176,31 @@ export function CounsellorProfileScreen({ navigation }: Props) {
 
           <View style={s.settingRow}>
             <View>
-              <Text style={s.settingLabel}>Accepting new clients</Text>
-              <Text style={s.settingHint}>Students can book appointments with you</Text>
+              <Text style={s.settingLabel}>Availability status</Text>
+              <Text style={s.settingHint}>Shown to students browsing Support</Text>
             </View>
-            <Switch
-              value={accepting}
-              onValueChange={v => { hapticLight(); setAccepting(v); }}
-              trackColor={{ false: '#D5D8DC', true: '#2980B9' }}
-              thumbColor='#FFFFFF'
-            />
+            <View>
+              <Pressable
+                style={[s.statusPill, { backgroundColor: currentStatus.bg }, statusSaving && s.statusPillSaving]}
+                onPress={() => { if (statusSaving) return; hapticLight(); setStatusOpen((v) => !v); }}
+              >
+                <Text style={[s.statusLabel, { color: currentStatus.color }]}>{currentStatus.label}</Text>
+                <Text style={[s.statusCaret, { color: currentStatus.color }]}>▾</Text>
+              </Pressable>
+              {statusOpen && (
+                <View style={s.statusDropdown}>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <Pressable
+                      key={opt.key}
+                      style={[s.statusOption, opt.key === status && s.statusOptionActive]}
+                      onPress={() => handleStatusChange(opt.key)}
+                    >
+                      <Text style={[s.statusOptionLabel, { color: opt.color }]}>{opt.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={[s.settingRow, s.settingBorder]}>
@@ -138,23 +220,25 @@ export function CounsellorProfileScreen({ navigation }: Props) {
         {/* Stats card */}
         <View style={s.statsCard}>
           <LinearGradient colors={['#1B4F72', '#2471A3']} style={s.statsGrad} start={{x:0,y:0}} end={{x:1,y:1}}>
-            <Text style={s.statsTitle}>This Month</Text>
+            <Text style={s.statsTitle}>Your stats</Text>
             <View style={s.statsRow}>
               <View style={s.statItem}>
-                <Text style={s.statNum}>12</Text>
+                <Text style={s.statNum}>{analytics ? analytics.totalAppointments : '–'}</Text>
                 <Text style={s.statLbl}>Sessions</Text>
               </View>
               <View style={s.statDiv} />
               <View style={s.statItem}>
-                <Text style={s.statNum}>8</Text>
+                <Text style={s.statNum}>{clientCount ?? '–'}</Text>
                 <Text style={s.statLbl}>Active clients</Text>
               </View>
               <View style={s.statDiv} />
               <View style={s.statItem}>
-                <Text style={s.statNum}>4.9★</Text>
-                <Text style={s.statLbl}>Rating</Text>
+                <Text style={s.statNum}>{analytics ? `${Math.round(analytics.completionRate * 100)}%` : '–'}</Text>
+                <Text style={s.statLbl}>Completion rate</Text>
               </View>
             </View>
+            {/* No rating/review system exists yet (see Fix #5) - showing a real completion rate
+                here instead of a fabricated star rating. */}
           </LinearGradient>
         </View>
 
@@ -229,6 +313,25 @@ const s = StyleSheet.create({
   settingBorder: { borderTopWidth: 1, borderTopColor: '#F0F6FF', marginTop: 8, paddingTop: 12 },
   settingLabel: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.ink },
   settingHint: { fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.inkFaint, marginTop: 2 },
+
+  // Availability status pill + dropdown (mirrors CounsellorDashboardScreen.tsx)
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: radii.pill,
+  },
+  statusPillSaving: { opacity: 0.6 },
+  statusLabel: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs },
+  statusCaret: { fontFamily: fonts.bodyBold, fontSize: 10 },
+  statusDropdown: {
+    position: 'absolute', right: 0, top: 36,
+    backgroundColor: '#FFFFFF', borderRadius: 12,
+    ...shadow.md, minWidth: 130, zIndex: 99,
+    overflow: 'hidden',
+  },
+  statusOption: { paddingHorizontal: 14, paddingVertical: 10 },
+  statusOptionActive: { backgroundColor: '#F0F6FF' },
+  statusOptionLabel: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs },
 
   statsCard: { borderRadius: 18, overflow: 'hidden' },
   statsGrad: { padding: spacing.lg, gap: spacing.md },
