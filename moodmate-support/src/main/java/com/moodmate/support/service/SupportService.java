@@ -11,9 +11,11 @@ import com.moodmate.support.dto.CounsellorAnalyticsResponse;
 import com.moodmate.support.dto.CounsellorAppointmentView;
 import com.moodmate.support.dto.CounsellorConversationView;
 import com.moodmate.support.dto.CounsellorDto;
+import com.moodmate.support.dto.CounsellorRatingResponse;
 import com.moodmate.support.dto.CounsellorRequestAdminView;
 import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
+import com.moodmate.support.dto.SubmitCounsellorRatingRequest;
 import com.moodmate.support.dto.LinkMentorAccountRequest;
 import com.moodmate.support.dto.MeetingWindowView;
 import com.moodmate.support.dto.MentorRequestResponse;
@@ -31,6 +33,7 @@ import com.moodmate.support.entity.AppointmentStatus;
 import com.moodmate.support.entity.Conversation;
 import com.moodmate.support.entity.Counsellor;
 import com.moodmate.support.entity.CounsellorAvailabilityStatus;
+import com.moodmate.support.entity.CounsellorRating;
 import com.moodmate.support.entity.CounsellorStatus;
 import com.moodmate.support.entity.MentorRequest;
 import com.moodmate.support.entity.MentorRequestStatus;
@@ -41,6 +44,7 @@ import com.moodmate.support.entity.SupportMessage;
 import com.moodmate.support.exception.ApiException;
 import com.moodmate.support.repository.AppointmentRepository;
 import com.moodmate.support.repository.ConversationRepository;
+import com.moodmate.support.repository.CounsellorRatingRepository;
 import com.moodmate.support.repository.CounsellorRepository;
 import com.moodmate.support.repository.MentorRequestRepository;
 import com.moodmate.support.repository.PeerMentorRepository;
@@ -75,6 +79,7 @@ public class SupportService {
     private final ConversationRepository conversationRepository;
     private final SupportMessageRepository supportMessageRepository;
     private final MentorRequestRepository mentorRequestRepository;
+    private final CounsellorRatingRepository counsellorRatingRepository;
     private final AuthServiceClient authServiceClient;
 
     @Transactional(readOnly = true)
@@ -942,8 +947,35 @@ public class SupportService {
     }
 
     private AppointmentResponse toResponse(Appointment appointment, String counsellorName) {
+        boolean rated = appointment.getStatus() == AppointmentStatus.COMPLETED
+                && counsellorRatingRepository.existsByAppointmentId(appointment.getId());
         return new AppointmentResponse(appointment.getId(), appointment.getCounsellorId(), counsellorName,
-                appointment.getScheduledAt(), appointment.getStatus(), appointment.getNotes(), appointment.getCreatedAt());
+                appointment.getScheduledAt(), appointment.getStatus(), appointment.getNotes(), appointment.getCreatedAt(), rated);
+    }
+
+    // ── Fix #5 (rating/review system) ────────────────────────────────────────────────────────────
+
+    @Transactional
+    public CounsellorRatingResponse submitCounsellorRating(Long userId, Long appointmentId, SubmitCounsellorRatingRequest request) {
+        Appointment appointment = appointmentRepository.findByIdAndUserId(appointmentId, userId)
+                .orElseThrow(() -> new ApiException("Appointment not found: " + appointmentId, HttpStatus.NOT_FOUND));
+        if (appointment.getStatus() != AppointmentStatus.COMPLETED) {
+            throw new ApiException("Only a completed appointment can be rated", HttpStatus.BAD_REQUEST);
+        }
+        if (counsellorRatingRepository.existsByAppointmentId(appointmentId)) {
+            throw new ApiException("This appointment has already been rated", HttpStatus.CONFLICT);
+        }
+
+        CounsellorRating rating = CounsellorRating.builder()
+                .appointmentId(appointmentId)
+                .counsellorId(appointment.getCounsellorId())
+                .studentUserId(userId)
+                .stars(request.stars())
+                .comment(request.comment())
+                .build();
+        rating = counsellorRatingRepository.save(rating);
+        return new CounsellorRatingResponse(rating.getId(), rating.getAppointmentId(), rating.getStars(),
+                rating.getComment(), rating.getCreatedAt());
     }
 
     private CounsellorAppointmentView toCounsellorView(Appointment a, Map<Long, UserSummary> students) {
@@ -989,8 +1021,10 @@ public class SupportService {
         List<String> specialties = c.getSpecialties() == null || c.getSpecialties().isBlank()
                 ? List.of()
                 : Arrays.stream(c.getSpecialties().split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        long ratingCount = counsellorRatingRepository.countByCounsellorId(c.getId());
+        Double averageRating = ratingCount == 0 ? null : counsellorRatingRepository.averageStarsByCounsellorId(c.getId());
         return new CounsellorDto(c.getId(), c.getName(), c.getTitle(), c.getBio(), c.getAvatarEmoji(), specialties,
-                c.isAvailable(), c.getAvailabilityStatus());
+                c.isAvailable(), c.getAvailabilityStatus(), averageRating, ratingCount);
     }
 
     private PeerMentorDto toDto(PeerMentor m) {

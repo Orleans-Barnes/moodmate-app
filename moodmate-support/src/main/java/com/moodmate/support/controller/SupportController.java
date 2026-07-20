@@ -9,9 +9,11 @@ import com.moodmate.support.dto.CounsellorAnalyticsResponse;
 import com.moodmate.support.dto.CounsellorAppointmentView;
 import com.moodmate.support.dto.CounsellorConversationView;
 import com.moodmate.support.dto.CounsellorDto;
+import com.moodmate.support.dto.CounsellorRatingResponse;
 import com.moodmate.support.dto.CounsellorRequestAdminView;
 import com.moodmate.support.dto.CounsellorRequestInput;
 import com.moodmate.support.dto.CounsellorRequestResponse;
+import com.moodmate.support.dto.SubmitCounsellorRatingRequest;
 import com.moodmate.support.dto.LinkMentorAccountRequest;
 import com.moodmate.support.dto.MeetingWindowView;
 import com.moodmate.support.dto.MentorRequestResponse;
@@ -239,6 +241,16 @@ public class SupportController {
     @GetMapping("/appointments/{id}/meeting")
     public MeetingWindowView appointmentMeeting(@RequestHeader("X-User-Id") Long userId, @PathVariable Long id) {
         return supportService.getStudentMeetingWindow(userId, id);
+    }
+
+    // Fix #5 (rating/review system) - student-facing, gated to their own COMPLETED appointment
+    // (ownership + status both enforced in the service, same pattern as cancel/reschedule above).
+    @PostMapping("/appointments/{id}/rating")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CounsellorRatingResponse submitCounsellorRating(@RequestHeader("X-User-Id") Long userId,
+                                                             @PathVariable Long id,
+                                                             @Valid @RequestBody SubmitCounsellorRatingRequest request) {
+        return supportService.submitCounsellorRating(userId, id, request);
     }
 
     @GetMapping("/counsellor/appointments")

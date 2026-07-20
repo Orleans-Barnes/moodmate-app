@@ -11,6 +11,7 @@ import com.moodmate.support.entity.CounsellorStatus;
 import com.moodmate.support.entity.SupportMessage;
 import com.moodmate.support.repository.AppointmentRepository;
 import com.moodmate.support.repository.ConversationRepository;
+import com.moodmate.support.repository.CounsellorRatingRepository;
 import com.moodmate.support.repository.CounsellorRepository;
 import com.moodmate.support.repository.MentorRequestRepository;
 import com.moodmate.support.repository.PeerMentorRepository;
@@ -57,10 +58,15 @@ class SupportServiceTest {
         // stale compiled class or skipped tests). Not exercised by any test here, so a plain mock
         // with no stubbing is enough.
         MentorRequestRepository mentorRequestRepository = mock(MentorRequestRepository.class);
+        // Fix #5 added counsellorRatingRepository the same way Phase 1G added
+        // mentorRequestRepository above - not exercised by any test here, plain mock is enough
+        // (existsByAppointmentId defaults to false, countByCounsellorId to 0, both fine unstubbed).
+        CounsellorRatingRepository counsellorRatingRepository = mock(CounsellorRatingRepository.class);
         authServiceClient = mock(AuthServiceClient.class);
 
         service = new SupportService(counsellorRepository, peerMentorRepository, appointmentRepository,
-                conversationRepository, supportMessageRepository, mentorRequestRepository, authServiceClient);
+                conversationRepository, supportMessageRepository, mentorRequestRepository,
+                counsellorRatingRepository, authServiceClient);
 
         when(supportMessageRepository.save(any(SupportMessage.class))).thenAnswer(inv -> {
             SupportMessage m = inv.getArgument(0);
