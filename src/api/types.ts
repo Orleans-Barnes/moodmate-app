@@ -192,6 +192,10 @@ export interface CounsellorView {
   specialties: string[];
   available: boolean;
   availabilityStatus: CounsellorAvailabilityStatus;
+  // Fix #5 (rating/review system) - averageRating is null (not 0) when ratingCount is 0, so a
+  // never-rated counsellor can be told apart from one rated poorly (which can't happen - 1-5 only).
+  averageRating: number | null;
+  ratingCount: number;
 }
 
 export interface MentorView {
@@ -211,6 +215,9 @@ export interface AppointmentView {
   status: AppointmentStatus;
   notes: string | null;
   createdAt: string;
+  // Fix #5 - true only once this appointment is COMPLETED and has been rated; tells the UI
+  // whether to show "Rate this session" vs. a already-rated state.
+  rated: boolean;
 }
 
 export interface BookAppointmentRequest {

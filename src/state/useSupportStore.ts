@@ -10,6 +10,7 @@ import {
   requestMentor as apiRequestMentor,
   rescheduleAppointment,
   startConversation,
+  submitCounsellorRating,
 } from '@/api/support';
 import type {
   AppointmentView,
@@ -18,6 +19,7 @@ import type {
   MentorRequestView,
   MentorView,
 } from '@/api/types';
+import type { CounsellorRatingResponse } from '@/api/support';
 
 interface SupportState {
   counsellors: CounsellorView[];
@@ -34,6 +36,14 @@ interface SupportState {
   cancel: (token: string, appointmentId: number) => Promise<void>;
   /** Phase 1F-A - student-initiated reschedule of an existing appointment. */
   reschedule: (token: string, appointmentId: number, scheduledAt: string) => Promise<AppointmentView>;
+  /** Fix #5 - rates a COMPLETED appointment. The backend response is the rating itself, not the
+   * appointment, so this locally flips that appointment's `rated` flag to true on success. */
+  rateAppointment: (
+    token: string,
+    appointmentId: number,
+    stars: number,
+    comment?: string
+  ) => Promise<CounsellorRatingResponse>;
   /** Phase 1G - sends a new mentor request; does not create a conversation (that happens once the
    * mentor accepts). */
   requestMentor: (token: string, peerMentorId: number, message?: string) => Promise<MentorRequestView>;
@@ -90,6 +100,13 @@ export const useSupportStore = create<SupportState>((set, get) => ({
     const updated = await rescheduleAppointment(token, appointmentId, scheduledAt);
     set({ appointments: get().appointments.map((a) => (a.id === appointmentId ? updated : a)) });
     return updated;
+  },
+  rateAppointment: async (token, appointmentId, stars, comment) => {
+    const rating = await submitCounsellorRating(token, appointmentId, stars, comment);
+    set({
+      appointments: get().appointments.map((a) => (a.id === appointmentId ? { ...a, rated: true } : a)),
+    });
+    return rating;
   },
   requestMentor: async (token, peerMentorId, message) => {
     const created = await apiRequestMentor(token, { peerMentorId, message });

@@ -107,6 +107,7 @@ export function SupportScreen({ navigation }: Props) {
   const book = useSupportStore((s) => s.book);
   const cancelAppt = useSupportStore((s) => s.cancel);
   const rescheduleAppt = useSupportStore((s) => s.reschedule);
+  const rateAppt = useSupportStore((s) => s.rateAppointment);
   const requestMentorAction = useSupportStore((s) => s.requestMentor);
   const openConversation = useSupportStore((s) => s.openConversation);
   const [requestingMentorId, setRequestingMentorId] = useState<number | null>(null);
@@ -125,6 +126,13 @@ export function SupportScreen({ navigation }: Props) {
   const [rescheduleDay, setRescheduleDay] = useState(() => new Date());
   const [rescheduleTime, setRescheduleTime] = useState(TIME_SLOTS[0]);
   const [reschedulingBusy, setReschedulingBusy] = useState(false);
+
+  // Fix #5 - "Rate this session" panel, one at a time, keyed by appointment id like the booking
+  // panel above.
+  const [ratingAppointmentId, setRatingAppointmentId] = useState<number | null>(null);
+  const [ratingStars, setRatingStars] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
   // Booking a counsellor and messaging both need a real, identifiable account server-side, so
   // unlike the local-only guest modes elsewhere there's no honest stand-in here - guests see
@@ -224,6 +232,31 @@ export function SupportScreen({ navigation }: Props) {
   const upcoming = appointments
     .filter((a) => (a.status === 'PENDING' || a.status === 'CONFIRMED') && new Date(a.scheduledAt).getTime() > Date.now())
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
+
+  // Fix #5 - completed sessions the student hasn't rated yet, newest first.
+  const unratedCompleted = appointments
+    .filter((a) => a.status === 'COMPLETED' && !a.rated)
+    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+
+  const handleToggleRating = (appointmentId: number) => {
+    setRatingAppointmentId((current) => (current === appointmentId ? null : appointmentId));
+    setRatingStars(5);
+    setRatingComment('');
+  };
+
+  const handleSubmitRating = async (appointmentId: number) => {
+    if (!token) return;
+    setRatingSubmitting(true);
+    try {
+      await rateAppt(token, appointmentId, ratingStars, ratingComment.trim() || undefined);
+      toast('Thanks for rating your session ✓');
+      setRatingAppointmentId(null);
+    } catch (err) {
+      toast(err instanceof ApiRequestError ? err.message : 'Could not submit that rating.');
+    } finally {
+      setRatingSubmitting(false);
+    }
+  };
 
   const fullRoster: RosterItem[] = [
     ...counsellors.map((c): RosterItem => ({ kind: 'counsellor', data: c })),
@@ -357,6 +390,51 @@ export function SupportScreen({ navigation }: Props) {
         </Card>
       )}
 
+      {unratedCompleted.map((appt) => {
+        const isRatingThis = ratingAppointmentId === appt.id;
+        return (
+          <Card key={appt.id} tint="sage">
+            <Text style={styles.apptTop}>Rate your session</Text>
+            <View style={styles.apptRow}>
+              <Text style={styles.apptName}>{appt.counsellorName}</Text>
+              <Text style={styles.apptTime}>{formatApptWhen(appt.scheduledAt)}</Text>
+            </View>
+            <Button
+              label={isRatingThis ? 'Never mind' : 'Rate this session'}
+              onPress={() => handleToggleRating(appt.id)}
+            />
+            {isRatingThis && (
+              <View style={styles.bookingPanel}>
+                <Text style={styles.bookingLabel}>How was it?</Text>
+                <View style={styles.starRow}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Pressable key={n} onPress={() => setRatingStars(n)} accessibilityRole="button" accessibilityLabel={`${n} star${n === 1 ? '' : 's'}`}>
+                      <Text style={styles.starChar}>{n <= ratingStars ? '★' : '☆'}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  style={styles.ratingCommentInput}
+                  placeholder="Add a comment (optional)"
+                  placeholderTextColor={colors.inkFaint}
+                  value={ratingComment}
+                  onChangeText={setRatingComment}
+                  multiline
+                />
+                <Button
+                  label={ratingSubmitting ? 'Submitting…' : 'Submit rating'}
+                  variant="primary"
+                  fullWidth
+                  disabled={ratingSubmitting}
+                  onPress={() => handleSubmitRating(appt.id)}
+                  style={styles.confirmBtn}
+                />
+              </View>
+            )}
+          </Card>
+        );
+      })}
+
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Counsellors & mentors</Text>
         <Text style={styles.sectionMeta}>{roster.length} of {fullRoster.length}</Text>
@@ -441,6 +519,15 @@ export function SupportScreen({ navigation }: Props) {
                 </View>
                 <Text style={styles.mentorBigName}>{name}</Text>
                 <Text style={styles.mentorBigSpecialty}>{subtitle}</Text>
+                {isCounsellor && (
+                  // Fix #5 - averageRating is null until the counsellor has at least one rating,
+                  // so this shows "New" rather than a misleading 0★.
+                  <Text style={styles.ratingMeta}>
+                    {(item.data as CounsellorView).averageRating != null
+                      ? `★ ${(item.data as CounsellorView).averageRating!.toFixed(1)} (${(item.data as CounsellorView).ratingCount})`
+                      : 'New · no ratings yet'}
+                  </Text>
+                )}
                 {specialties.length > 0 && (
                   <View style={styles.specialtyRow}>
                     {specialties.map((s) => (
@@ -702,6 +789,23 @@ const styles = StyleSheet.create({
   timeChipText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft },
   timeChipTextActive: { color: '#FFFFFF' },
   confirmBtn: { marginTop: spacing.xs },
+  starRow: { flexDirection: 'row', gap: 6, marginBottom: spacing.sm },
+  starChar: { fontSize: 28, color: colors.coral },
+  ratingCommentInput: {
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    backgroundColor: colors.surface,
+    color: colors.ink,
+    minHeight: 44,
+    textAlignVertical: 'top',
+    marginBottom: spacing.sm,
+  },
+  ratingMeta: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkSoft, marginBottom: spacing.sm },
   // ── Message conversation cards ────────────────────────────────────────────
   msgCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2,

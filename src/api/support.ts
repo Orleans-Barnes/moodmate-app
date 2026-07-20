@@ -212,6 +212,29 @@ export function rescheduleAppointment(
   );
 }
 
+// Fix #5 - student rates a COMPLETED counsellor appointment, one rating per appointment
+// (backend enforces via a unique constraint + a 409 conflict if already rated).
+export interface CounsellorRatingResponse {
+  id: number;
+  appointmentId: number;
+  stars: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+export function submitCounsellorRating(
+  token: string,
+  appointmentId: number,
+  stars: number,
+  comment?: string
+): Promise<CounsellorRatingResponse> {
+  return apiPost<CounsellorRatingResponse>(
+    `/api/support/appointments/${appointmentId}/rating`,
+    { stars, comment },
+    token
+  );
+}
+
 // Phase 1F-B - Jitsi meeting credentials, student side. Only ever returns a real
 // roomName/joinUrl when the backend's join window is open - see MeetingWindowView's doc comment.
 export function getAppointmentMeeting(token: string, appointmentId: number): Promise<MeetingWindowView> {
