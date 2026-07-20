@@ -7,6 +7,7 @@ import com.moodmate.wallet.dto.WalletStateResponse;
 import com.moodmate.wallet.entity.LeafTransaction;
 import com.moodmate.wallet.entity.LeafTransactionReason;
 import com.moodmate.wallet.entity.LeafWallet;
+import com.moodmate.wallet.entity.SubscriptionStatus;
 import com.moodmate.wallet.entity.TreeSkin;
 import com.moodmate.wallet.entity.UserOwnedSkin;
 import com.moodmate.wallet.entity.UserOwnedSkinId;
@@ -15,6 +16,7 @@ import com.moodmate.wallet.repository.LeafTransactionRepository;
 import com.moodmate.wallet.repository.LeafWalletRepository;
 import com.moodmate.wallet.repository.TreeSkinRepository;
 import com.moodmate.wallet.repository.UserOwnedSkinRepository;
+import com.moodmate.wallet.repository.UserSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,10 +36,12 @@ public class WalletService {
     private final TreeSkinRepository treeSkinRepository;
     private final UserOwnedSkinRepository userOwnedSkinRepository;
     private final LeafTransactionRepository leafTransactionRepository;
-    // Premium gating breadth (Milestone item 7) - same service, same JVM as PaymentsService (both
-    // live in moodmate-wallet), so this is a plain in-process call, not a network hop like
-    // PaymentsServiceClient.isPro() in moodmate-ai/moodmate-journal/moodmate-support.
-    private final PaymentsService paymentsService;
+    // Premium gating breadth (Milestone item 7) - queried directly rather than through
+    // PaymentsService: PaymentsService itself depends on WalletService (to credit leaves on a
+    // successful payment), so injecting PaymentsService here created a circular bean dependency
+    // that only surfaces at Spring context startup, not at compile time. This repository has no
+    // dependency on WalletService, so it's safe to use directly for the pro-only-skin check.
+    private final UserSubscriptionRepository userSubscriptionRepository;
 
     @Transactional
     public WalletStateResponse getWalletState(Long userId) {
@@ -84,7 +88,7 @@ public class WalletService {
         // counted in userOwnedSkinRepository, no refund) but can't re-equip it until Pro is active
         // again. Checked before the cost/ownership logic below so it blocks unconditionally,
         // whether or not the skin is already owned.
-        if (skin.isProOnly() && !paymentsService.getSubscriptionState(userId).pro()) {
+        if (skin.isProOnly() && !isPro(userId)) {
             throw new ApiException(
                     "\"" + skin.getName() + "\" is exclusive to MoodMate Pro. Upgrade to unlock it.",
                     HttpStatus.PAYMENT_REQUIRED);
@@ -159,6 +163,15 @@ public class WalletService {
                 .build());
 
         return buildWalletState(wallet);
+    }
+
+    // Mirrors PaymentsService.toStateResponse's "pro" definition exactly (ACTIVE or TRIALING) -
+    // duplicated here rather than shared to avoid the circular dependency explained on the
+    // userSubscriptionRepository field above. If that definition ever changes, update both.
+    private boolean isPro(Long userId) {
+        return userSubscriptionRepository.findByUserId(userId)
+                .map(sub -> sub.getStatus() == SubscriptionStatus.ACTIVE || sub.getStatus() == SubscriptionStatus.TRIALING)
+                .orElse(false);
     }
 
     private LeafWallet getOrCreateWallet(Long userId) {
