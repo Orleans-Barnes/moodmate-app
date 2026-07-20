@@ -20,6 +20,8 @@ import com.moodmate.support.dto.MentorRequestResponse;
 import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
 import com.moodmate.support.dto.PeerMentorAdminView;
+import com.moodmate.support.dto.PeerMentorApplicationInput;
+import com.moodmate.support.dto.PeerMentorApplicationResponse;
 import com.moodmate.support.dto.PeerMentorDto;
 import com.moodmate.support.dto.RequestMentorRequest;
 import com.moodmate.support.dto.SendMessageRequest;
@@ -33,6 +35,7 @@ import com.moodmate.support.entity.CounsellorStatus;
 import com.moodmate.support.entity.MentorRequest;
 import com.moodmate.support.entity.MentorRequestStatus;
 import com.moodmate.support.entity.PeerMentor;
+import com.moodmate.support.entity.PeerMentorStatus;
 import com.moodmate.support.entity.SenderType;
 import com.moodmate.support.entity.SupportMessage;
 import com.moodmate.support.exception.ApiException;
@@ -182,11 +185,11 @@ public class SupportService {
     }
 
     // ── Phase 1H (Admin Portal - Peer Mentor Management) ────────────────────────────────────────
-    // No approve/reject queue here - Phase 1G already established that peer mentor accounts are
-    // admin-linked, not self-serve-applied-for (see linkMentorAccount's own doc comment). "Manage"
-    // for mentors means listing the full roster and toggling available on/off (deactivate keeps
-    // the row and any linked account intact, just hides it from the public roster - same effect
-    // suspendCounsellor has via status, but PeerMentor has no status enum, only this boolean).
+    // "Manage" for an already-APPROVED mentor still means listing the roster and toggling
+    // available on/off (deactivate keeps the row and any linked account intact, just hides it from
+    // the public roster - same effect suspendCounsellor has via status). The approve/reject queue
+    // for PENDING applications is the block below this one - see applyAsPeerMentor's doc comment
+    // for why this replaced the old admin-linked-only design (Fix #4).
 
     @Transactional(readOnly = true)
     public List<PeerMentorAdminView> listAllPeerMentorsForAdmin() {
@@ -203,12 +206,81 @@ public class SupportService {
 
     private PeerMentorAdminView toPeerMentorAdminView(PeerMentor m) {
         return new PeerMentorAdminView(m.getId(), m.getUserId(), m.getName(), m.getBio(), m.getAvatarEmoji(),
-                m.getFocusArea(), m.isAvailable());
+                m.getFocusArea(), m.isAvailable(), m.getStatus());
+    }
+
+    // ── Fix #4 (Peer Mentor self-serve application flow) ────────────────────────────────────────
+    // Replaces the old admin-linked-only design: this service used to only let an admin link a
+    // userId to a pre-seeded roster row (linkMentorAccount, still kept below for that case - e.g.
+    // an institution hands MoodMate a pre-vetted mentor list to seed directly), because a real
+    // vetting/training pipeline didn't exist and the previous design didn't want to imply one. That
+    // framing is dropped here: this is a plain application reviewed by an admin, the same honesty
+    // level the counsellor request flow already has (which also doesn't verify credentials, just
+    // gives an admin a judgment call) - see requestCounsellorStatus above for the pattern this
+    // mirrors field-for-field.
+
+    @Transactional
+    public PeerMentorApplicationResponse applyAsPeerMentor(Long userId, PeerMentorApplicationInput request) {
+        if (peerMentorRepository.findByUserId(userId).isPresent()) {
+            throw new ApiException("You already have a peer mentor application on file", HttpStatus.CONFLICT);
+        }
+
+        UserSummary requester = authServiceClient.getUserSummary(userId);
+
+        PeerMentor mentor = PeerMentor.builder()
+                .userId(userId)
+                .name(requester.fullName())
+                .avatarEmoji(requester.avatarEmoji())
+                .bio(request.bio())
+                .focusArea(request.focusArea())
+                .available(false)
+                .sortOrder(0)
+                .status(PeerMentorStatus.PENDING)
+                .build();
+        mentor = peerMentorRepository.save(mentor);
+        return new PeerMentorApplicationResponse(mentor.getId(), mentor.getStatus());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PeerMentorAdminView> listPendingPeerMentorApplications() {
+        return peerMentorRepository.findByStatus(PeerMentorStatus.PENDING).stream()
+                .map(this::toPeerMentorAdminView).toList();
+    }
+
+    @Transactional
+    public PeerMentorAdminView approvePeerMentorApplication(Long mentorId) {
+        PeerMentor mentor = findPendingPeerMentorApplication(mentorId);
+        mentor.setStatus(PeerMentorStatus.APPROVED);
+        mentor.setAvailable(true);
+        mentor = peerMentorRepository.save(mentor);
+
+        // Mirrors approveCounsellorRequest's authServiceClient.promoteToCounsellor call.
+        authServiceClient.promoteToMentor(mentor.getUserId());
+
+        return toPeerMentorAdminView(mentor);
+    }
+
+    @Transactional
+    public PeerMentorAdminView rejectPeerMentorApplication(Long mentorId) {
+        PeerMentor mentor = findPendingPeerMentorApplication(mentorId);
+        mentor.setStatus(PeerMentorStatus.REJECTED);
+        mentor = peerMentorRepository.save(mentor);
+        return toPeerMentorAdminView(mentor);
+    }
+
+    private PeerMentor findPendingPeerMentorApplication(Long mentorId) {
+        PeerMentor mentor = peerMentorRepository.findById(mentorId)
+                .orElseThrow(() -> new ApiException("Peer mentor application not found: " + mentorId, HttpStatus.NOT_FOUND));
+        if (mentor.getStatus() != PeerMentorStatus.PENDING) {
+            throw new ApiException("This application has already been " + mentor.getStatus(), HttpStatus.BAD_REQUEST);
+        }
+        return mentor;
     }
 
     @Transactional(readOnly = true)
     public List<PeerMentorDto> listPeerMentors() {
-        return peerMentorRepository.findByAvailableTrueOrderBySortOrder().stream().map(this::toDto).toList();
+        return peerMentorRepository.findByStatusAndAvailableTrueOrderBySortOrder(PeerMentorStatus.APPROVED)
+                .stream().map(this::toDto).toList();
     }
 
     @Transactional
@@ -452,14 +524,10 @@ public class SupportService {
 
     // ── Phase 1G - Peer Mentor request/accept workflow ──────────────────────────────────────────
 
-    /** Admin-only account linkage - see PeerMentor.userId's doc comment. Not a self-serve
-     * request/approve flow like counsellors have (no CounsellorRequest equivalent for mentors):
-     * peer mentor accounts require offline certification (see PeerMentorSignupScreen.tsx's own
-     * doc comment - "complete training programme", "get certified through the MoodMate Peer
-     * Mentor Academy" - a real training pipeline that's explicitly out of scope for this phase),
-     * so for now an admin manually links a userId to an existing roster row rather than this
-     * service fabricating a fake self-serve application flow around a certification process it
-     * doesn't actually run. */
+    /** Admin-only account linkage for a pre-seeded roster row - see PeerMentor.userId's doc
+     * comment. Kept alongside the self-serve applyAsPeerMentor flow above (Fix #4) for the case
+     * where an admin wants to seed a mentor roster row directly (e.g. an institution hands MoodMate
+     * a pre-vetted list) rather than having that person go through the in-app application. */
     @Transactional
     public PeerMentorDto linkMentorAccount(Long mentorId, Long userId) {
         PeerMentor mentor = peerMentorRepository.findById(mentorId)

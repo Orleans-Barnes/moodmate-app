@@ -12,6 +12,7 @@ import com.moodmate.support.entity.SupportMessage;
 import com.moodmate.support.repository.AppointmentRepository;
 import com.moodmate.support.repository.ConversationRepository;
 import com.moodmate.support.repository.CounsellorRepository;
+import com.moodmate.support.repository.MentorRequestRepository;
 import com.moodmate.support.repository.PeerMentorRepository;
 import com.moodmate.support.repository.SupportMessageRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,10 +50,17 @@ class SupportServiceTest {
         appointmentRepository = mock(AppointmentRepository.class);
         conversationRepository = mock(ConversationRepository.class);
         supportMessageRepository = mock(SupportMessageRepository.class);
+        // Phase 1G added mentorRequestRepository as a new SupportService constructor dependency
+        // (@RequiredArgsConstructor picks up field declaration order); this test wasn't updated at
+        // the time, which silently broke `mvn spring-boot:run`'s test-compile step ever since (it
+        // never surfaced until someone actually ran a clean build - IDEs/prior runs likely used a
+        // stale compiled class or skipped tests). Not exercised by any test here, so a plain mock
+        // with no stubbing is enough.
+        MentorRequestRepository mentorRequestRepository = mock(MentorRequestRepository.class);
         authServiceClient = mock(AuthServiceClient.class);
 
         service = new SupportService(counsellorRepository, peerMentorRepository, appointmentRepository,
-                conversationRepository, supportMessageRepository, authServiceClient);
+                conversationRepository, supportMessageRepository, mentorRequestRepository, authServiceClient);
 
         when(supportMessageRepository.save(any(SupportMessage.class))).thenAnswer(inv -> {
             SupportMessage m = inv.getArgument(0);

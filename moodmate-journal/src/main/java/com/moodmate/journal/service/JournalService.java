@@ -168,7 +168,15 @@ public class JournalService {
     }
 
     private JournalEntryResponse toResponse(JournalEntry entry) {
+        // entry.getTags() alone hands back a reference to Hibernate's lazy-loading proxy (tags is
+        // @ElementCollection(fetch = LAZY)) rather than actually reading it - for entries loaded
+        // from the DB (list()/search()/get()), that proxy only resolves later when Jackson
+        // serializes the HTTP response, by which point the transaction/session has already closed,
+        // throwing LazyInitializationException ("could not initialize proxy - no Session"). Wrapping
+        // in a plain HashSet here forces the read to happen now, while the session from this
+        // @Transactional method is still open. (create()/update() didn't show this bug because their
+        // entries are freshly built in memory with a plain HashSet, never a Hibernate proxy.)
         return new JournalEntryResponse(entry.getId(), entry.getTitle(), entry.getBody(), entry.getMoodEmoji(),
-                entry.isFavorite(), entry.getTags(), entry.getCreatedAt(), entry.getUpdatedAt());
+                entry.isFavorite(), new HashSet<>(entry.getTags()), entry.getCreatedAt(), entry.getUpdatedAt());
     }
 }

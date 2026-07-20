@@ -18,6 +18,8 @@ import com.moodmate.support.dto.MentorRequestResponse;
 import com.moodmate.support.dto.MentorRequestView;
 import com.moodmate.support.dto.MessageResponse;
 import com.moodmate.support.dto.PeerMentorAdminView;
+import com.moodmate.support.dto.PeerMentorApplicationInput;
+import com.moodmate.support.dto.PeerMentorApplicationResponse;
 import com.moodmate.support.dto.PeerMentorDto;
 import com.moodmate.support.dto.RequestMentorRequest;
 import com.moodmate.support.dto.RescheduleAppointmentRequest;
@@ -164,6 +166,42 @@ public class SupportController {
         requireAdmin(role);
         PeerMentorAdminView result = supportService.setPeerMentorActive(id, true);
         auditLogServiceClient.record(adminUserId, "ACTIVATE_MENTOR", "PEER_MENTOR", String.valueOf(id), null);
+        return result;
+    }
+
+    // ── Fix #4 (Peer Mentor self-serve application flow) - mirrors the counsellor-requests block
+    // above field-for-field. ────────────────────────────────────────────────────────────────────
+
+    @PostMapping("/mentor-applications")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PeerMentorApplicationResponse applyAsPeerMentor(@RequestHeader("X-User-Id") Long userId,
+                                                             @Valid @RequestBody PeerMentorApplicationInput request) {
+        return supportService.applyAsPeerMentor(userId, request);
+    }
+
+    @GetMapping("/mentor-applications/pending")
+    public List<PeerMentorAdminView> pendingMentorApplications(@RequestHeader("X-User-Role") String role) {
+        requireAdmin(role);
+        return supportService.listPendingPeerMentorApplications();
+    }
+
+    @PostMapping("/mentor-applications/{id}/approve")
+    public PeerMentorAdminView approveMentorApplication(@RequestHeader("X-User-Role") String role,
+                                                          @RequestHeader("X-User-Id") Long adminUserId,
+                                                          @PathVariable Long id) {
+        requireAdmin(role);
+        PeerMentorAdminView result = supportService.approvePeerMentorApplication(id);
+        auditLogServiceClient.record(adminUserId, "APPROVE_MENTOR_APPLICATION", "PEER_MENTOR", String.valueOf(id), null);
+        return result;
+    }
+
+    @PostMapping("/mentor-applications/{id}/reject")
+    public PeerMentorAdminView rejectMentorApplication(@RequestHeader("X-User-Role") String role,
+                                                         @RequestHeader("X-User-Id") Long adminUserId,
+                                                         @PathVariable Long id) {
+        requireAdmin(role);
+        PeerMentorAdminView result = supportService.rejectPeerMentorApplication(id);
+        auditLogServiceClient.record(adminUserId, "REJECT_MENTOR_APPLICATION", "PEER_MENTOR", String.valueOf(id), null);
         return result;
     }
 

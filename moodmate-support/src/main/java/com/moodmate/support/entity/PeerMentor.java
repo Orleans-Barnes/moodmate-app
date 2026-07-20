@@ -2,6 +2,8 @@ package com.moodmate.support.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -50,4 +52,11 @@ public class PeerMentor {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+
+    // Fix #4 - self-serve application status, mirrors Counsellor.status. Existing seeded rows are
+    // backfilled to APPROVED by V6 (see PeerMentorStatus's doc comment).
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private PeerMentorStatus status = PeerMentorStatus.PENDING;
 }
