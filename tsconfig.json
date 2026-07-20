@@ -13,5 +13,9 @@
     "ignoreDeprecations": "5.0"
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  // backend/ is the Spring Boot monorepo folder added when we pushed to GitHub - it's Java, not
+  // TypeScript, except for backend/FRONTEND_UPDATES/, a stale pre-merge snapshot of old frontend
+  // screens (different module paths, old store signatures) that was never imported by src/ and was
+  // never meant to be compiled as part of this app. Excluded so tsc only checks the real app.
+  "exclude": ["node_modules", "backend"]
 }

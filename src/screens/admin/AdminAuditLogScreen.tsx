@@ -85,7 +85,9 @@ export function AdminAuditLogScreen({ navigation }: Props) {
       const result = await getAuditLogs(token, nextPage, PAGE_SIZE);
       setLogs((prev) => [...prev, ...result.content]);
       setPage(nextPage);
-      setHasMore(!result.last);
+      // PageResponse<T> only has `content` (no `last`/pagination metadata from the backend) - use
+      // the same page-size heuristic loadFirstPage() already uses above, for consistency.
+      setHasMore(result.content.length === PAGE_SIZE);
     } catch {
       // Silent — the user can just tap the bottom of the list again.
     } finally {

@@ -25,193 +25,14 @@ const TOPICS = ['#exam-season', '#anxiety', '#first-year', '#relationships', '#w
 
 function stripHash(t: string) { return t.startsWith('#') ? t.slice(1) : t; }
 
-const MODES = [
-  { key: 'voices', icon: '🗣️', label: 'Campus Voices', sub: 'anonymous sharing' },
-  { key: 'peer',   icon: '🤝', label: 'PeerConnect',   sub: '1:1 peer mentors'  },
-];
-
-// ── PeerConnect static data ──────────────────────────────────────────────────
-const PEER_CATEGORIES = ['All', 'Anxiety', 'Academic', 'Social', 'Grief', 'Identity'];
-
-const PEER_MENTORS = [
-  {
-    id: 1, emoji: '🧑🏽', name: 'Kwame A.', year: '3rd Year · Psychology',
-    tags: ['Anxiety', 'Academic'], rating: 4.9, sessions: 42, online: true,
-    bio: 'I struggled through my first two years and found strategies that really work. Happy to talk exams, burnout, or just life.',
-  },
-  {
-    id: 2, emoji: '👩🏾', name: 'Amara D.', year: '4th Year · Social Work',
-    tags: ['Social', 'Grief'], rating: 4.8, sessions: 67, online: true,
-    bio: "Lost my dad in my sophomore year. Grief is hard — you don't have to face it alone.",
-  },
-  {
-    id: 3, emoji: '🧑🏻', name: 'Liam T.', year: '2nd Year · Computer Science',
-    tags: ['Academic', 'Anxiety'], rating: 4.7, sessions: 28, online: false,
-    bio: "Imposter syndrome is real. I've been there and came out stronger. Let's talk code & confidence.",
-  },
-  {
-    id: 4, emoji: '👩🏽', name: 'Zainab K.', year: '3rd Year · Medicine',
-    tags: ['Identity', 'Social'], rating: 5.0, sessions: 53, online: true,
-    bio: 'Navigating culture, faith, and university life. I get the unique pressures that come with that.',
-  },
-  {
-    id: 5, emoji: '🧑🏿', name: 'Emeka O.', year: '4th Year · Business',
-    tags: ['Academic', 'Social'], rating: 4.6, sessions: 35, online: false,
-    bio: 'First-gen student here. Built my network from zero — happy to help you do the same.',
-  },
-];
-
-function PeerConnectView({ toast }: { toast: (msg: string) => void }) {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const filtered = PEER_MENTORS.filter((m) => {
-    const matchCat = activeCategory === 'All' || m.tags.includes(activeCategory);
-    const matchSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.bio.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCat && matchSearch;
-  });
-
-  return (
-    <>
-      {/* Intro banner */}
-      <View style={p.introBanner}>
-        <Text style={p.introEmoji}>🤝</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={p.introTitle}>Peer Mentors</Text>
-          <Text style={p.introSub}>Connect 1:1 with a trained student who gets it</Text>
-        </View>
-        <View style={p.onlinePill}>
-          <View style={p.onlineDot} />
-          <Text style={p.onlineTxt}>{PEER_MENTORS.filter(m => m.online).length} online</Text>
-        </View>
-      </View>
-
-      {/* Search bar */}
-      <View style={p.searchWrap}>
-        <Text style={p.searchIcon}>🔍</Text>
-        <TextInput
-          style={p.searchInput}
-          placeholder="Search by name or topic…"
-          placeholderTextColor={colors.inkFaint}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery('')}>
-            <Text style={p.searchClear}>✕</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* Category chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={p.catRow}
-      >
-        {PEER_CATEGORIES.map((cat) => (
-          <Pressable
-            key={cat}
-            style={[p.catChip, activeCategory === cat && p.catChipActive]}
-            onPress={() => { hapticLight(); setActiveCategory(cat); }}
-          >
-            <Text style={[p.catLabel, activeCategory === cat && p.catLabelActive]}>{cat}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {/* Stats row */}
-      <View style={p.statsRow}>
-        <View style={p.statPill}>
-          <Text style={p.statNum}>{PEER_MENTORS.length}</Text>
-          <Text style={p.statLbl}>Mentors</Text>
-        </View>
-        <View style={p.statPill}>
-          <Text style={p.statNum}>4.8★</Text>
-          <Text style={p.statLbl}>Avg rating</Text>
-        </View>
-        <View style={p.statPill}>
-          <Text style={p.statNum}>225+</Text>
-          <Text style={p.statLbl}>Sessions</Text>
-        </View>
-        <View style={p.statPill}>
-          <Text style={p.statNum}>Free</Text>
-          <Text style={p.statLbl}>Always</Text>
-        </View>
-      </View>
-
-      {/* Mentor cards */}
-      {filtered.length === 0 ? (
-        <View style={p.emptyWrap}>
-          <Text style={p.emptyEmoji}>🔎</Text>
-          <Text style={p.emptyTitle}>No mentors found</Text>
-          <Text style={p.emptySub}>Try a different topic or clear your search</Text>
-        </View>
-      ) : (
-        filtered.map((mentor) => (
-          <View key={mentor.id} style={p.mentorCard}>
-            {/* Top row */}
-            <View style={p.mentorTop}>
-              <View style={p.avatarWrap}>
-                <Text style={p.avatarEmoji}>{mentor.emoji}</Text>
-                {mentor.online && <View style={p.onlineBadge} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={p.nameRow}>
-                  <Text style={p.mentorName}>{mentor.name}</Text>
-                  <Text style={p.ratingBadge}>★ {mentor.rating}</Text>
-                </View>
-                <Text style={p.mentorYear}>{mentor.year}</Text>
-                <Text style={p.sessionCount}>💬 {mentor.sessions} sessions</Text>
-              </View>
-            </View>
-
-            {/* Bio */}
-            <Text style={p.mentorBio}>{mentor.bio}</Text>
-
-            {/* Tags */}
-            <View style={p.tagRow}>
-              {mentor.tags.map((tag) => (
-                <View key={tag} style={p.tagChip}>
-                  <Text style={p.tagLabel}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Actions */}
-            <View style={p.actionRow}>
-              <Pressable
-                style={p.msgBtn}
-                onPress={() => { hapticLight(); toast(`Opening chat with ${mentor.name} 💬`); }}
-              >
-                <Text style={p.msgBtnTxt}>💬 Message</Text>
-              </Pressable>
-              <Pressable
-                style={p.connectBtn}
-                onPress={() => { hapticSuccess(); toast(`Request sent to ${mentor.name} 🤝`); }}
-              >
-                <Text style={p.connectBtnTxt}>Connect →</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))
-      )}
-
-      {/* Footer note */}
-      <View style={p.footerNote}>
-        <Text style={p.footerText}>
-          🔒 All peer mentors are trained & verified by your campus wellbeing team. Sessions are confidential.
-        </Text>
-      </View>
-    </>
-  );
-}
-
 // ── Main screen ──────────────────────────────────────────────────────────────
+// Note: this screen used to have a second "PeerConnect" mode with a hardcoded mentor list and
+// Message/Connect buttons that only fired a toast - no real chat, no real request, nothing backend-
+// wired. The actual peer-mentor request/chat flow already exists and works in the Support tab
+// (PeerMentorDashboardScreen + SupportScreen's request UI), so that fake duplicate was removed
+// rather than built out a second time. See the "Find a peer mentor" card below for the real link.
 
-export function CommunityScreen(_props: Props) {
-  const [mode, setMode]               = useState('voices');
+export function CommunityScreen(props: Props) {
   const [activeTopic, setActiveTopic] = useState(TOPICS[0]);
   const [draft, setDraft]             = useState('');
   const [posting, setPosting]         = useState(false);
@@ -227,11 +48,11 @@ export function CommunityScreen(_props: Props) {
   const insets       = useSafeAreaInsets();
 
   const refresh = useCallback(() => {
-    if (!token || mode !== 'voices') return;
+    if (!token) return;
     load(token, stripHash(activeTopic)).catch((err) =>
       toast(err instanceof ApiRequestError ? err.message : 'Could not load the feed.')
     );
-  }, [token, activeTopic, load, toast, mode]);
+  }, [token, activeTopic, load, toast]);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -302,39 +123,16 @@ export function CommunityScreen(_props: Props) {
       >
         <Text style={s.headerTitle}>Community</Text>
         <Text style={s.headerSub}>You're not alone here 💚</Text>
-
-        {/* Mode toggle */}
-        <View style={s.modeRow}>
-          {MODES.map((m) => (
-            <Pressable
-              key={m.key}
-              style={[s.modeChip, mode === m.key && s.modeChipActive]}
-              onPress={() => { hapticLight(); setMode(m.key); }}
-            >
-              <Text style={s.modeIcon}>{m.icon}</Text>
-              <View>
-                <Text style={[s.modeLabel, mode === m.key && s.modeLabelActive]}>{m.label}</Text>
-                <Text style={s.modeSub}>{m.sub}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
       </LinearGradient>
 
       <Screen
         backgroundColor={colors.bg}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
         edges={{ top: false, bottom: false }}
-        refreshing={mode === 'voices' && loading && posts.length > 0}
+        refreshing={loading && posts.length > 0}
         onRefresh={refresh}
         refreshTintColor={colors.coral}
       >
-        {mode === 'peer' ? (
-          /* ── PeerConnect view ── */
-          <PeerConnectView toast={toast} />
-        ) : (
-          /* ── Campus Voices view ── */
-          <>
             {/* Topic pills */}
             <ScrollView
               horizontal
@@ -454,157 +252,28 @@ export function CommunityScreen(_props: Props) {
               </View>
             </View>
 
-            {/* Mentor spotlight */}
-            <View style={s.sectionRow}>
-              <Text style={s.sectionTitle}>Mentor spotlight</Text>
-              <View style={s.onlineRow}>
-                <View style={s.onlineDot} />
-                <Text style={s.onlineTxt}>online now</Text>
-              </View>
-            </View>
+            {/* Find a peer mentor - real link to the Support tab, where mentor requests + chat
+                actually work end-to-end. This used to be a hardcoded "Kwame is online now" card
+                with a Chat button that only showed a toast; replaced with an honest CTA instead
+                of a second fake mentor feature. */}
             <View style={s.mentorCard}>
               <View style={s.mentorAvatar}>
-                <Text style={s.mentorEmoji}>🧑🏽</Text>
+                <Text style={s.mentorEmoji}>🤝</Text>
               </View>
               <View style={s.mentorInfo}>
-                <Text style={s.mentorName}>Kwame · Peer Mentor</Text>
-                <Text style={s.mentorSub}>Stress · Time management</Text>
+                <Text style={s.mentorName}>Want to talk to someone?</Text>
+                <Text style={s.mentorSub}>Peer mentors are ready to chat in Support</Text>
               </View>
-              <Pressable style={s.chatBtn} onPress={() => toast('Opening chat with Kwame 💬')}>
-                <Text style={s.chatBtnTxt}>Chat</Text>
+              <Pressable style={s.chatBtn} onPress={() => props.navigation.navigate('Support')}>
+                <Text style={s.chatBtnTxt}>Go</Text>
               </Pressable>
             </View>
-          </>
-        )}
       </Screen>
 
       <EmojiBurst ref={burstRef} />
     </View>
   );
 }
-
-// ── PeerConnect styles ────────────────────────────────────────────────────────
-const p = StyleSheet.create({
-  introBanner: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    ...shadow.sm,
-  },
-  introEmoji: { fontSize: 32 },
-  introTitle: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink },
-  introSub:   { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkFaint, marginTop: 2 },
-  onlinePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#E8F5EE', borderRadius: radii.pill,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4CAF7D' },
-  onlineTxt: { fontFamily: fonts.bodyBold, fontSize: 10, color: '#4CAF7D' },
-
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: '#FFFFFF', borderRadius: 14,
-    paddingHorizontal: spacing.md, paddingVertical: 10,
-    borderWidth: 1.5, borderColor: colors.line,
-    ...shadow.sm,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    color: colors.ink,
-  },
-  searchClear: { fontSize: 12, color: colors.inkFaint, paddingHorizontal: 4 },
-
-  catRow: { gap: spacing.sm, paddingBottom: 2 },
-  catChip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: radii.pill, backgroundColor: '#FFFFFF',
-    borderWidth: 1.5, borderColor: colors.line,
-    ...shadow.sm,
-  },
-  catChipActive: { backgroundColor: colors.sageSoft, borderColor: colors.sage },
-  catLabel:  { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft },
-  catLabelActive: { color: colors.sage },
-
-  statsRow: {
-    flexDirection: 'row', gap: spacing.sm,
-  },
-  statPill: {
-    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14,
-    paddingVertical: spacing.md, alignItems: 'center',
-    borderWidth: 1.5, borderColor: colors.line,
-  },
-  statNum: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink },
-  statLbl: { fontFamily: fonts.bodyMedium, fontSize: 9, color: colors.inkFaint, marginTop: 2 },
-
-  mentorCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 18,
-    padding: spacing.lg, gap: spacing.md,
-    ...shadow.sm,
-  },
-  mentorTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  avatarWrap: { position: 'relative' },
-  avatarEmoji: { fontSize: 34 },
-  onlineBadge: {
-    position: 'absolute', bottom: 0, right: -2,
-    width: 11, height: 11, borderRadius: 6,
-    backgroundColor: '#4CAF7D',
-    borderWidth: 2, borderColor: '#FFFFFF',
-  },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  mentorName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink, flex: 1 },
-  ratingBadge: {
-    fontFamily: fonts.bodyBold, fontSize: 10,
-    color: '#C68B00', backgroundColor: '#FFF8E1',
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill,
-  },
-  mentorYear: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkFaint, marginTop: 1 },
-  sessionCount: { fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.sage, marginTop: 2 },
-  mentorBio: {
-    fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm,
-    color: colors.inkSoft, lineHeight: 20,
-  },
-  tagRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  tagChip: {
-    paddingHorizontal: 10, paddingVertical: 4,
-    backgroundColor: colors.sageSoft, borderRadius: radii.pill,
-  },
-  tagLabel: { fontFamily: fonts.bodyBold, fontSize: 10, color: colors.sage },
-  actionRow: { flexDirection: 'row', gap: spacing.sm },
-  msgBtn: {
-    flex: 1, alignItems: 'center',
-    paddingVertical: 10, borderRadius: radii.pill,
-    backgroundColor: colors.bg,
-    borderWidth: 1.5, borderColor: colors.line,
-  },
-  msgBtnTxt: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.inkSoft },
-  connectBtn: {
-    flex: 1, alignItems: 'center',
-    paddingVertical: 10, borderRadius: radii.pill,
-    backgroundColor: colors.sage,
-  },
-  connectBtnTxt: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#FFFFFF' },
-
-  emptyWrap: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
-  emptyEmoji: { fontSize: 40 },
-  emptyTitle: { fontFamily: fonts.bodyBold, fontSize: fontSizes.md, color: colors.ink },
-  emptySub:   { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.inkFaint, textAlign: 'center' },
-
-  footerNote: {
-    backgroundColor: colors.lavenderSoft, borderRadius: 14,
-    padding: spacing.md,
-  },
-  footerText: {
-    fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs,
-    color: colors.lavender, lineHeight: 18, textAlign: 'center',
-  },
-});
 
 // ── Campus Voices styles ─────────────────────────────────────────────────────
 const CARD_R = 18;
@@ -628,39 +297,6 @@ const s = StyleSheet.create({
     marginTop: 2,
     marginBottom: spacing.md,
   },
-  modeRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  modeChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: CARD_R,
-    padding: spacing.md,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  modeChipActive: {
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    borderColor: 'rgba(255,255,255,0.55)',
-  },
-  modeIcon: { fontSize: 20 },
-  modeLabel: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSizes.xs,
-    color: 'rgba(255,255,255,0.75)',
-  },
-  modeLabelActive: { color: '#FFFFFF' },
-  modeSub: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: 1,
-  },
-
   content: { padding: spacing.lg, gap: spacing.md },
 
   topicRow: { gap: spacing.sm, paddingBottom: 2 },
@@ -815,21 +451,6 @@ const s = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-
-  sectionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  sectionTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSizes.md,
-    color: colors.ink,
-  },
-  onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4CAF7D' },
-  onlineTxt: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: '#4CAF7D' },
 
   mentorCard: {
     backgroundColor: '#FFFFFF',

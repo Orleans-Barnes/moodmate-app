@@ -378,6 +378,9 @@ const s = StyleSheet.create({
     marginTop: spacing.sm, backgroundColor: colors.lavender, borderRadius: radii.md,
     paddingVertical: spacing.sm, alignItems: 'center', justifyContent: 'center',
   },
+  // Was referenced on the Publish/Create buttons but never defined - disabled={saving} still
+  // blocked double-taps functionally, this just restores the visual dimmed-while-saving state.
+  btnDisabled: { opacity: 0.5 },
   publishBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#fff' },
 
   dayRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
