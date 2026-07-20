@@ -31,10 +31,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   loading: false,
   pendingReference: null,
   load: async (token) => {
-    set({ loading: true });
-    // Guest users have no JWT — bail before hitting the real API (prevents 403)
+    // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
+    // setting loading:true so a guest doesn't get stuck on a loading state forever.
     if (token === 'guest') return;
 
+    set({ loading: true });
     try {
       const [wallet, leafPacks] = await Promise.all([
         getWalletState(token),

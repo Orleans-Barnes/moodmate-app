@@ -43,10 +43,12 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   loading: false,
 
   load: async (token) => {
-    set({ loading: true });
-    // Guest users have no JWT — bail before hitting the real API (prevents 403)
+    // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
+    // setting loading:true so a guest's Journal tab doesn't get stuck on the skeleton forever (see
+    // the identical fix applied to useSupportStore.load - this was the same copy-pasted bug).
     if (token === 'guest') return;
 
+    set({ loading: true });
     try {
       const page = await listJournalEntries(token);
       set({ entries: page.content.map(fromApi) });

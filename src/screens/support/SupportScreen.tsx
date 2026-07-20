@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { useSupportStore } from '@/state/useSupportStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
+import { GuestGate } from '@/components/GuestGate';
 import { ApiRequestError } from '@/api/client';
 import type { ConversationView, CounsellorAvailabilityStatus, CounsellorView, MentorRequestView, MentorView } from '@/api/types';
 import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
@@ -94,6 +95,7 @@ export function SupportScreen({ navigation }: Props) {
   const cardWidth = Math.min(280, width * 0.72);
   const toast = useToast();
   const token = useAuthStore((s) => s.token);
+  const isGuest = useAuthStore((s) => s.user?.guest ?? false);
 
   const counsellors = useSupportStore((s) => s.counsellors);
   const mentors = useSupportStore((s) => s.mentors);
@@ -124,10 +126,13 @@ export function SupportScreen({ navigation }: Props) {
   const [rescheduleTime, setRescheduleTime] = useState(TIME_SLOTS[0]);
   const [reschedulingBusy, setReschedulingBusy] = useState(false);
 
+  // Booking a counsellor and messaging both need a real, identifiable account server-side, so
+  // unlike the local-only guest modes elsewhere there's no honest stand-in here - guests see
+  // GuestGate below instead of a roster load that would silently fail with no X-User-Id.
   const refresh = useCallback(() => {
-    if (!token) return;
+    if (!token || isGuest) return;
     load(token).catch((err) => toast(err instanceof ApiRequestError ? err.message : 'Could not load Support.'));
-  }, [token, load, toast]);
+  }, [token, isGuest, load, toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -252,6 +257,16 @@ export function SupportScreen({ navigation }: Props) {
         <Text style={styles.gradHeading}>Support</Text>
         <Text style={styles.gradSub}>Counsellors · Mentors · Messages</Text>
       </LinearGradient>
+      {isGuest ? (
+        <Screen backgroundColor={colors.bg} edges={{ top: false, bottom: false }}>
+          <GuestGate
+            emoji="🤝"
+            title="Connect with real support"
+            message="Booking a counsellor or messaging a peer mentor needs a free account so they know who they're talking to."
+            onCreateAccount={() => navigation.navigate('Signup')}
+          />
+        </Screen>
+      ) : (
       <Screen
         backgroundColor={colors.bg}
         contentContainerStyle={styles.content}
@@ -403,7 +418,11 @@ export function SupportScreen({ navigation }: Props) {
                   </View>
                   {isCounsellor ? (
                     (() => {
-                      const meta = AVAILABILITY_META[(item.data as CounsellorView).availabilityStatus];
+                      // Falls back to the ONLINE badge rather than throwing if a counsellor record
+                      // ever arrives with a missing/unrecognized status - the backend column is
+                      // NOT NULL with a default of ONLINE today, but this keeps the whole roster
+                      // carousel from crashing if that ever isn't true (e.g. a future enum value).
+                      const meta = AVAILABILITY_META[(item.data as CounsellorView).availabilityStatus] ?? AVAILABILITY_META.ONLINE;
                       return (
                         <View style={[styles.onlineBadge, { backgroundColor: meta.bg }]}>
                           <View style={[styles.onlineDot, { backgroundColor: meta.dot }]} />
@@ -586,6 +605,7 @@ export function SupportScreen({ navigation }: Props) {
         })
       )}
       </Screen>
+      )}
     </View>
   );
 }

@@ -76,10 +76,12 @@ export const useWellnessStore = create<WellnessState>((set) => ({
   goals: [],
   loading: false,
   load: async (token) => {
-    set({ loading: true });
-    // Guest users have no JWT — bail before hitting the real API (prevents 403)
+    // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
+    // setting loading:true so a guest doesn't get stuck on a loading state forever (the old order
+    // set loading:true then returned before the finally block that resets it).
     if (token === 'guest') return;
 
+    set({ loading: true });
     try {
       const state = await getWellnessState(token);
       applyState(set, state);

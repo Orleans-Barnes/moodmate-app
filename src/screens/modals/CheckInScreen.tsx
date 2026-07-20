@@ -11,6 +11,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmotionWheel, Emotion } from '@/components/EmotionWheel';
 import { ConfettiBurst, ConfettiHandle } from '@/components/Confetti';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useGuestStore } from '@/state/useGuestStore';
+import { XP_VALUES } from '@/state/useGamificationStore';
 import { useToast } from '@/state/useToast';
 import { recordCheckIn } from '@/api/checkin';
 import { ApiRequestError } from '@/api/client';
@@ -77,16 +79,29 @@ export function CheckInScreen({ navigation }: Props) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const token = useAuthStore((s) => s.token);
+  const isGuest = useAuthStore((s) => s.user?.guest ?? false);
+  const showProgressModal = useGuestStore((s) => s.showProgressModal);
   const toast = useToast();
   const confettiRef = useRef<ConfettiHandle>(null);
   const btnScale = useRef(new Animated.Value(1)).current;
 
   const handleSave = async () => {
-    if (!selected || !token) return;
+    if (!selected) return;
     Animated.sequence([
       Animated.timing(btnScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.spring(btnScale, { toValue: 1, useNativeDriver: true, friction: 4 }),
     ]).start();
+
+    // Guest path — no API call, same local-only pattern as GratitudeJar/JournalEntry/etc.
+    if (isGuest) {
+      confettiRef.current?.fire();
+      toast(`Mood logged — ${selected.label} 🌱`);
+      showProgressModal('Mood check-in', XP_VALUES.checkin);
+      setTimeout(() => navigation.goBack(), 500);
+      return;
+    }
+
+    if (!token) return;
     setSaving(true);
     try {
       await recordCheckIn(token, {

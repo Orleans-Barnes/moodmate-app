@@ -22,7 +22,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { TextField } from '@/components/TextField';
 import { useToast } from '@/state/useToast';
 import { useAuthStore } from '@/state/useAuthStore';
-import { signup, loginAsGuest } from '@/api/auth';
+import { signup } from '@/api/auth';
 import { ApiRequestError } from '@/api/client';
 import { colors, fonts, fontSizes, radii, spacing, shadow, gradients, glow } from '@/theme/tokens';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,6 +70,7 @@ export function SignupScreen({ navigation }: Props) {
   const [loading, setLoading]         = useState(false);
   const toast      = useToast();
   const setSession = useAuthStore((s) => s.setSession);
+  const loginAsGuest = useAuthStore((s) => s.loginAsGuest);
   const insets     = useSafeAreaInsets();
   const btnScale   = useRef(new Animated.Value(1)).current;
 
@@ -109,17 +110,15 @@ export function SignupScreen({ navigation }: Props) {
     }
   };
 
-  const handleGuest = async () => {
-    setLoading(true);
-    try {
-      const { token, refreshToken, user } = await loginAsGuest();
-      await setSession(token, refreshToken, user);
-      navigation.replace('Main');
-    } catch (err) {
-      toast(err instanceof ApiRequestError ? err.message : 'Could not continue as guest.');
-    } finally {
-      setLoading(false);
-    }
+  // Uses the same session-only, no-backend guest path as LoginScreen (see useAuthStore.loginAsGuest)
+  // rather than the real /api/auth/guest account this used to call — that created a persisted DB
+  // user but wasn't recognized by any of the screens that special-case guests for the local-only
+  // "feel the value first, gate once" experience (GratitudeJar, JournalEntry, BreathingSession,
+  // etc.), so a signup-flow guest got a worse, inconsistent experience than a login-flow guest.
+  // One guest implementation now, matching "Explore without an account" everywhere.
+  const handleGuest = () => {
+    loginAsGuest();
+    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   };
 
   return (

@@ -73,10 +73,11 @@ export const useCommunityStore = create<CommunityState>((set, get) => ({
   posts: [],
   loading: false,
   load: async (token, topic) => {
-    set({ loading: true });
-    // Guest users have no JWT — bail before hitting the real API (prevents 403)
+    // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
+    // setting loading:true so a guest doesn't get stuck on a loading state forever.
     if (token === 'guest') return;
 
+    set({ loading: true });
     try {
       const page = await listCommunityPosts(token, topic);
       set({ posts: page.content.map(fromApi) });

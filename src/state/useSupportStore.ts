@@ -57,10 +57,13 @@ export const useSupportStore = create<SupportState>((set, get) => ({
   myMentorRequests: [],
   loading: false,
   load: async (token) => {
-    set({ loading: true });
-    // Guest users have no JWT — bail before hitting the real API (prevents 403)
+    // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
+    // setting loading:true so a guest's Support tab doesn't get stuck on the skeleton forever with
+    // no way to clear it (the old code set loading:true then returned before the finally block
+    // that resets it).
     if (token === 'guest') return;
 
+    set({ loading: true });
     try {
       const [counsellors, mentors, appointments, conversations, myMentorRequests] = await Promise.all([
         listCounsellors(token),

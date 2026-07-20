@@ -57,7 +57,11 @@ export type RootStackParamList = {
   CheckIn: undefined;
   WellnessTree: undefined;
   GratitudeJar: undefined;
-  JournalEntry: { template: string; icon: string };
+  // "emoji" (not the Ionicons icon name used on the template card) - this is shown in the entry
+  // header and sent to the backend as moodEmoji, which is a VARCHAR(10) column, so it must stay a
+  // short real emoji, never an Ionicons identifier like "clipboard-outline" (that mismatch used to
+  // cause "value too long for type character varying(10)" / a 409 on every template-based save).
+  JournalEntry: { template: string; emoji: string };
   JournalView: { id: string; title: string; body: string; moodEmoji: string | null; date: string };
   BreathingSession: { session: string; duration: number };
   SOS: undefined;

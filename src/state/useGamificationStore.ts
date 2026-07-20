@@ -70,6 +70,7 @@ export interface ActionCounts {
 // ─── XP award sources ────────────────────────────────────────────────────────
 export const XP_VALUES = {
   moodGate:   10,
+  checkin:    10,
   journal:    15,
   breathing:  20,
   community:  10,

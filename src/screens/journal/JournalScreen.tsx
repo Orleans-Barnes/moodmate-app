@@ -35,30 +35,34 @@ function isSameDay(a: Date, b: Date) {
     a.getDate() === b.getDate();
 }
 
+// "icon" is an Ionicons glyph name, used only for the template card's icon. "emoji" is the actual
+// short emoji sent to JournalEntryScreen (header display + backend moodEmoji, a VARCHAR(10)
+// column) - the two must never be conflated, see JournalEntry's route param comment in
+// navigation/types.ts for why.
 const TEMPLATES = [
   {
-    icon: 'clipboard-outline', name: 'Daily reflection',
+    icon: 'clipboard-outline', emoji: '📝', name: 'Daily reflection',
     sub: 'Reflect on your day',
     from: '#4A7FD4', to: '#6BAAF5',
     glowColor: 'rgba(92,138,230,0.45)',
     accent: '#D9E8FF',
   },
   {
-    icon: 'school-outline', name: 'Exam stress',
+    icon: 'school-outline', emoji: '📚', name: 'Exam stress',
     sub: 'Write through pressure',
     from: '#E85A30', to: '#FF8A65',
     glowColor: 'rgba(255,111,77,0.45)',
     accent: '#FFE4DC',
   },
   {
-    icon: 'heart-circle-outline', name: 'Gratitude jar',
+    icon: 'heart-circle-outline', emoji: '💛', name: 'Gratitude jar',
     sub: 'Count your blessings',
     from: '#3D8A63', to: '#6BBD90',
     glowColor: 'rgba(95,158,124,0.45)',
     accent: '#D4F0E4',
   },
   {
-    icon: 'trophy-outline', name: 'Goals & wins',
+    icon: 'trophy-outline', emoji: '🏆', name: 'Goals & wins',
     sub: 'Celebrate progress',
     from: '#6B58B0', to: '#A491D3',
     glowColor: 'rgba(142,123,192,0.45)',
@@ -157,7 +161,7 @@ export function JournalScreen({ navigation }: Props) {
 
   const handleTemplate = (t: typeof TEMPLATES[number]) => {
     if (t.name === 'Gratitude jar') navigation.navigate('GratitudeJar');
-    else navigation.navigate('JournalEntry', { template: t.name, icon: t.icon });
+    else navigation.navigate('JournalEntry', { template: t.name, emoji: t.emoji });
   };
 
   const filteredEntries = entries; // could filter by selectedDate later
@@ -178,7 +182,7 @@ export function JournalScreen({ navigation }: Props) {
           </View>
           <Pressable
             style={s.newBtn}
-            onPress={() => { hapticMedium(); navigation.navigate('JournalEntry', { template: 'Free write', icon: '✍️' }); }}
+            onPress={() => { hapticMedium(); navigation.navigate('JournalEntry', { template: 'Free write', emoji: '✍️' }); }}
           >
             <Text style={s.newBtnText}>＋ New</Text>
           </Pressable>

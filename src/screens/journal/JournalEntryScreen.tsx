@@ -26,7 +26,7 @@ const PROMPTS: Record<string, string> = {
 };
 
 export function JournalEntryScreen({ route, navigation }: Props) {
-  const { template, icon } = route.params;
+  const { template, emoji } = route.params;
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
   const addEntry = useJournalStore((s) => s.addEntry);
@@ -52,7 +52,7 @@ export function JournalEntryScreen({ route, navigation }: Props) {
     if (!token) return;
     setSaving(true);
     try {
-      await addEntry(token, template, text.trim(), icon);
+      await addEntry(token, template, text.trim(), emoji);
       hapticSuccess();
       confettiRef.current?.fire();
       toast('Entry saved ✍️');
@@ -67,7 +67,7 @@ export function JournalEntryScreen({ route, navigation }: Props) {
   return (
     <View style={styles.flex}>
       <Screen backgroundColor={colors.bg} contentContainerStyle={styles.content}>
-        <ScreenHeader title={`${icon} ${template}`} onClose={() => navigation.goBack()} />
+        <ScreenHeader title={`${emoji} ${template}`} onClose={() => navigation.goBack()} />
 
         <Card tint="lavender" style={styles.promptCard}>
           <Text style={styles.promptText}>{PROMPTS[template] ?? 'Write what comes to mind.'}</Text>

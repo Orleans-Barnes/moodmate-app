@@ -75,10 +75,11 @@ export const useHubStore = create<HubState>((set, get) => ({
   events: [],
   loading: false,
   load: async (token) => {
-    set({ loading: true });
-    // Guest users have no JWT — bail before hitting the real API (prevents 403)
+    // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
+    // setting loading:true so a guest doesn't get stuck on a loading state forever.
     if (token === 'guest') return;
 
+    set({ loading: true });
     try {
       const [articlesPage, eventsPage] = await Promise.all([listArticles(token), listEvents(token)]);
       set({

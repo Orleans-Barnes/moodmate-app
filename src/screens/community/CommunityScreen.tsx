@@ -4,9 +4,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { MainTabParamList } from '@/navigation/types';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 import { Screen } from '@/components/Screen';
 import { Skeleton } from '@/components/Skeleton';
 import { EmojiBurst, EmojiBurstHandle } from '@/components/EmojiBurst';
@@ -15,6 +16,7 @@ import { useGamificationStore } from '@/state/useGamificationStore';
 import type { Reaction } from '@/state/useCommunityStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
+import { GuestGate } from '@/components/GuestGate';
 import { ApiRequestError } from '@/api/client';
 import { hapticLight, hapticSuccess } from '@/utils/haptics';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
@@ -43,16 +45,22 @@ export function CommunityScreen(props: Props) {
   const reactToPost  = useCommunityStore((s) => s.react);
   const deletePost   = useCommunityStore((s) => s.deletePost);
   const token        = useAuthStore((s) => s.token);
+  const isGuest       = useAuthStore((s) => s.user?.guest ?? false);
   const toast        = useToast();
   const burstRef     = useRef<EmojiBurstHandle>(null);
   const insets       = useSafeAreaInsets();
+  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
+  // The community feed and posting both require a real backend account (the gateway needs a
+  // valid X-User-Id, which the session-only guest token never carries) - unlike GratitudeJar/
+  // JournalEntry/etc. there's no honest local-only stand-in for a *shared* anonymous feed, so
+  // guests see GuestGate below instead of a feed that would silently fail to load.
   const refresh = useCallback(() => {
-    if (!token) return;
+    if (!token || isGuest) return;
     load(token, stripHash(activeTopic)).catch((err) =>
       toast(err instanceof ApiRequestError ? err.message : 'Could not load the feed.')
     );
-  }, [token, activeTopic, load, toast]);
+  }, [token, isGuest, activeTopic, load, toast]);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -125,6 +133,16 @@ export function CommunityScreen(props: Props) {
         <Text style={s.headerSub}>You're not alone here 💚</Text>
       </LinearGradient>
 
+      {isGuest ? (
+        <Screen backgroundColor={colors.bg} edges={{ top: false, bottom: false }}>
+          <GuestGate
+            emoji="💬"
+            title="Join the conversation"
+            message="Campus Voices is a real, anonymous community feed — create a free account to read and post."
+            onCreateAccount={() => rootNavigation.navigate('Signup')}
+          />
+        </Screen>
+      ) : (
       <Screen
         backgroundColor={colors.bg}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
@@ -269,6 +287,7 @@ export function CommunityScreen(props: Props) {
               </Pressable>
             </View>
       </Screen>
+      )}
 
       <EmojiBurst ref={burstRef} />
     </View>
