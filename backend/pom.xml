@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.moodmate</groupId>
+    <artifactId>moodmate-parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>MoodMate — Parent</name>
+    <description>MoodMate microservices parent POM</description>
+
+    <modules>
+        <module>moodmate-gateway</module>
+        <module>moodmate-auth</module>
+        <module>moodmate-mood</module>
+        <module>moodmate-support</module>
+        <module>moodmate-community</module>
+        <module>moodmate-wellness</module>
+        <module>moodmate-wallet</module>
+        <module>moodmate-journal</module>
+        <module>moodmate-gamification</module>
+        <module>moodmate-admin</module>
+        <module>moodmate-crisis</module>
+        <module>moodmate-ai</module>
+        <module>moodmate-notifications</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <spring.boot.version>3.5.11</spring.boot.version>
+        <!-- 2025.0.x (Northfields) is the release train compatible with Spring Boot 3.5.x - see
+             https://spring.io/projects/spring-cloud#overview's release-train table. The prior
+             value, 2024.0.1 (Moorgate), only supports Boot 3.4.x and was never actually run until
+             now - moodmate-gateway failed its compatibility check on first real startup.
+             Pinned to 2025.0.0 specifically (not a later patch) because Maven Central only ever
+             published the org.springframework.cloud:spring-cloud-dependencies BOM artifact under
+             that one version within this train - starting with 2025.0.1, Spring Cloud renamed the
+             BOM artifact itself (to spring-cloud-starter-build), so 2025.0.1/2025.0.2/2025.0.2.1
+             all 404 under the old artifact name used below. Verified via Maven Central's search
+             API before making this change, after the first attempt (2025.0.2.1) failed to resolve.
+             Fixing the version bump alone isn't enough: 2025.0 also renamed the Gateway artifact
+             and its config property prefix - see moodmate-gateway/pom.xml and application.yml for
+             the matching changes. -->
+        <spring.cloud.version>2025.0.0</spring.cloud.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <!-- Feature 15 (Production Hardening) - Circuit Breaker. Applied to the highest-traffic
+             cross-service calls first (moodmate-ai/moodmate-journal's Premium check, moodmate-
+             wellness's wallet read), not exhaustively to all 14 RestClient-based clients in this
+             pass - see each client's own doc comment for whether it was included. 2.2.0 is the
+             latest resilience4j-spring-boot3 release compatible with Spring Boot 3.5.x/Java 17 as
+             of this project's last verified check. -->
+        <resilience4j.version>2.2.0</resilience4j.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring.cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring.boot.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+                <!-- Caught by Feature 17's WellnessControllerTest (mvnw test, first real run of
+                     that test): WellnessController.toggleGoal(@PathVariable String key) has no
+                     explicit name on @PathVariable, and without this flag Spring can fail to
+                     resolve unnamed @PathVariable/@RequestParam parameter names via reflection at
+                     runtime ("Name for argument of type [java.lang.String] not specified... "),
+                     producing a 500 instead of routing the request. -parameters makes javac embed
+                     real parameter names in every compiled class, which is what Spring's own docs
+                     recommend over relying on debug-info-based name discovery. Set here in
+                     pluginManagement so every one of the 12 modules inherits it automatically -
+                     fixing this at the root rather than adding an explicit name to every
+                     individual @PathVariable/@RequestParam across the whole project. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

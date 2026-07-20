@@ -1,0 +1,145 @@
+server:
+  port: ${PORT:8091}
+
+spring:
+  # Loads the repo-root .env file as real Spring properties - see moodmate-gateway/application.yml's
+  # spring.config.import comment for the full root-cause explanation this fixes across every service.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: moodmate-auth
+  datasource:
+    # Shared Postgres instance across services, but each service owns its own schema so tables
+    # stay isolated and no service can accidentally query another's tables. Auth owns the "auth"
+    # schema. See moodmate-mood, moodmate-support, etc. for the same pattern with their own schema.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/moodmate?currentSchema=auth}
+    username: ${DB_USERNAME:moodmate}
+    password: ${DB_PASSWORD:moodmate}
+    # Capped for local dev - see moodmate-wellness/application.yml's datasource.hikari comment for
+    # the full "remaining connection slots" root-cause explanation this fixes across all services.
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_schema: auth
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: auth
+    default-schema: auth
+    create-schemas: true
+    baseline-on-migrate: true
+    ignore-missing-migrations: true
+  jackson:
+    time-zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+    # NOTE: set MAIL_PASSWORD to the 16-character Gmail App Password with the spaces REMOVED.
+    # Google displays it as 4 groups of 4 for readability only - the real secret has no spaces,
+    # and Spring reads this property as a literal string, so a value with spaces fails SMTP auth.
+
+moodmate:
+  # Phase 1H (Audit Logs) - direct (non-gateway) address for admin-service, read by
+  # AuditLogServiceClient via ServiceClientsProperties. Same pattern as moodmate-crisis's
+  # moodmate.services.auth-base-url.
+  services:
+    admin-base-url: ${ADMIN_SERVICE_URL:http://localhost:8099}
+  jwt:
+    # Must be byte-for-byte identical to the gateway's JWT_SECRET (moodmate-gateway/application.yml)
+    # - this service signs tokens, the gateway verifies them; a mismatch breaks every login.
+    # The dev fallback below only exists so a bare `mvn spring-boot:run` doesn't crash locally -
+    # JwtService rejects it outright if spring.profiles.active is prod/production/staging.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-before-deploy-32chars-min}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:1440}
+    # Feature 4 - JWT Refresh Tokens. How long a refresh token stays valid before the user must
+    # log in again with their password - much longer than the 24h access token on purpose, since
+    # its entire job is to avoid that daily forced re-login.
+    refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
+
+  password-reset:
+    otp-expiry-minutes: ${OTP_EXPIRY_MINUTES:15}
+    from-address: ${MAIL_USERNAME:noreply@moodmate.local}
+
+  avatar:
+    # Local folder this service writes uploaded photos to (created automatically if missing).
+    storage-dir: ${AVATAR_STORAGE_DIR:./uploads/avatars}
+    # Must be the SAME host:port the frontend's BACKEND_BASE_URL points at (see
+    # src/config.ts and current_ip.txt / check_ip.bat) - this is embedded directly into the
+    # avatarUrl returned to the app, and "localhost" would be unreachable from a phone/emulator
+    # that is a different device than the machine running this service.
+    public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
+
+  seed-demo-accounts:
+    enabled: ${SEED_DEMO_ACCOUNTS:false}
+    admin-password: ${SEED_ADMIN_PASSWORD:}
+
+  expo:
+    # Feature 9 (Notification Deep Linking) - Expo's real push API by default; overridable so a
+    # local/sandbox environment can point this at a mock server without a code change (same
+    # reasoning as moodmate-wallet's paystack.base-url).
+    push-url: ${EXPO_PUSH_URL:https://exp.host/--/api/v2/push/send}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Feature 16 (Observability) - Part 3/5. metrics: auto-recorded JVM/process/
+        # http.server.requests/HikariCP-pool metrics, no code needed. prometheus: scrape endpoint
+        # for monitoring/prometheus/prometheus.yml (needs micrometer-registry-prometheus, added in
+        # pom.xml). See root OBSERVABILITY.md for the "unauthenticated, same as health/info
+        # already were" caveat.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      # Feature 16 (Observability) - Part 9, Performance Monitoring (P95/P99 latency). Client-side
+      # computed percentile gauges (not full histogram buckets - that's the lighter-weight of the
+      # two options Micrometer supports, and enough for the Grafana "API Monitoring" dashboard's
+      # p95/p99 panels; histogram buckets would additionally allow server-side aggregation across
+      # multiple instances of the *same* service in Prometheus, which this single-instance-per-
+      # service topology doesn't need).
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,
+    # thread, correlation ID (via CorrelationIdFilter's MDC entry, key "correlationId" - see that
+    # class's doc comment), logger class, message. CorrelationIdFilter itself logs
+    # "METHOD /uri completed STATUS in N ms" as %msg for every request, satisfying this feature's
+    # request-logging requirement without a second filter.
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] [correlationId=%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.moodmate.auth: INFO

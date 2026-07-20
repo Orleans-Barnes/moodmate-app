@@ -1,0 +1,90 @@
+server:
+  port: ${PORT:8092}
+
+spring:
+  # Loads the repo-root .env file as real Spring properties - see moodmate-gateway/application.yml's
+  # spring.config.import comment for the full root-cause explanation this fixes across every service.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: moodmate-mood
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/moodmate?currentSchema=mood}
+    username: ${DB_USERNAME:moodmate}
+    password: ${DB_PASSWORD:moodmate}
+    # Capped for local dev - see moodmate-wellness/application.yml's datasource.hikari comment for
+    # the full "remaining connection slots" root-cause explanation this fixes across all services.
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_schema: mood
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: mood
+    default-schema: mood
+    create-schemas: true
+    baseline-on-migrate: true
+    ignore-missing-migrations: true
+  jackson:
+    time-zone: UTC
+
+moodmate:
+  services:
+    # Feature 8 (Mood Analytics) - direct (non-gateway) service-to-service address for
+    # WellnessServiceClient's habit/sleep correlation reads, same pattern as
+    # moodmate-community/moodmate-journal/moodmate-ai's *-base-url properties.
+    wellness-base-url: ${WELLNESS_SERVICE_URL:http://localhost:8095}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Feature 16 (Observability) - Part 3/5. metrics: auto-recorded JVM/process/
+        # http.server.requests/HikariCP-pool metrics, no code needed. prometheus: scrape endpoint
+        # for monitoring/prometheus/prometheus.yml (needs micrometer-registry-prometheus, added in
+        # pom.xml). See root OBSERVABILITY.md for the "unauthenticated, same as health/info
+        # already were" caveat.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      # Feature 16 (Observability) - Part 9, Performance Monitoring (P95/P99 latency). Client-side
+      # computed percentile gauges (not full histogram buckets - that's the lighter-weight of the
+      # two options Micrometer supports, and enough for the Grafana "API Monitoring" dashboard's
+      # p95/p99 panels; histogram buckets would additionally allow server-side aggregation across
+      # multiple instances of the *same* service in Prometheus, which this single-instance-per-
+      # service topology doesn't need).
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,
+    # thread, correlation ID (via CorrelationIdFilter's MDC entry, key "correlationId" - see that
+    # class's doc comment), logger class, message. CorrelationIdFilter itself logs
+    # "METHOD /uri completed STATUS in N ms" as %msg for every request, satisfying this feature's
+    # request-logging requirement without a second filter.
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] [correlationId=%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.moodmate.mood: INFO

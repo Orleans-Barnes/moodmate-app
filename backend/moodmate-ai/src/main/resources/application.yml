@@ -1,0 +1,156 @@
+server:
+  port: ${PORT:8101}
+
+spring:
+  # Loads the repo-root .env file as real Spring properties - see moodmate-gateway/application.yml's
+  # spring.config.import comment for the full "GROQ_API_KEY is not set despite being in .env" root
+  # cause this fixes across every service.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: moodmate-ai
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/moodmate?currentSchema=ai}
+    username: ${DB_USERNAME:moodmate}
+    password: ${DB_PASSWORD:moodmate}
+    # Capped for local dev - see moodmate-wellness/application.yml's datasource.hikari comment for
+    # the full "remaining connection slots" root-cause explanation this fixes across all services.
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_schema: ai
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: ai
+    default-schema: ai
+    create-schemas: true
+    baseline-on-migrate: true
+    ignore-missing-migrations: true
+  jackson:
+    time-zone: UTC
+
+moodmate:
+  groq:
+    # No default for api-key on purpose - if it's blank, GroqClient fails fast with a clear
+    # ApiException instead of silently sending an unauthenticated request to Groq and getting a
+    # confusing 401 back. Set via: set GROQ_API_KEY=... before starting this service.
+    api-key: ${GROQ_API_KEY:}
+    base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+    # llama-3.3-70b-versatile (this default's original value) was deprecated by Groq on
+    # 2026-06-17 - confirmed via web search after live chat requests started failing with a
+    # "model decommissioned" style error. Groq's own migration guidance points to
+    # openai/gpt-oss-120b as the replacement (qwen/qwen3.6-27b is the other option they list).
+    # Groq's model lineup changes over time; if this one is ever deprecated too, check
+    # https://console.groq.com/docs/models and override via GROQ_MODEL rather than editing this
+    # default blind.
+    model: ${GROQ_MODEL:openai/gpt-oss-120b}
+    max-history-messages: ${GROQ_MAX_HISTORY_MESSAGES:20}
+
+  gemini:
+    # Secondary/fallback model behind AiModelRouter (see that class) - used automatically if Groq
+    # fails, and selectable by Pro users via AiChatRequest.preferredModel. Same no-default,
+    # fail-fast reasoning as groq.api-key above. Set via: set GEMINI_API_KEY=... before starting.
+    api-key: ${GEMINI_API_KEY:}
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    # gemini-2.0-flash was Google's fast general-purpose chat model as of this project's last
+    # verified check. If chat requests start failing with a "model not found" style error from
+    # Gemini, check https://ai.google.dev/gemini-api/docs/models and override via GEMINI_MODEL
+    # rather than editing this default.
+    model: ${GEMINI_MODEL:gemini-2.0-flash}
+
+  services:
+    # Direct (non-gateway) service-to-service addresses.
+    mood-base-url: ${MOOD_SERVICE_URL:http://localhost:8092}
+    crisis-base-url: ${CRISIS_SERVICE_URL:http://localhost:8100}
+    wallet-base-url: ${WALLET_SERVICE_URL:http://localhost:8096}
+
+  ai-usage:
+    # Free-tier daily AI chat message cap (Premium Enforcement) - matches the business plan's
+    # "Basic AI chat (10 messages/day)" line. Pro users are exempt. Set to 0 to disable the cap
+    # entirely (e.g. for local development).
+    free-daily-message-limit: ${AI_FREE_DAILY_MESSAGE_LIMIT:10}
+
+  ai-safety:
+    # Feature 11 (AI Safety Improvements). disclaimer-version must be bumped (not just the text
+    # changed) whenever a change is substantive enough that every user should be asked to
+    # re-acknowledge - see DisclaimerAcknowledgement's doc comment.
+    disclaimer-text: >
+      MoodMate's AI Coach is a supportive companion, not a licensed therapist, doctor, or crisis
+      counsellor. It cannot diagnose conditions, prescribe treatment, or replace professional
+      mental health care. If you're in crisis or thinking about harming yourself, please use the
+      SOS resources in this app or contact a crisis line immediately.
+    disclaimer-version: ${AI_DISCLAIMER_VERSION:1}
+    # Abuse Protection. 0 disables either guard (e.g. for local development/testing).
+    max-message-length: ${AI_MAX_MESSAGE_LENGTH:2000}
+    duplicate-message-window-seconds: ${AI_DUPLICATE_MESSAGE_WINDOW_SECONDS:10}
+
+# Feature 15 (Production Hardening) - Circuit Breaker for the "walletService" breaker used by
+# PaymentsServiceClient.isPro(). Trips open after 5 of the last 10 calls fail (a mix of consecutive
+# and intermittent failures both count, since COUNT_BASED windows track the whole window, not just
+# a streak), waits 10s before allowing a trial call through (half-open), and only needs 3
+# consecutive successes in half-open to fully close again.
+resilience4j:
+  circuitbreaker:
+    instances:
+      walletService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Feature 16 (Observability) - Part 3/5. metrics: auto-recorded JVM/process/
+        # http.server.requests/HikariCP-pool metrics, no code needed. prometheus: scrape endpoint
+        # for monitoring/prometheus/prometheus.yml (needs micrometer-registry-prometheus, added in
+        # pom.xml). See root OBSERVABILITY.md for the "unauthenticated, same as health/info
+        # already were" caveat.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      # Feature 16 (Observability) - Part 9, Performance Monitoring (P95/P99 latency). Client-side
+      # computed percentile gauges (not full histogram buckets - that's the lighter-weight of the
+      # two options Micrometer supports, and enough for the Grafana "API Monitoring" dashboard's
+      # p95/p99 panels; histogram buckets would additionally allow server-side aggregation across
+      # multiple instances of the *same* service in Prometheus, which this single-instance-per-
+      # service topology doesn't need).
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,
+    # thread, correlation ID (via CorrelationIdFilter's MDC entry, key "correlationId" - see that
+    # class's doc comment), logger class, message. CorrelationIdFilter itself logs
+    # "METHOD /uri completed STATUS in N ms" as %msg for every request, satisfying this feature's
+    # request-logging requirement without a second filter.
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] [correlationId=%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.moodmate.ai: INFO

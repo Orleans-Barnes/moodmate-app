@@ -1,246 +1,179 @@
-# MoodMate — React Native (Expo + TypeScript) frontend
+# MoodMate
 
-The full frontend build, ported screen-by-screen from the approved HTML/CSS/JS
-prototype (`MoodMate_Headspace_Style_UI.html`). Tech stack matches the original
-proposal: **React Native + Expo + TypeScript**. The backend (Spring Boot +
-PostgreSQL microservices) is a separate build.
+AI-powered mental wellness mobile app for university students in Ghana. Mood tracking,
+journaling, gratitude, a gamified "wellness tree," breathing/grounding exercises, peer support,
+professional counselling (with secure video sessions), community, and an AI chat companion with
+built-in crisis-detection safety guardrails.
 
-## Status: every screen is built and wired
-
-`npx tsc --noEmit` passes with **zero errors** across all 37 source files, and
-every screen in the prototype now has a real React Native implementation —
-nothing is a placeholder anymore.
-
-**Entry flow:** Splash (animated logo, auto-advance, tap-to-skip) → Login /
-Signup (real validation: disabled-until-valid buttons, password mismatch
-detection, show/hide toggle) → Main tabs.
-
-**Tabs:** Home (streak, Wellness Tree card, daily goals, quick actions, AI
-insight → Pro), Journal (calendar strip, templates, notebook entries),
-Explore (breathing hero, daily-calm sessions, Wellness Hub, Calm Match,
-soundscape grid, challenge/exam-hub teasers), Community (Campus
-Voices/PeerConnect toggle, topic chips, live-reaction posts, mentor
-spotlight), Support (appointment card, peer mentors, messages).
-
-**Modals:** Check-in (emotion wheel + sliders + save → tree XP), Wellness Tree
-(shares live state with Home), Gratitude Jar, Breathing Session (real
-phase-cycling animation: Breathe in 4s → Hold 2s → Breathe out 5s, looped),
-SOS (always free, never gated), Profile (live streak/tree-level/leaf balance),
-Pro (feature checklist + monthly/yearly toggle), Tree Shop (real skin
-purchases, boosts, leaf packs — wired to global state), Wellness Hub
-(Articles/Events toggle, live RSVP), Calm Match (full flip/match game logic,
-rewards tree XP on a win).
-
-## Architecture
+This repository is a **monorepo**: the mobile frontend and the entire backend live together here,
+plus everything needed to run a local database. There is nothing else to clone.
 
 ```
-App.tsx                      → providers + NavigationContainer + ToastHost
-src/
-  theme/tokens.ts             → colors/spacing/radii/type, ported 1:1 from the prototype's CSS variables
-  state/
-    useAppState.ts            → global Zustand store: treeXP, streakCount, goals, leafBalance, treeSkin
-    useToast.ts                → global toast store (mirrors showToast() in the prototype)
-  components/
-    Button, Card, Chip, ProgressBar, TextField, ScreenHeader, ToggleCards,
-    EmotionWheel, Confetti (imperative burst), ToastHost, PlaceholderScreen
-  navigation/
-    types.ts                   → typed param lists for the tab navigator + root stack
-    MainTabs.tsx                → bottom tabs: Home, Journal, Explore, Community, Support
-    RootNavigator.tsx           → Splash → Login/Signup → Main, + modal-presented overlays
-  screens/
-    SplashScreen.tsx
-    auth/LoginScreen.tsx, SignupScreen.tsx
-    home/HomeScreen.tsx, GoalRow.tsx
-    journal/JournalScreen.tsx
-    explore/ExploreScreen.tsx
-    community/CommunityScreen.tsx
-    support/SupportScreen.tsx
-    modals/   → CheckIn, WellnessTree, GratitudeJar, BreathingSession, SOS,
-                 Profile, Pro, Shop, Hub, Game
+moodmate-app/
+├── src/                → React Native (Expo + TypeScript) frontend — see below
+├── App.tsx, app.json, package.json, ...
+├── backend/            → 13 Spring Boot microservices + API gateway — see backend/README.md
+└── database/           → docker-compose for local Postgres — see database/README.md
 ```
 
-**State management:** Zustand. `useAppState()` is the single source of truth
-for tree XP, streak, daily goals, leaf currency, and the equipped tree skin —
-any screen that needs them just calls the hook, so Home and Wellness Tree
-(and the Shop) always agree with each other. `useToast()` is a second, tiny
-store purely for the toast pill, kept separate so screens don't need a
-provider — just call the hook.
+## Tech stack
 
-**Navigation:** React Navigation (native-stack + bottom-tabs). Prototype
-overlays are modal-presented stack screens (`presentation: 'modal'`).
+- **Frontend:** React Native + Expo (SDK 54) + TypeScript, React Navigation v7, Zustand for state.
+- **Backend:** Java 17, Spring Boot 3.5, Spring Cloud Gateway, PostgreSQL, Flyway migrations,
+  JWT authentication, one microservice per domain (auth, mood, journal, support/counselling,
+  community, wellness, wallet, gamification, admin, crisis, AI chat, notifications) behind a single
+  API gateway.
+- **Database:** One shared local Postgres instance, one schema per microservice, run via Docker.
 
-**Animation:** React Native's built-in `Animated` API throughout — button
-press-scale, checkbox bounce + floating XP text, confetti bursts, tree sway,
-animated progress-bar fills, the breathing ring's per-phase scale animation,
-and shake-on-insufficient-funds in the Tree Shop and Calm Match mismatches.
-No extra native animation library needed.
+## Getting the whole stack running locally
 
-## Safe-area / status-bar overflow fix — rollout status
+You need three things running at once: the database, the backend services (at minimum the
+gateway plus whichever services the screen you're testing needs), and the Expo app.
 
-**Root cause:** Android now enforces edge-to-edge rendering by default, and
-every screen here uses `headerShown: false` (no native header left to absorb
-the inset automatically). Content was rendering right under the status bar.
+### 1. Database
 
-**The fix:** `src/components/Screen.tsx` — a wrapper using
-`useSafeAreaInsets()` that pads content by the device's real inset while
-letting the background bleed full-screen behind the status bar (no hard
-color seam). It owns `paddingTop`/`paddingBottom` exclusively by design —
-screens pass `extraTopGap`/`extraBottomGap` for cosmetic spacing instead of
-setting padding directly, which structurally prevents a screen's own styles
-from silently overriding the inset (a real bug I caught and fixed mid-build —
-see commit history in this conversation if you're curious, or just trust the
-verification below).
+```bash
+cd database
+docker compose up -d
+```
 
-**Migrated so far (Phase 1 — verified):** Splash, Login, Signup, Home,
-Wellness Tree.
+See [`database/README.md`](./database/README.md) for the full explanation (schema-per-service map,
+port list, how to reset a single service's data). No manual schema setup is needed — every backend
+service creates its own schema automatically via Flyway the first time it starts.
 
-**Not yet migrated (Phase 2 — same overflow bug still present):** Journal,
-Explore, Community, Support, and the Check-in / Gratitude Jar / Breathing
-Session / SOS / Profile / Pro / Tree Shop / Hub / Game modals. These still
-use the old plain `ScrollView`/`View` pattern. Migrating them is mechanical
-— swap the outer `ScrollView` for `<Screen>`, remove any `padding`/
-`paddingTop`/`paddingBottom` from that screen's own `content` style, done.
-Doing this in another batch of ~5, verified the same way (`tsc --noEmit` +
-real `expo export` bundle), is the next step — deliberately not done all at
-once in this pass, to keep risk contained per screen-batch.
+### 2. Backend
 
+Each microservice is a normal Maven module. From the `backend/` folder:
 
-## What I verified (not just "should compile")
+```bash
+cd backend/moodmate-<service-name>
+../mvnw.cmd spring-boot:run        # Windows
+../mvnw spring-boot:run            # macOS/Linux
+```
 
-- `npx tsc --noEmit` — 0 errors, all 37 files, including every screen.
-- Caught and fixed 2 real type errors along the way (an invalid `pointerEvents`
-  prop on `Animated.Text`, and an under-inferred `useState` literal type in
-  the breathing-phase state) — both would have been runtime/logic bugs.
-- Compiled `useAppState.ts` standalone to CommonJS and ran it directly in
-  Node, replaying the exact same goal-completion sequence tested against the
-  HTML prototype: toggling all 3 daily goals correctly raises tree XP *and*
-  increments the streak only on the 3rd completion; unchecking a goal doesn't
-  undo the streak; insufficient-funds tree-skin purchases are correctly
-  rejected with no state mutation; leaf spend/earn never underflows.
-- After the SDK 51→54 upgrade: re-ran `tsc --noEmit` (0 errors) **and** ran
-  `npx expo export --platform android`, which actually bundled all 879
-  modules into a real Hermes bytecode file — proof the app builds end to
-  end, not just type-checks.
-- After the Phase-1 safe-area migration: re-ran both checks again (880
-  modules now, +1 for the new `Screen` component), plus the state-store
-  regression test one more time. All still pass.
+**Do not run `mvnw.cmd -pl moodmate-<service> -am spring-boot:run` from the `backend/` root** —
+because `backend/pom.xml` is a multi-module aggregator (`packaging: pom`, no `mainClass`), Maven's
+reactor tries to run the bare `spring-boot:run` goal against the parent project first and fails
+before it ever reaches your service. Always `cd` into the specific service's own folder first, as
+shown above.
 
-## ⚠️ Expo Go SDK version — read this if you hit "Failed to download remote update"
+You always need `moodmate-gateway` running (it's what the frontend actually talks to — every
+other service also needs to be reachable through it, not called directly). Beyond that, only start
+the services relevant to what you're working on. See [`backend/README.md`](./backend/README.md)
+for the full service list, ports, and architecture notes.
 
-**This project targets Expo SDK 54.** Expo Go only supports one SDK version at a
-time (the one matching the Expo Go app itself) — if your Expo Go app is on a
-different SDK than the project, you'll get exactly this error:
-`Uncaught Error: java.io.IOException: Failed to download remote update`
+### 3. Frontend
 
-It looks like a network problem but it usually isn't — it's a version
-mismatch. Check your Expo Go SDK version (Profile tab → scroll down) and make
-sure it matches `"expo": "~54.0.0"` in `package.json`. If Expo Go updates
-itself to a newer SDK later, this project will need bumping too — see "Ways
-to run this on your phone" below for an option that sidesteps this problem
-entirely (a standalone build).
-
-I verified this version set two ways, not just by checking it compiles:
-1. `npx tsc --noEmit` — 0 errors against React 19 / React Native 0.81 / React
-   Navigation v7.
-2. `npx expo export --platform android` — Metro actually bundled all 879
-   modules into a real Hermes bytecode bundle (the literal artifact Expo Go
-   downloads and runs) with zero build errors. This is the same step that
-   was failing before — confirmed it now succeeds end-to-end, not just
-   type-checks.
-
-I also caught a second real issue while doing this: `babel-preset-expo` isn't
-transitively resolvable at SDK 54 the way it was at 51, so I added it as an
-explicit `devDependency` — without that fix, you'd have hit a *different*
-bundling error right after the SDK mismatch was resolved.
-
-## Ways to run this on your phone
-
-In order of how fast/reliable each is for this kind of project:
-
-**1. Expo Go, same Wi-Fi network (fastest, what most people use)**
 ```bash
 npm install
 npm start
 ```
-Scan the QR code with Expo Go. Phone and computer must be on the *same*
-Wi-Fi — this fails on networks that isolate devices from each other (common
-on campus/office/guest Wi-Fi).
 
-**2. Expo Go, tunnel mode (when phone & computer can't share a network)**
+Then scan the QR code with Expo Go, or see the frontend section below for other ways to run it
+(tunnel mode, EAS build, native run, web preview).
+
+## Environment variables / secrets
+
+Every backend service reads real secrets (JWT signing key, database credentials, AI provider API
+keys, payment provider keys, mail credentials) from environment variables with safe local-dev
+defaults baked in — nothing is hardcoded, and no real secret is committed to this repo. Each
+service's own `application.yml` documents exactly which `${VAR_NAME:default}` it reads. If you
+need a real third-party key (e.g. an actual Groq/Gemini key for AI chat, or a real Paystack key
+for payments), set it as an environment variable before starting that service — ask a teammate for
+the shared dev keys rather than committing your own.
+
+**Never commit a `start.bat`, `.env`, or any file containing a real API key or password** — this
+is explicitly called out in `backend/.gitignore` after a real key was accidentally committed once
+in an earlier version of this project.
+
+## Architecture note: microservices behind one gateway
+
+The backend is genuinely split into 13 independently-runnable Spring Boot services (not a
+monolith with folders) — see [`backend/README.md`](./backend/README.md) for the full breakdown.
+The frontend and any other client should only ever talk to the gateway (`localhost:8080`), which
+routes to the right service and is the only place JWT validation happens; it never calls an
+individual service's port directly.
+
+---
+
+## Frontend detail
+
+### Screens
+
+Auth (login/signup/forgot-password/guest), Home dashboard, Journal (templates + notebook +
+tags/favorites), Gratitude Jar, Wellness Tree (XP/streak/skins), Habit tracker, Sleep tracker,
+Breathing/grounding sessions, SOS (always free, never gated), Community, Counsellor directory +
+booking + secure video sessions (Jitsi) + messaging, Peer Mentor requests + messaging, Wellness Hub
+(articles/events), AI chat + insights, Notifications, and a full Admin Portal (user management,
+counsellor/mentor approval, wellness content, community moderation, feature flags, admin
+announcements, audit log).
+
+### State management
+
+Zustand, one store per domain (`useAuthStore`, `useSupportStore`, `useJournalStore`,
+`useWellnessStore`, `useCommunityStore`, etc. — see `src/state/`). Every store follows the same
+shape: a `load(token)` action that fetches from the real backend via `src/api/*.ts`, with
+`loading`/data fields the relevant screen subscribes to.
+
+### Navigation
+
+React Navigation (native-stack + bottom-tabs). The full route list lives in
+`src/navigation/types.ts`; every screen is registered in `src/navigation/RootNavigator.tsx`.
+
+### Design tokens
+
+`src/theme/tokens.ts` is the single source of truth for colors, spacing, radii, and type — never
+hardcode a color or spacing value in a screen; add it to tokens.ts first.
+
+### Ways to run this on your phone
+
+**1. Expo Go, same Wi-Fi network (fastest)**
+```bash
+npm start
+```
+Scan the QR code with Expo Go. Phone and computer must be on the *same* Wi-Fi.
+
+**2. Expo Go, tunnel mode (different networks)**
 ```bash
 npx expo start --tunnel
 ```
-Slower (routes through a relay), but works across different networks/mobile
-data. If the tunnel itself fails, try `npm install -g @expo/ngrok` first.
 
-**3. Standalone preview build via EAS (most "assured" — no Expo Go needed at all)**
-This sidesteps SDK-matching entirely, since the build contains its own JS —
-nothing to download at runtime.
+**3. Standalone preview build via EAS (no Expo Go needed)**
 ```bash
 npm install -g eas-cli
-eas login          # free Expo account
+eas login
 eas build:configure
 eas build -p android --profile preview
 ```
-EAS builds it on Expo's servers and gives you a link to download an `.apk`
-directly to your phone (Android: just open the link and install; you may
-need to allow "install from unknown sources" once). For iOS this needs a
-paid Apple developer account to install outside the App Store/TestFlight, so
-it's an Android-first option unless you have that.
 
-**4. Local native build with USB (most control, most setup)**
-Requires Android Studio (Android) or Xcode (iOS, Mac only) installed:
+**4. Local native build with USB**
 ```bash
-npx expo run:android   # phone connected via USB with USB debugging on
-npx expo run:ios        # Mac + Xcode + cable, or a simulator
+npx expo run:android
+npx expo run:ios
 ```
-This builds a real native app directly from your machine — no Expo Go, no
-SDK-matching concern, works offline once dependencies are installed.
 
-**5. Web preview (not your phone, but useful for a fast visual check)**
+**5. Web preview (quick visual check only)**
 ```bash
 npx expo start --web
 ```
-Good for sanity-checking screens quickly on a laptop before touching a
-device at all — some native-only bits (the slider, certain animations) may
-render slightly differently than on a real phone.
 
+### ⚠️ Expo Go SDK version
 
-## ⚠️ One thing I still couldn't do in this environment
+This project targets **Expo SDK 54**. Expo Go only supports one SDK at a time — if you get
+`Uncaught Error: java.io.IOException: Failed to download remote update`, it's almost always an SDK
+mismatch, not a network problem. Check your Expo Go app's SDK version (Profile tab) against
+`"expo": "~54.0.0"` in `package.json`.
 
-The design tokens reference `'Baloo2-Bold'` / DM Sans to match the prototype's
-fonts exactly, but this sandbox has no network access to Google Fonts, so the
-`.ttf` files aren't bundled. The app **runs fine** without them — React
-Native silently falls back to the system font when a `fontFamily` isn't
-loaded — it just won't visually match until someone:
+## Known gaps (tracked, not accidental)
 
-1. Downloads Baloo 2 (SemiBold/Bold) and DM Sans (Regular/Medium/Bold) from
-   Google Fonts
-2. Drops the `.ttf` files in `assets/fonts/`
-3. Loads them in `App.tsx` with `expo-font`'s `useFonts()` — the exact code
-   is already commented in `App.tsx`, just uncomment and add the files
+- No Docker images / CI pipeline for the backend services yet (each service is run directly via
+  Maven for local dev, as above).
+- No crash-reporting/error-boundary layer in the frontend yet.
+- Push notifications require a development build — they're not supported in Expo Go as of the SDK
+  this project targets.
 
-## Quick start
+## Contributing
 
-```bash
-npm install
-npm run typecheck   # tsc --noEmit — should report 0 errors
-npm start
-```
-Then see "Ways to run this on your phone" above for how to actually open it on a device.
-
-## Known simplifications (intentional, frontend-only stage)
-- All data is in-memory (Zustand) — nothing persists across app restarts yet.
-  That's expected: persistence is the backend's job (Spring Boot + Postgres),
-  not the frontend's, and is the natural next phase after this.
-- Journal entries, messages, and mentor lists are static display data, not
-  wired to a real list/CRUD yet — same reasoning.
-- `PlaceholderScreen.tsx` is no longer used by any screen but is left in
-  `components/` since it's a handy pattern if you add a new screen before its
-  real content is ready.
-
-## Suggested next steps, in order
-1. Add the real fonts (above) — fastest visual win, makes every screen match the prototype exactly.
-2. Wire up the Spring Boot services in parallel — the entity shapes are already in the original proposal, and the frontend's `useAppState` shape maps cleanly onto a `/wellness-progress` endpoint.
-3. Replace in-memory state with real API calls + persisted auth (JWT) once the backend exists.
-4. Add the actual breathing/meditation audio (expo-av) to the Breathing Session and Explore's soundscape tiles — currently silent.
+This is an active team project. Before pushing to `main`, push your work to a feature branch and
+open a pull request so the team can review — see the repo's branch protection / PR workflow for
+specifics.
