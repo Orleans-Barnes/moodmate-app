@@ -6,6 +6,7 @@
  *   2. Platform stats row (students, counsellors, appointments, posts)
  *   3. Quick-action cards
  *   4. Pending counsellor approval queue
+ *   5. Pending peer mentor application queue (Fix #4)
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -23,11 +24,15 @@ import {
   listPendingCounsellorRequests,
   approveCounsellorRequest,
   rejectCounsellorRequest,
+  listPendingMentorApplications,
+  approveMentorApplication,
+  rejectMentorApplication,
   getAdminStats,
   getWhitelist,
   addToWhitelist,
   removeFromWhitelist,
   type CounsellorRequestAdminView,
+  type PeerMentorAdminView,
   type AdminStats,
   type WhitelistEntry,
 } from '@/api/support';
@@ -57,6 +62,7 @@ export function AdminDashboardScreen({ navigation }: Props) {
   const logout  = useAuthStore((s) => s.logout);
 
   const [requests, setRequests]   = useState<CounsellorRequestAdminView[]>([]);
+  const [mentorRequests, setMentorRequests] = useState<PeerMentorAdminView[]>([]);
   const [stats, setStats]         = useState<AdminStats | null>(null);
   const [loading, setLoading]     = useState(true);
   const [actionId, setActionId]   = useState<number | null>(null);
@@ -75,18 +81,20 @@ export function AdminDashboardScreen({ navigation }: Props) {
     setApiError(null);
     setWlError(null);
     try {
-      const [sRes, rRes, crisisRes, wlRes] = await Promise.allSettled([
+      const [sRes, rRes, mRes, crisisRes, wlRes] = await Promise.allSettled([
         getAdminStats(token),
         listPendingCounsellorRequests(token),
+        listPendingMentorApplications(token),
         getOpenAlertCount(token),
         getWhitelist(token),
       ]);
       if (sRes.status === 'fulfilled') setStats(sRes.value);
       if (rRes.status === 'fulfilled') setRequests(rRes.value);
+      if (mRes.status === 'fulfilled') setMentorRequests(mRes.value);
       if (crisisRes.status === 'fulfilled') setOpenCrisisCount(crisisRes.value.open);
       if (wlRes.status === 'fulfilled') setWhitelist(wlRes.value);
       // If ALL failed it's likely a 401 — handle below
-      if ([sRes, rRes, crisisRes, wlRes].every(r => r.status === 'rejected')) {
+      if ([sRes, rRes, mRes, crisisRes, wlRes].every(r => r.status === 'rejected')) {
         throw (sRes as PromiseRejectedResult).reason;
       }
     } catch (err: unknown) {
@@ -145,6 +153,52 @@ export function AdminDashboardScreen({ navigation }: Props) {
               await rejectCounsellorRequest(token, item.id);
               setRequests((p) => p.filter((r) => r.id !== item.id));
               setStats((s) => s ? { ...s, pendingCounsellorRequests: s.pendingCounsellorRequests - 1 } : s);
+            } catch {
+              Alert.alert('Error', 'Could not reject. Please try again.');
+            } finally { setActionId(null); }
+          },
+        },
+      ],
+    );
+  };
+
+  // Fix #4 - mirrors handleApprove/handleReject above exactly (no stats field to bump here since
+  // AdminStats doesn't track a peer mentor count yet).
+  const handleApproveMentor = (item: PeerMentorAdminView) => {
+    Alert.alert(
+      'Approve peer mentor?',
+      `${item.name} will be promoted and can start supporting students.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            setActionId(item.id);
+            try {
+              await approveMentorApplication(token, item.id);
+              setMentorRequests((p) => p.filter((r) => r.id !== item.id));
+            } catch {
+              Alert.alert('Error', 'Could not approve. Please try again.');
+            } finally { setActionId(null); }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRejectMentor = (item: PeerMentorAdminView) => {
+    Alert.alert(
+      'Reject application?',
+      `${item.name}'s application will be rejected.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject', style: 'destructive',
+          onPress: async () => {
+            setActionId(item.id);
+            try {
+              await rejectMentorApplication(token, item.id);
+              setMentorRequests((p) => p.filter((r) => r.id !== item.id));
             } catch {
               Alert.alert('Error', 'Could not reject. Please try again.');
             } finally { setActionId(null); }
@@ -271,6 +325,14 @@ export function AdminDashboardScreen({ navigation }: Props) {
             </Text>
           </View>
         )}
+        {mentorRequests.length > 0 && (
+          <View style={s.alertBanner}>
+            <Ionicons name="alert-circle" size={18} color="#E67E22" />
+            <Text style={s.alertText}>
+              {mentorRequests.length} peer mentor application{mentorRequests.length > 1 ? 's' : ''} awaiting your review
+            </Text>
+          </View>
+        )}
 
         {/* ── Crisis alert banner ── */}
         {openCrisisCount > 0 && (
@@ -359,6 +421,59 @@ export function AdminDashboardScreen({ navigation }: Props) {
                 <Pressable
                   style={[s.approveBtn, actionId === item.id && s.btnDisabled]}
                   onPress={() => handleApprove(item)}
+                  disabled={actionId === item.id}>
+                  {actionId === item.id
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={s.approveBtnText}>✓ Approve</Text>}
+                </Pressable>
+              </View>
+            </View>
+          ))
+        )}
+
+        {/* ── Fix #4 - Peer Mentor Application Queue (mirrors Counsellor Requests above) ── */}
+        <Text style={s.sectionTitle}>Peer Mentor Applications</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.lavender} style={{ margin: 20 }} />
+        ) : mentorRequests.length === 0 ? (
+          <View style={s.emptyState}>
+            <Ionicons name="checkmark-circle-outline" size={44} color={colors.sage} />
+            <Text style={s.emptyTitle}>All clear!</Text>
+            <Text style={s.emptyBody}>No pending peer mentor applications right now.</Text>
+          </View>
+        ) : (
+          mentorRequests.map((item) => (
+            <View key={item.id} style={s.card}>
+              <View style={s.cardHeader}>
+                <LinearGradient colors={['#2D6A4F', '#52B788']}
+                  style={s.avatarCircle}>
+                  <Text style={s.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                </LinearGradient>
+                <View style={s.cardInfo}>
+                  <Text style={s.cardName}>{item.name}</Text>
+                  <Text style={s.cardTitle}>{item.focusArea || 'No focus area provided'}</Text>
+                </View>
+                <View style={s.pendingBadge}>
+                  <Text style={s.pendingBadgeText}>PENDING</Text>
+                </View>
+              </View>
+
+              {item.bio ? (
+                <Text style={s.cardBio} numberOfLines={3}>{item.bio}</Text>
+              ) : null}
+
+              <View style={s.actionRow}>
+                <Pressable
+                  style={[s.rejectBtn, actionId === item.id && s.btnDisabled]}
+                  onPress={() => handleRejectMentor(item)}
+                  disabled={actionId === item.id}>
+                  {actionId === item.id
+                    ? <ActivityIndicator size="small" color={colors.coral} />
+                    : <Text style={s.rejectBtnText}>✕ Reject</Text>}
+                </Pressable>
+                <Pressable
+                  style={[s.approveBtn, actionId === item.id && s.btnDisabled]}
+                  onPress={() => handleApproveMentor(item)}
                   disabled={actionId === item.id}>
                   {actionId === item.id
                     ? <ActivityIndicator size="small" color="#fff" />

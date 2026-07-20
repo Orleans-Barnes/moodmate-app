@@ -300,9 +300,9 @@ export function adminEditCounsellor(
   return apiPatch<CounsellorRequestAdminView>(`/api/support/counsellor-requests/${id}`, input, token);
 }
 
-// Phase 1H (Admin Portal - Peer Mentor Management) - no approve/reject queue (Phase 1G already
-// established peer mentor accounts are admin-linked, not self-serve-applied-for). "Manage" here
-// means the full roster (including deactivated rows) plus an activate/deactivate toggle.
+// Phase 1H (Admin Portal - Peer Mentor Management) - "Manage" here means the full roster
+// (including deactivated rows) plus an activate/deactivate toggle for an already-APPROVED mentor.
+// The pending-application approve/reject queue is the separate block below (Fix #4).
 
 export interface PeerMentorAdminView {
   id: number;
@@ -312,6 +312,7 @@ export interface PeerMentorAdminView {
   avatarEmoji: string;
   focusArea: string;
   available: boolean;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 
 export function listAllMentorsForAdmin(token: string): Promise<PeerMentorAdminView[]> {
@@ -324,6 +325,34 @@ export function deactivateMentor(token: string, id: number): Promise<PeerMentorA
 
 export function activateMentor(token: string, id: number): Promise<PeerMentorAdminView> {
   return apiPost<PeerMentorAdminView>(`/api/support/mentors/${id}/activate`, undefined, token);
+}
+
+// Fix #4 (Peer Mentor self-serve application flow) - mirrors the counsellor-requests functions
+// above field-for-field. Bio and focusArea are the only fields asked for (PeerMentor has no
+// "title" field like Counsellor does); name/avatar come from the requester's own profile.
+
+export interface PeerMentorApplicationInput {
+  bio: string;
+  focusArea?: string;
+}
+
+export function submitMentorApplication(
+  token: string,
+  input: PeerMentorApplicationInput,
+): Promise<{ id: number; status: string }> {
+  return apiPost<{ id: number; status: string }>('/api/support/mentor-applications', input, token);
+}
+
+export function listPendingMentorApplications(token: string): Promise<PeerMentorAdminView[]> {
+  return apiGet<PeerMentorAdminView[]>('/api/support/mentor-applications/pending', token);
+}
+
+export function approveMentorApplication(token: string, id: number): Promise<PeerMentorAdminView> {
+  return apiPost<PeerMentorAdminView>(`/api/support/mentor-applications/${id}/approve`, undefined, token);
+}
+
+export function rejectMentorApplication(token: string, id: number): Promise<PeerMentorAdminView> {
+  return apiPost<PeerMentorAdminView>(`/api/support/mentor-applications/${id}/reject`, undefined, token);
 }
 
 // ── Admin endpoints ───────────────────────────────────────────────────────

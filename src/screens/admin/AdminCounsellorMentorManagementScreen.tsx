@@ -35,6 +35,20 @@ const STATUS_META: Record<CounsellorRequestAdminView['status'], { label: string;
   SUSPENDED: { label: 'Suspended', bg: '#FDEDEC', color: '#C0392B' },
 };
 
+// Fix #4 - mentors now carry a real status too (previously only the available boolean existed).
+// The PENDING applications themselves are reviewed on AdminDashboardScreen's queue, not here - this
+// screen still only shows the activate/deactivate toggle, but now only for APPROVED rows, since
+// toggling "available" on a still-PENDING or REJECTED application doesn't mean anything. An
+// APPROVED row can still be independently active/deactivated, hence the function (not a flat
+// lookup) - it depends on both fields.
+function mentorBadge(item: PeerMentorAdminView): { label: string; bg: string; color: string } {
+  if (item.status === 'PENDING') return { label: 'Pending', bg: '#FEF9E7', color: '#8A6800' };
+  if (item.status === 'REJECTED') return { label: 'Rejected', bg: '#FDEDEC', color: '#E74C3C' };
+  return item.available
+    ? { label: 'Active', bg: '#E8F8EF', color: '#27AE60' }
+    : { label: 'Deactivated', bg: '#FDEDEC', color: '#C0392B' };
+}
+
 export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((s) => s.token) ?? '';
@@ -201,48 +215,53 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
             <Ionicons name="leaf-outline" size={40} color={colors.inkFaint} />
             <Text style={s.emptyBody}>No peer mentors on the roster yet.</Text>
           </View>
-        ) : mentors.map((item) => (
-          <View key={item.id} style={s.card}>
-            <View style={s.cardHeader}>
-              <View style={[s.avatarCircle, { backgroundColor: '#2D6A4F' }]}>
-                <Text style={s.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+        ) : mentors.map((item) => {
+          const badge = mentorBadge(item);
+          return (
+            <View key={item.id} style={s.card}>
+              <View style={s.cardHeader}>
+                <View style={[s.avatarCircle, { backgroundColor: '#2D6A4F' }]}>
+                  <Text style={s.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={s.cardInfo}>
+                  <Text style={s.cardName}>{item.name}</Text>
+                  <Text style={s.cardTitle}>{item.focusArea || 'No focus area'}</Text>
+                </View>
+                <View style={[s.statusBadge, { backgroundColor: badge.bg }]}>
+                  <Text style={[s.statusBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                </View>
               </View>
-              <View style={s.cardInfo}>
-                <Text style={s.cardName}>{item.name}</Text>
-                <Text style={s.cardTitle}>{item.focusArea || 'No focus area'}</Text>
-              </View>
-              <View style={[s.statusBadge, { backgroundColor: item.available ? '#E8F8EF' : '#FDEDEC' }]}>
-                <Text style={[s.statusBadgeText, { color: item.available ? '#27AE60' : '#C0392B' }]}>
-                  {item.available ? 'Active' : 'Deactivated'}
-                </Text>
-              </View>
+              <Text style={s.cardSpecialties}>
+                {item.status === 'PENDING'
+                  ? '📝 Application under review'
+                  : item.userId ? '🔗 Account linked' : '⬜ No account linked yet'}
+              </Text>
+              {item.status === 'APPROVED' && (
+                item.available ? (
+                  <Pressable
+                    style={[s.suspendBtn, actionId === item.id && s.btnDisabled]}
+                    onPress={() => handleDeactivateMentor(item)}
+                    disabled={actionId === item.id}
+                  >
+                    {actionId === item.id
+                      ? <ActivityIndicator size="small" color={colors.coral} />
+                      : <Text style={s.suspendBtnText}>Deactivate</Text>}
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={[s.reinstateBtn, actionId === item.id && s.btnDisabled]}
+                    onPress={() => handleActivateMentor(item)}
+                    disabled={actionId === item.id}
+                  >
+                    {actionId === item.id
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={s.reinstateBtnText}>Reactivate</Text>}
+                  </Pressable>
+                )
+              )}
             </View>
-            <Text style={s.cardSpecialties}>
-              {item.userId ? '🔗 Account linked' : '⬜ No account linked yet'}
-            </Text>
-            {item.available ? (
-              <Pressable
-                style={[s.suspendBtn, actionId === item.id && s.btnDisabled]}
-                onPress={() => handleDeactivateMentor(item)}
-                disabled={actionId === item.id}
-              >
-                {actionId === item.id
-                  ? <ActivityIndicator size="small" color={colors.coral} />
-                  : <Text style={s.suspendBtnText}>Deactivate</Text>}
-              </Pressable>
-            ) : (
-              <Pressable
-                style={[s.reinstateBtn, actionId === item.id && s.btnDisabled]}
-                onPress={() => handleActivateMentor(item)}
-                disabled={actionId === item.id}
-              >
-                {actionId === item.id
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={s.reinstateBtnText}>Reactivate</Text>}
-              </Pressable>
-            )}
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
