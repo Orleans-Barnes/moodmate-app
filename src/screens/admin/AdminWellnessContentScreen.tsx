@@ -1,11 +1,11 @@
 /**
  * AdminWellnessContentScreen — Phase 1H (Admin Portal - Wellness Content).
  *
- * Articles/Events tab toggle (same pattern as AdminCounsellorMentorManagementScreen). Create via
- * an inline expandable form, delete via a confirm alert. No edit UI in this pass (deliberate,
- * documented scope limit - the backend PATCH endpoints exist and are ready for a future edit
- * screen, but a create+delete loop already closes the real gap this phase called out: HubController
- * was entirely read-only before).
+ * Articles/Events tab toggle (same pattern as AdminCounsellorMentorManagementScreen). Create/edit
+ * share the same inline expandable form (editingArticleId/editingEventId set = edit mode, prefills
+ * the form and PATCHes on save instead of POSTing); delete via a confirm alert. The backend PATCH
+ * endpoints (updateArticle/updateEvent) already existed and worked - this pass just closes the
+ * "no frontend edit UI" gap called out in the Admin narrow-gaps review.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -18,8 +18,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
 import {
-  listArticles, createArticle, deleteArticle,
-  listEvents, createEvent, deleteEvent,
+  listArticles, createArticle, updateArticle, deleteArticle,
+  listEvents, createEvent, updateEvent, deleteEvent,
 } from '@/api/hub';
 import { ApiRequestError } from '@/api/client';
 import type { ArticleView, EventView } from '@/api/types';
@@ -63,6 +63,8 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState<number | null>(null);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
 
   // Article form
   const [aTitle, setATitle] = useState('');
@@ -99,7 +101,7 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
   }, [token, tab]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { setShowForm(false); }, [tab]);
+  useEffect(() => { setShowForm(false); setEditingArticleId(null); setEditingEventId(null); }, [tab]);
 
   const resetArticleForm = () => {
     setATitle(''); setASummary(''); setABody(''); setACategory(''); setAReadMinutes('5'); setAEmoji('🌱');
@@ -108,32 +110,74 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
     setETitle(''); setEDescription(''); setELocation(''); setECapacity(''); setEDay(new Date()); setETime(TIME_SLOTS[0]);
   };
 
-  const handleCreateArticle = async () => {
+  const openNewArticleForm = () => {
+    setEditingArticleId(null);
+    resetArticleForm();
+    setShowForm(true);
+  };
+
+  const openEditArticleForm = (item: ArticleView) => {
+    setEditingArticleId(item.id);
+    setATitle(item.title);
+    setASummary(item.summary ?? '');
+    setABody(item.body);
+    setACategory(item.category);
+    setAReadMinutes(String(item.readMinutes));
+    setAEmoji(item.imageEmoji);
+    setShowForm(true);
+  };
+
+  const openNewEventForm = () => {
+    setEditingEventId(null);
+    resetEventForm();
+    setShowForm(true);
+  };
+
+  const openEditEventForm = (item: EventView) => {
+    setEditingEventId(item.id);
+    const startsAt = new Date(item.startsAt);
+    setETitle(item.title);
+    setEDescription(item.description ?? '');
+    setELocation(item.location ?? '');
+    setECapacity(item.capacity != null ? String(item.capacity) : '');
+    setEDay(startsAt);
+    setETime(`${String(startsAt.getHours()).padStart(2, '0')}:${String(startsAt.getMinutes()).padStart(2, '0')}`);
+    setShowForm(true);
+  };
+
+  const handleSaveArticle = async () => {
     if (!aTitle.trim() || !aBody.trim() || !aCategory.trim()) {
       Alert.alert('Missing fields', 'Title, body, and category are required.');
       return;
     }
     setSaving(true);
     try {
-      const created = await createArticle(token, {
+      const input = {
         title: aTitle.trim(),
         summary: aSummary.trim() || undefined,
         body: aBody.trim(),
         category: aCategory.trim(),
         readMinutes: Number(aReadMinutes) || 1,
         imageEmoji: aEmoji.trim() || '🌱',
-      });
-      setArticles((prev) => [created, ...prev]);
+      };
+      if (editingArticleId != null) {
+        const updated = await updateArticle(token, editingArticleId, input);
+        setArticles((prev) => prev.map((a) => a.id === editingArticleId ? updated : a));
+      } else {
+        const created = await createArticle(token, input);
+        setArticles((prev) => [created, ...prev]);
+      }
       resetArticleForm();
+      setEditingArticleId(null);
       setShowForm(false);
     } catch (err) {
-      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not publish this article.');
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not save this article.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCreateEvent = async () => {
+  const handleSaveEvent = async () => {
     if (!eTitle.trim()) {
       Alert.alert('Missing fields', 'Title is required.');
       return;
@@ -143,18 +187,26 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
     startsAt.setHours(hh, mm, 0, 0);
     setSaving(true);
     try {
-      const created = await createEvent(token, {
+      const input = {
         title: eTitle.trim(),
         description: eDescription.trim() || undefined,
         startsAt: startsAt.toISOString(),
         location: eLocation.trim() || undefined,
         capacity: eCapacity.trim() ? Number(eCapacity) : undefined,
-      });
-      setEvents((prev) => [created, ...prev].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+      };
+      if (editingEventId != null) {
+        const updated = await updateEvent(token, editingEventId, input);
+        setEvents((prev) => prev.map((e) => e.id === editingEventId ? updated : e)
+          .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+      } else {
+        const created = await createEvent(token, input);
+        setEvents((prev) => [created, ...prev].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+      }
       resetEventForm();
+      setEditingEventId(null);
       setShowForm(false);
     } catch (err) {
-      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not create this event.');
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not save this event.');
     } finally {
       setSaving(false);
     }
@@ -206,7 +258,15 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
           <Ionicons name="chevron-back" size={22} color="#fff" />
         </Pressable>
         <Text style={s.headerTitle}>Wellness Content</Text>
-        <Pressable style={s.backBtn} onPress={() => setShowForm((v) => !v)} hitSlop={10}>
+        <Pressable
+          style={s.backBtn}
+          onPress={() => {
+            if (showForm) { setShowForm(false); setEditingArticleId(null); setEditingEventId(null); }
+            else if (tab === 'articles') openNewArticleForm();
+            else openNewEventForm();
+          }}
+          hitSlop={10}
+        >
           <Ionicons name={showForm ? 'close' : 'add'} size={22} color="#fff" />
         </Pressable>
       </LinearGradient>
@@ -223,7 +283,7 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {showForm && tab === 'articles' && (
           <View style={s.formCard}>
-            <Text style={s.formTitle}>New article</Text>
+            <Text style={s.formTitle}>{editingArticleId != null ? 'Edit article' : 'New article'}</Text>
             <TextInput style={s.input} placeholder="Title" placeholderTextColor={colors.inkFaint} value={aTitle} onChangeText={setATitle} />
             <TextInput style={s.input} placeholder="Summary (optional)" placeholderTextColor={colors.inkFaint} value={aSummary} onChangeText={setASummary} />
             <TextInput style={[s.input, s.inputMultiline]} placeholder="Body" placeholderTextColor={colors.inkFaint} value={aBody} onChangeText={setABody} multiline />
@@ -232,15 +292,17 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
               <TextInput style={[s.input, s.inputSmall]} placeholder="Min" placeholderTextColor={colors.inkFaint} value={aReadMinutes} onChangeText={setAReadMinutes} keyboardType="number-pad" />
               <TextInput style={[s.input, s.inputSmall]} placeholder="🌱" placeholderTextColor={colors.inkFaint} value={aEmoji} onChangeText={setAEmoji} />
             </View>
-            <Pressable style={[s.publishBtn, saving && s.btnDisabled]} onPress={handleCreateArticle} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.publishBtnText}>Publish article</Text>}
+            <Pressable style={[s.publishBtn, saving && s.btnDisabled]} onPress={handleSaveArticle} disabled={saving}>
+              {saving
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={s.publishBtnText}>{editingArticleId != null ? 'Save changes' : 'Publish article'}</Text>}
             </Pressable>
           </View>
         )}
 
         {showForm && tab === 'events' && (
           <View style={s.formCard}>
-            <Text style={s.formTitle}>New event</Text>
+            <Text style={s.formTitle}>{editingEventId != null ? 'Edit event' : 'New event'}</Text>
             <TextInput style={s.input} placeholder="Title" placeholderTextColor={colors.inkFaint} value={eTitle} onChangeText={setETitle} />
             <TextInput style={s.input} placeholder="Description (optional)" placeholderTextColor={colors.inkFaint} value={eDescription} onChangeText={setEDescription} />
             <TextInput style={s.input} placeholder="Location (optional)" placeholderTextColor={colors.inkFaint} value={eLocation} onChangeText={setELocation} />
@@ -269,8 +331,10 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
                 );
               })}
             </View>
-            <Pressable style={[s.publishBtn, saving && s.btnDisabled]} onPress={handleCreateEvent} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.publishBtnText}>Create event</Text>}
+            <Pressable style={[s.publishBtn, saving && s.btnDisabled]} onPress={handleSaveEvent} disabled={saving}>
+              {saving
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={s.publishBtnText}>{editingEventId != null ? 'Save changes' : 'Create event'}</Text>}
             </Pressable>
           </View>
         )}
@@ -296,6 +360,9 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
                   <Text style={s.cardName} numberOfLines={2}>{item.title}</Text>
                   <Text style={s.cardMeta}>{item.category} · {item.readMinutes} min read</Text>
                 </View>
+                <Pressable style={s.editIconBtn} onPress={() => openEditArticleForm(item)}>
+                  <Ionicons name="pencil-outline" size={16} color={colors.lavender} />
+                </Pressable>
                 <Pressable
                   style={s.deleteBtn}
                   onPress={() => handleDeleteArticle(item)}
@@ -325,6 +392,9 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
                 <Text style={s.cardMeta}>{formatEventWhen(item.startsAt)}</Text>
                 <Text style={s.cardMeta}>{item.goingCount} going{item.capacity ? ` / ${item.capacity} spots` : ''}</Text>
               </View>
+              <Pressable style={s.editIconBtn} onPress={() => openEditEventForm(item)}>
+                <Ionicons name="pencil-outline" size={16} color={colors.lavender} />
+              </Pressable>
               <Pressable
                 style={s.deleteBtn}
                 onPress={() => handleDeleteEvent(item)}
@@ -419,6 +489,10 @@ const s = StyleSheet.create({
   cardName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.md, color: colors.ink },
   cardMeta: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.inkSoft, marginTop: 2 },
   cardBody: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.inkSoft, marginTop: spacing.sm, lineHeight: 20 },
+  editIconBtn: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: colors.lavenderSoft,
+    alignItems: 'center', justifyContent: 'center', marginRight: 8,
+  },
   deleteBtn: {
     width: 34, height: 34, borderRadius: 17, backgroundColor: '#FEF0EE',
     alignItems: 'center', justifyContent: 'center',

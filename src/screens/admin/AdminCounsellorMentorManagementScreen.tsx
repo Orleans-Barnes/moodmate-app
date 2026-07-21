@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, Alert,
+  View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, Alert, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
 import {
-  listAllCounsellorsForAdmin, suspendCounsellor, reinstateCounsellor,
+  listAllCounsellorsForAdmin, suspendCounsellor, reinstateCounsellor, adminEditCounsellor,
   listAllMentorsForAdmin, deactivateMentor, activateMentor,
   type CounsellorRequestAdminView, type PeerMentorAdminView,
 } from '@/api/support';
@@ -59,6 +59,12 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<number | null>(null);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editSpecialties, setEditSpecialties] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,6 +130,32 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
     ]);
   };
 
+  const startEditCounsellor = (item: CounsellorRequestAdminView) => {
+    setEditingId(item.id);
+    setEditTitle(item.title ?? '');
+    setEditBio(item.bio ?? '');
+    setEditSpecialties(item.specialties ?? '');
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEditCounsellor = async (item: CounsellorRequestAdminView) => {
+    setSaving(true);
+    try {
+      const updated = await adminEditCounsellor(token, item.id, {
+        title: editTitle.trim(),
+        bio: editBio.trim(),
+        specialties: editSpecialties.trim(),
+      });
+      setCounsellors((prev) => prev.map((c) => c.id === item.id ? updated : c));
+      setEditingId(null);
+    } catch (err) {
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not save changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleActivateMentor = async (item: PeerMentorAdminView) => {
     setActionId(item.id);
     try {
@@ -184,28 +216,58 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
                     <Text style={[s.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
                   </View>
                 </View>
-                {item.specialties ? <Text style={s.cardSpecialties}>🎯 {item.specialties}</Text> : null}
-                {item.status === 'APPROVED' && (
-                  <Pressable
-                    style={[s.suspendBtn, actionId === item.id && s.btnDisabled]}
-                    onPress={() => handleSuspendCounsellor(item)}
-                    disabled={actionId === item.id}
-                  >
-                    {actionId === item.id
-                      ? <ActivityIndicator size="small" color={colors.coral} />
-                      : <Text style={s.suspendBtnText}>Suspend</Text>}
-                  </Pressable>
-                )}
-                {item.status === 'SUSPENDED' && (
-                  <Pressable
-                    style={[s.reinstateBtn, actionId === item.id && s.btnDisabled]}
-                    onPress={() => handleReinstateCounsellor(item)}
-                    disabled={actionId === item.id}
-                  >
-                    {actionId === item.id
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <Text style={s.reinstateBtnText}>Reinstate</Text>}
-                  </Pressable>
+                {editingId === item.id ? (
+                  <View style={s.editForm}>
+                    <Text style={s.editLabel}>Title</Text>
+                    <TextInput style={s.editInput} value={editTitle} onChangeText={setEditTitle} placeholder="e.g. Licensed Clinical Psychologist" placeholderTextColor={colors.inkFaint} />
+                    <Text style={s.editLabel}>Bio</Text>
+                    <TextInput style={[s.editInput, s.editInputMulti]} value={editBio} onChangeText={setEditBio} multiline placeholder="Short bio shown to students" placeholderTextColor={colors.inkFaint} />
+                    <Text style={s.editLabel}>Specialties</Text>
+                    <TextInput style={s.editInput} value={editSpecialties} onChangeText={setEditSpecialties} placeholder="Comma-separated, e.g. Anxiety, Depression" placeholderTextColor={colors.inkFaint} />
+                    <View style={s.editActions}>
+                      <Pressable style={s.editCancelBtn} onPress={cancelEdit} disabled={saving}>
+                        <Text style={s.editCancelText}>Cancel</Text>
+                      </Pressable>
+                      <Pressable style={s.editSaveBtn} onPress={() => saveEditCounsellor(item)} disabled={saving}>
+                        {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.editSaveText}>Save</Text>}
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    {item.specialties ? <Text style={s.cardSpecialties}>🎯 {item.specialties}</Text> : null}
+                    <View style={s.actionRow}>
+                      <Pressable
+                        style={[s.editBtn, actionId === item.id && s.btnDisabled]}
+                        onPress={() => startEditCounsellor(item)}
+                        disabled={actionId === item.id}
+                      >
+                        <Text style={s.editBtnText}>Edit</Text>
+                      </Pressable>
+                      {item.status === 'APPROVED' && (
+                        <Pressable
+                          style={[s.suspendBtn, actionId === item.id && s.btnDisabled]}
+                          onPress={() => handleSuspendCounsellor(item)}
+                          disabled={actionId === item.id}
+                        >
+                          {actionId === item.id
+                            ? <ActivityIndicator size="small" color={colors.coral} />
+                            : <Text style={s.suspendBtnText}>Suspend</Text>}
+                        </Pressable>
+                      )}
+                      {item.status === 'SUSPENDED' && (
+                        <Pressable
+                          style={[s.reinstateBtn, actionId === item.id && s.btnDisabled]}
+                          onPress={() => handleReinstateCounsellor(item)}
+                          disabled={actionId === item.id}
+                        >
+                          {actionId === item.id
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Text style={s.reinstateBtnText}>Reinstate</Text>}
+                        </Pressable>
+                      )}
+                    </View>
+                  </>
                 )}
               </View>
             );
@@ -313,15 +375,41 @@ const s = StyleSheet.create({
   statusBadgeText: { fontFamily: fonts.bodyBold, fontSize: 9, letterSpacing: 0.5 },
   cardSpecialties: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.ink, marginBottom: spacing.md },
 
+  actionRow: { flexDirection: 'row', gap: spacing.sm },
   suspendBtn: {
-    paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
     borderColor: colors.coral, alignItems: 'center', justifyContent: 'center',
   },
   suspendBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.coral },
   reinstateBtn: {
-    paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.sage,
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.sage,
     alignItems: 'center', justifyContent: 'center',
   },
   reinstateBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#fff' },
+  editBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    borderColor: colors.lavender, alignItems: 'center', justifyContent: 'center',
+  },
+  editBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.lavender },
   btnDisabled: { opacity: 0.5 },
+
+  editForm: { gap: 6 },
+  editLabel: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft, marginTop: 4 },
+  editInput: {
+    borderWidth: 1.5, borderColor: colors.line, borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 8,
+    fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.ink,
+  },
+  editInputMulti: { minHeight: 60, textAlignVertical: 'top' },
+  editActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  editCancelBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    borderColor: colors.line, alignItems: 'center', justifyContent: 'center',
+  },
+  editCancelText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.inkSoft },
+  editSaveBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.lavender,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  editSaveText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#fff' },
 });
