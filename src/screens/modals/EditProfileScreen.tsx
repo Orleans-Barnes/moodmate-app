@@ -12,7 +12,7 @@ import { Button } from '@/components/Button';
 import { ConfettiBurst, ConfettiHandle } from '@/components/Confetti';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
-import { updateMyProfile, uploadAvatar } from '@/api/auth';
+import { deleteAvatar, updateMyProfile, uploadAvatar } from '@/api/auth';
 import { ApiRequestError } from '@/api/client';
 import { BACKEND_BASE_URL } from '@/config';
 import { hapticSuccess } from '@/utils/haptics';
@@ -47,6 +47,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const [localPhotoUri, setLocalPhotoUri] = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
   const [uploading, setUploading]       = useState(false);
+  const [removingPhoto, setRemovingPhoto] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // The URL to display — local pick preview takes priority, then server URL, then nothing
@@ -106,11 +107,25 @@ export function EditProfileScreen({ navigation }: Props) {
     ]);
   };
 
-  const handleRemovePhoto = () => {
-    setLocalPhotoUri(null);
-    // Clear the server URL optimistically — the PUT /api/users/me with avatarUrl=null
-    // isn't wired yet, so we just clear the preview locally for now.
-    // TODO: add a DELETE/clear avatar endpoint when needed.
+  // If there's an unsaved local pick, clearing it is purely local state - nothing to call.
+  // If the photo shown is the user's actual saved server avatar, DELETE /api/users/me/avatar
+  // (Feature 13, already built backend-side) actually removes it and falls back to avatarEmoji.
+  const handleRemovePhoto = async () => {
+    if (localPhotoUri) {
+      setLocalPhotoUri(null);
+      return;
+    }
+    if (!token || !user?.avatarUrl) return;
+    setRemovingPhoto(true);
+    try {
+      const updated = await deleteAvatar(token);
+      setUser(updated);
+      hapticSuccess();
+    } catch (err) {
+      toast(err instanceof ApiRequestError ? err.message : 'Could not remove photo.');
+    } finally {
+      setRemovingPhoto(false);
+    }
   };
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -160,7 +175,7 @@ export function EditProfileScreen({ navigation }: Props) {
 
         {/* ── Photo avatar ── */}
         <View style={styles.photoSection}>
-          <Pressable style={styles.photoWrap} onPress={handlePhotoPress}>
+          <Pressable style={styles.photoWrap} onPress={handlePhotoPress} disabled={removingPhoto || uploading}>
             {displayPhotoUri ? (
               <Image source={{ uri: displayPhotoUri }} style={styles.photo} />
             ) : (
@@ -172,11 +187,11 @@ export function EditProfileScreen({ navigation }: Props) {
             <View style={styles.cameraBadge}>
               <Text style={styles.cameraBadgeIcon}>📷</Text>
             </View>
-            {(saving && uploading) && (
+            {(saving && uploading) || removingPhoto ? (
               <View style={styles.uploadingOverlay}>
                 <ActivityIndicator color="#fff" />
               </View>
-            )}
+            ) : null}
           </Pressable>
           <Text style={styles.photoHint}>Tap to change photo</Text>
         </View>

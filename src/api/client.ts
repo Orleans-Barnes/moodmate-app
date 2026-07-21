@@ -139,6 +139,9 @@ function authHeader(token?: string): Record<string, string> {
   return token && token !== 'guest' ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export function apiDelete(path: string, token?: string, body?: unknown): Promise<void> {
-  return request<void>(path, { method: 'DELETE', body: body !== undefined ? JSON.stringify(body) : undefined, headers: authHeader(token) });
+// Generic defaults to void so every existing 204-No-Content caller is unaffected; DELETE
+// endpoints that return a body (like DELETE /api/users/me/avatar's updated UserDto) can call
+// apiDelete<T>(...) explicitly instead.
+export function apiDelete<T = void>(path: string, token?: string, body?: unknown): Promise<T> {
+  return request<T>(path, { method: 'DELETE', body: body !== undefined ? JSON.stringify(body) : undefined, headers: authHeader(token) });
 }

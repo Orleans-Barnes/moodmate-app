@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiPut } from './client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './client';
 import { ApiRequestError } from './client';
 import { BACKEND_BASE_URL } from '@/config';
 import type { AuthResponse, PageResponse, Role, UserProfile } from './types';
@@ -72,6 +72,13 @@ export async function uploadAvatar(token: string, imageUri: string): Promise<Use
     throw new ApiRequestError(msg, response.status);
   }
   return JSON.parse(text) as UserProfile;
+}
+
+// Mirrors DELETE /api/users/me/avatar (Feature 13, AuthService#deleteAvatar) - already fully
+// built backend-side; this was the missing frontend wrapper for EditProfileScreen's
+// "Remove photo" button.
+export function deleteAvatar(token: string): Promise<UserProfile> {
+  return apiDelete<UserProfile>('/api/users/me/avatar', token);
 }
 
 // Alias kept for backward compat
