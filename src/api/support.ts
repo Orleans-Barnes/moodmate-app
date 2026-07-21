@@ -540,6 +540,23 @@ export function setInstitutionActive(token: string, id: number, active: boolean)
   return apiPatch<InstitutionView>(`/api/admin/institutions/${id}/active`, { active }, token);
 }
 
+// ── Item 8 - Admin Revenue Dashboard ────────────────────────────────────────
+// Mirrors com.moodmate.admin.dto.RevenueSummaryView. Live read from wallet-service via
+// moodmate-admin's RevenueServiceClient - not cached, so pull-to-refresh always shows current
+// totals rather than a stale snapshot.
+export interface RevenueSummary {
+  subscriptionRevenuePesewas: number;
+  leafPackRevenuePesewas: number;
+  totalRevenuePesewas: number;
+  successfulTransactionCount: number;
+  activeProCount: number;
+  trialingCount: number;
+}
+
+export function getRevenueSummary(token: string): Promise<RevenueSummary> {
+  return apiGet<RevenueSummary>('/api/admin/revenue', token);
+}
+
 // Unauthenticated - backs the signup institution picker (see src/data/institutions/index.ts's
 // loadInstitutions, which owns the live/cached/bundled fallback chain). Deliberately called with
 // no token, mirroring src/api/sos.ts's public calls - /api/public/institutions has its own gateway

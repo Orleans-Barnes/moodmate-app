@@ -56,6 +56,7 @@ import { AdminModerationScreen } from '@/screens/admin/AdminModerationScreen';
 import { AdminSystemSettingsScreen } from '@/screens/admin/AdminSystemSettingsScreen';
 import { AdminAuditLogScreen } from '@/screens/admin/AdminAuditLogScreen';
 import { AdminInstitutionManagementScreen } from '@/screens/admin/AdminInstitutionManagementScreen';
+import { AdminRevenueScreen } from '@/screens/admin/AdminRevenueScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -83,6 +84,7 @@ export function RootNavigator() {
       <Stack.Screen name="AdminSystemSettings" component={AdminSystemSettingsScreen} />
       <Stack.Screen name="AdminAuditLog" component={AdminAuditLogScreen} />
       <Stack.Screen name="AdminInstitutionManagement" component={AdminInstitutionManagementScreen} />
+      <Stack.Screen name="AdminRevenue" component={AdminRevenueScreen} />
       <Stack.Screen name="CounsellorChat" component={CounsellorChatScreen} />
       <Stack.Screen name="MentorChat" component={MentorChatScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />

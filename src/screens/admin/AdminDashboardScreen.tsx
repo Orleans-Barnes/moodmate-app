@@ -379,6 +379,11 @@ export function AdminDashboardScreen({ navigation }: Props) {
             <Ionicons name="school-outline" size={26} color={colors.lavender} />
             <Text style={s.quickActionText}>Institutions</Text>
           </Pressable>
+          {/* Item 8 - Admin Revenue Dashboard */}
+          <Pressable style={s.quickActionCard} onPress={() => navigation.navigate('AdminRevenue')}>
+            <Ionicons name="cash-outline" size={26} color={colors.lavender} />
+            <Text style={s.quickActionText}>Revenue</Text>
+          </Pressable>
         </View>
 
         {/* ── Counsellor Approval Queue ── */}
