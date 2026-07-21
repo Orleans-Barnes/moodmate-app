@@ -16,9 +16,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RoleSelect'>;
 
 const { width: SW } = Dimensions.get('window');
 
-// Hidden Admin access: tap the MoodMate logo 7 times within ADMIN_TAP_WINDOW_MS to reach
-// AdminSetup. Not discoverable UI — intentional, per Phase 1B scope (Admin is no longer a
-// visible card). Resets automatically if the user pauses too long between taps.
+// Hidden Admin access: tap the MoodMate logo 7 times within ADMIN_TAP_WINDOW_MS to reach the
+// admin Login screen (role: 'ADMIN'). Not discoverable UI — intentional, per Phase 1B scope
+// (Admin is no longer a visible card). Resets automatically if the user pauses too long between
+// taps.
+//
+// Bug fix - this used to navigate straight to 'AdminSetup', which is a one-time-only screen: once
+// an admin account exists, AdminSetup just alerts "already set up" and dumps the user back here,
+// with no way to reach a real admin sign-in form. LoginScreen already has full ADMIN role support
+// (theme, validation, and its own "First time here? Set up admin account" link to AdminSetup for
+// the one-time case) - it was just never wired as the gesture's destination.
 const ADMIN_TAP_TARGET = 7;
 const ADMIN_TAP_WINDOW_MS = 2500;
 
@@ -200,7 +207,7 @@ export function RoleSelectScreen({ navigation }: Props) {
     tapCount.current += 1;
     if (tapCount.current >= ADMIN_TAP_TARGET) {
       tapCount.current = 0;
-      navigation.navigate('AdminSetup');
+      navigation.navigate('Login', { role: 'ADMIN' });
     }
   };
 
