@@ -79,9 +79,12 @@ management:
 # Phase 1H (System Settings - Admin Announcement broadcast) - direct (non-gateway) address for
 # notifications-service, read by NotificationsServiceClient via ServiceClientsProperties. Same
 # pattern as moodmate-crisis's moodmate.services.auth-base-url.
+# Item 8 (Admin Revenue Dashboard) - direct (non-gateway) address for wallet-service, read by
+# RevenueServiceClient. Port 8096 matches moodmate-wallet's own server.port default.
 moodmate:
   services:
     notifications-base-url: ${NOTIFICATIONS_SERVICE_URL:http://localhost:8102}
+    wallet-base-url: ${WALLET_SERVICE_URL:http://localhost:8096}
 
 logging:
   pattern:

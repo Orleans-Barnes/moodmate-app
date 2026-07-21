@@ -7,6 +7,7 @@ import com.moodmate.wallet.client.UserSummary;
 import com.moodmate.wallet.dto.CheckoutResponse;
 import com.moodmate.wallet.dto.LeafPackDto;
 import com.moodmate.wallet.dto.PaymentTransactionDto;
+import com.moodmate.wallet.dto.RevenueSummaryResponse;
 import com.moodmate.wallet.dto.SubscriptionPlanDto;
 import com.moodmate.wallet.dto.SubscriptionStateResponse;
 import com.moodmate.wallet.entity.BillingInterval;
@@ -89,6 +90,30 @@ public class PaymentsService {
         return userSubscriptionRepository.findByUserId(userId)
                 .map(this::toStateResponse)
                 .orElseGet(SubscriptionStateResponse::none);
+    }
+
+    /**
+     * Item 8 (Admin Revenue Dashboard) - platform-wide totals, read by moodmate-admin through
+     * InternalPaymentsController. Only SUCCESS transactions count (see
+     * PaymentTransactionRepository.sumAmountPesewasByStatusAndPurpose's doc comment).
+     */
+    @Transactional(readOnly = true)
+    public RevenueSummaryResponse getRevenueSummary() {
+        long subscriptionRevenue = paymentTransactionRepository.sumAmountPesewasByStatusAndPurpose(
+                PaymentStatus.SUCCESS, PaymentPurpose.SUBSCRIPTION);
+        long leafPackRevenue = paymentTransactionRepository.sumAmountPesewasByStatusAndPurpose(
+                PaymentStatus.SUCCESS, PaymentPurpose.LEAF_PACK);
+        long successfulTransactionCount = paymentTransactionRepository.countByStatus(PaymentStatus.SUCCESS);
+        long activeProCount = userSubscriptionRepository.countByStatus(SubscriptionStatus.ACTIVE);
+        long trialingCount = userSubscriptionRepository.countByStatus(SubscriptionStatus.TRIALING);
+
+        return new RevenueSummaryResponse(
+                subscriptionRevenue,
+                leafPackRevenue,
+                subscriptionRevenue + leafPackRevenue,
+                successfulTransactionCount,
+                activeProCount,
+                trialingCount);
     }
 
     /** Free trial - no payment required. One per user, ever (user_id is unique on this table). */

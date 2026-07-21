@@ -1,5 +1,6 @@
 package com.moodmate.admin.controller;
 
+import com.moodmate.admin.client.RevenueServiceClient;
 import com.moodmate.admin.dto.*;
 import com.moodmate.admin.service.AdminService;
 import com.moodmate.admin.service.AnnouncementService;
@@ -24,6 +25,7 @@ public class AdminController {
     private final AuditLogService auditLogService;
     private final AnnouncementService announcementService;
     private final InstitutionService institutionService;
+    private final RevenueServiceClient revenueServiceClient;
 
     @GetMapping("/stats")
     public AdminStatsResponse stats(@RequestHeader("X-User-Role") String role) {
@@ -73,6 +75,13 @@ public class AdminController {
     public List<Map<String,Object>> institutions(@RequestHeader("X-User-Role") String role) {
         requireAdmin(role);
         return service.institutionBreakdown();
+    }
+
+    // Item 8 (Admin Revenue Dashboard) - live read from wallet-service, not cached/stored here.
+    @GetMapping("/revenue")
+    public RevenueSummaryView revenue(@RequestHeader("X-User-Role") String role) {
+        requireAdmin(role);
+        return revenueServiceClient.getRevenueSummary();
     }
 
     // ── Phase 1H - System Settings: Feature Flags ───────────────────────────────────────────────

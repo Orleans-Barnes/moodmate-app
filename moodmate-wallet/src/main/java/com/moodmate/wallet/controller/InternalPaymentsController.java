@@ -1,5 +1,6 @@
 package com.moodmate.wallet.controller;
 
+import com.moodmate.wallet.dto.RevenueSummaryResponse;
 import com.moodmate.wallet.dto.SubscriptionStateResponse;
 import com.moodmate.wallet.service.PaymentsService;
 import lombok.RequiredArgsConstructor;
@@ -25,5 +26,11 @@ public class InternalPaymentsController {
     @GetMapping("/subscription/{userId}")
     public SubscriptionStateResponse subscription(@PathVariable Long userId) {
         return paymentsService.getSubscriptionState(userId);
+    }
+
+    // Item 8 (Admin Revenue Dashboard) - moodmate-admin's RevenueServiceClient calls this.
+    @GetMapping("/revenue-summary")
+    public RevenueSummaryResponse revenueSummary() {
+        return paymentsService.getRevenueSummary();
     }
 }

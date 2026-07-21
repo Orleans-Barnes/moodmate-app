@@ -14,4 +14,7 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
     List<UserSubscription> findByStatusAndTrialEndsAtBefore(SubscriptionStatus status, Instant cutoff);
 
     List<UserSubscription> findByStatusAndCurrentPeriodEndBefore(SubscriptionStatus status, Instant cutoff);
+
+    // Item 8 (Admin Revenue Dashboard) - active/trialing counts shown alongside revenue totals.
+    long countByStatus(SubscriptionStatus status);
 }
