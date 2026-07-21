@@ -8,6 +8,9 @@ export interface SignupInput {
   email: string;
   password: string;
   institution?: string;
+  // Institution Management (Milestone 2, Step 1) - the real id from the institution the user
+  // picked (SignupScreen's InstitutionPicker already resolves a full Institution row).
+  institutionId?: number;
 }
 
 export interface LoginInput {
@@ -104,6 +107,7 @@ export interface AdminUserView {
   email: string;
   fullName: string;
   institution: string | null;
+  institutionId: number | null;
   role: Role;
   guest: boolean;
   banned: boolean;

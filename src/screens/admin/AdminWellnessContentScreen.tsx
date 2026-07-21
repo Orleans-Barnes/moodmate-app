@@ -23,6 +23,7 @@ import {
 } from '@/api/hub';
 import { ApiRequestError } from '@/api/client';
 import type { ArticleView, EventView } from '@/api/types';
+import { FadeInItem } from '@/components/FadeInItem';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminWellnessContent'>;
@@ -352,8 +353,8 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
               <Ionicons name="document-text-outline" size={40} color={colors.inkFaint} />
               <Text style={s.emptyBody}>No articles published yet.</Text>
             </View>
-          ) : articles.map((item) => (
-            <View key={item.id} style={s.card}>
+          ) : articles.map((item, idx) => (
+            <FadeInItem key={item.id} index={idx} style={s.card}>
               <View style={s.cardHeader}>
                 <Text style={s.cardEmoji}>{item.imageEmoji}</Text>
                 <View style={s.cardInfo}>
@@ -374,15 +375,15 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
                 </Pressable>
               </View>
               {item.summary ? <Text style={s.cardBody} numberOfLines={2}>{item.summary}</Text> : null}
-            </View>
+            </FadeInItem>
           ))
         ) : events.length === 0 ? (
           <View style={s.emptyState}>
             <Ionicons name="calendar-outline" size={40} color={colors.inkFaint} />
             <Text style={s.emptyBody}>No events scheduled yet.</Text>
           </View>
-        ) : events.map((item) => (
-          <View key={item.id} style={s.card}>
+        ) : events.map((item, idx) => (
+          <FadeInItem key={item.id} index={idx} style={s.card}>
             <View style={s.cardHeader}>
               <View style={s.eventDateBox}>
                 <Text style={s.eventDateNum}>{new Date(item.startsAt).getDate()}</Text>
@@ -405,7 +406,7 @@ export function AdminWellnessContentScreen({ navigation }: Props) {
                   : <Ionicons name="trash-outline" size={18} color={colors.coral} />}
               </Pressable>
             </View>
-          </View>
+          </FadeInItem>
         ))}
       </ScrollView>
     </View>

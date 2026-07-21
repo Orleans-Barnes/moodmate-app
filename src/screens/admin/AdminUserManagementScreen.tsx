@@ -21,6 +21,7 @@ import {
   type AdminUserView, type AdminAssignableRole,
 } from '@/api/auth';
 import { ApiRequestError } from '@/api/client';
+import { FadeInItem } from '@/components/FadeInItem';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
 
 const ASSIGNABLE_ROLES: AdminAssignableRole[] = ['STUDENT', 'COUNSELLOR', 'MENTOR'];
@@ -169,8 +170,8 @@ export function AdminUserManagementScreen({ navigation }: Props) {
             <Text style={s.emptyBody}>No users found.</Text>
           </View>
         ) : (
-          users.map((u) => (
-            <View key={u.id} style={s.card}>
+          users.map((u, idx) => (
+            <FadeInItem key={u.id} index={idx} style={s.card}>
               <View style={s.cardHeader}>
                 <View style={[s.avatarCircle, { backgroundColor: ROLE_COLORS[u.role] ?? colors.lavender }]}>
                   <Text style={s.avatarText}>{u.fullName.charAt(0).toUpperCase()}</Text>
@@ -227,7 +228,7 @@ export function AdminUserManagementScreen({ navigation }: Props) {
                   )}
                 </View>
               )}
-            </View>
+            </FadeInItem>
           ))
         )}
       </ScrollView>

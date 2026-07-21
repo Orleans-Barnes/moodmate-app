@@ -19,10 +19,13 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
 import {
   listAllCounsellorsForAdmin, suspendCounsellor, reinstateCounsellor, adminEditCounsellor,
+  approveCounsellorRequest, rejectCounsellorRequest,
   listAllMentorsForAdmin, deactivateMentor, activateMentor,
+  approveMentorApplication, rejectMentorApplication,
   type CounsellorRequestAdminView, type PeerMentorAdminView,
 } from '@/api/support';
 import { ApiRequestError } from '@/api/client';
+import { FadeInItem } from '@/components/FadeInItem';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminCounsellorMentorManagement'>;
@@ -36,11 +39,13 @@ const STATUS_META: Record<CounsellorRequestAdminView['status'], { label: string;
 };
 
 // Fix #4 - mentors now carry a real status too (previously only the available boolean existed).
-// The PENDING applications themselves are reviewed on AdminDashboardScreen's queue, not here - this
-// screen still only shows the activate/deactivate toggle, but now only for APPROVED rows, since
-// toggling "available" on a still-PENDING or REJECTED application doesn't mean anything. An
-// APPROVED row can still be independently active/deactivated, hence the function (not a flat
-// lookup) - it depends on both fields.
+// PENDING applications can now be approved/rejected directly from this roster (previously only
+// AdminDashboardScreen's separate queue could do this, which was a real gap - an admin looking at
+// "Counsellor Management" specifically to review a new signup had no action available here at
+// all). The activate/deactivate toggle still only applies to APPROVED rows, since toggling
+// "available" on a still-PENDING or REJECTED application doesn't mean anything. An APPROVED row
+// can still be independently active/deactivated, hence the function (not a flat lookup) - it
+// depends on both fields.
 function mentorBadge(item: PeerMentorAdminView): { label: string; bg: string; color: string } {
   if (item.status === 'PENDING') return { label: 'Pending', bg: '#FEF9E7', color: '#8A6800' };
   if (item.status === 'REJECTED') return { label: 'Rejected', bg: '#FDEDEC', color: '#E74C3C' };
@@ -110,6 +115,66 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
     } catch (err) {
       Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not reinstate this counsellor.');
     } finally { setActionId(null); }
+  };
+
+  // approveCounsellorRequest promotes the applicant's auth role STUDENT -> COUNSELLOR server-side
+  // (AuthService#updateRole via a cross-service call) - this is the actual fix for "signed up as
+  // counsellor but admin's User Management still shows STUDENT": that's correct *until* approved,
+  // and this button is what was missing to close the loop from this screen.
+  const handleApproveCounsellor = async (item: CounsellorRequestAdminView) => {
+    setActionId(item.id);
+    try {
+      const updated = await approveCounsellorRequest(token, item.id);
+      setCounsellors((prev) => prev.map((c) => c.id === item.id ? updated : c));
+    } catch (err) {
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not approve this application.');
+    } finally { setActionId(null); }
+  };
+
+  const handleRejectCounsellor = (item: CounsellorRequestAdminView) => {
+    Alert.alert('Reject application?', `${item.name}'s counsellor application will be rejected.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject', style: 'destructive',
+        onPress: async () => {
+          setActionId(item.id);
+          try {
+            const updated = await rejectCounsellorRequest(token, item.id);
+            setCounsellors((prev) => prev.map((c) => c.id === item.id ? updated : c));
+          } catch (err) {
+            Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not reject this application.');
+          } finally { setActionId(null); }
+        },
+      },
+    ]);
+  };
+
+  const handleApproveMentor = async (item: PeerMentorAdminView) => {
+    setActionId(item.id);
+    try {
+      const updated = await approveMentorApplication(token, item.id);
+      setMentors((prev) => prev.map((m) => m.id === item.id ? updated : m));
+    } catch (err) {
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not approve this application.');
+    } finally { setActionId(null); }
+  };
+
+  const handleRejectMentor = (item: PeerMentorAdminView) => {
+    Alert.alert('Reject application?', `${item.name}'s peer mentor application will be rejected.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject', style: 'destructive',
+        onPress: async () => {
+          setActionId(item.id);
+          try {
+            const updated = await rejectMentorApplication(token, item.id);
+            setMentors((prev) => prev.map((m) => m.id === item.id ? updated : m));
+          } catch (err) {
+            Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not reject this application.');
+          } finally { setActionId(null); }
+        },
+      },
+    ]);
   };
 
   const handleDeactivateMentor = (item: PeerMentorAdminView) => {
@@ -200,10 +265,10 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
               <Ionicons name="people-outline" size={40} color={colors.inkFaint} />
               <Text style={s.emptyBody}>No counsellors on the roster yet.</Text>
             </View>
-          ) : counsellors.map((item) => {
+          ) : counsellors.map((item, idx) => {
             const meta = STATUS_META[item.status];
             return (
-              <View key={item.id} style={s.card}>
+              <FadeInItem key={item.id} index={idx} style={s.card}>
                 <View style={s.cardHeader}>
                   <View style={s.avatarCircle}>
                     <Text style={s.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
@@ -236,40 +301,66 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
                 ) : (
                   <>
                     {item.specialties ? <Text style={s.cardSpecialties}>🎯 {item.specialties}</Text> : null}
+                    {item.status === 'PENDING' && (
+                      <Text style={s.pendingHint}>📝 New application - approve to grant COUNSELLOR access.</Text>
+                    )}
                     <View style={s.actionRow}>
-                      <Pressable
-                        style={[s.editBtn, actionId === item.id && s.btnDisabled]}
-                        onPress={() => startEditCounsellor(item)}
-                        disabled={actionId === item.id}
-                      >
-                        <Text style={s.editBtnText}>Edit</Text>
-                      </Pressable>
-                      {item.status === 'APPROVED' && (
-                        <Pressable
-                          style={[s.suspendBtn, actionId === item.id && s.btnDisabled]}
-                          onPress={() => handleSuspendCounsellor(item)}
-                          disabled={actionId === item.id}
-                        >
-                          {actionId === item.id
-                            ? <ActivityIndicator size="small" color={colors.coral} />
-                            : <Text style={s.suspendBtnText}>Suspend</Text>}
-                        </Pressable>
-                      )}
-                      {item.status === 'SUSPENDED' && (
-                        <Pressable
-                          style={[s.reinstateBtn, actionId === item.id && s.btnDisabled]}
-                          onPress={() => handleReinstateCounsellor(item)}
-                          disabled={actionId === item.id}
-                        >
-                          {actionId === item.id
-                            ? <ActivityIndicator size="small" color="#fff" />
-                            : <Text style={s.reinstateBtnText}>Reinstate</Text>}
-                        </Pressable>
+                      {item.status === 'PENDING' ? (
+                        <>
+                          <Pressable
+                            style={[s.rejectBtn, actionId === item.id && s.btnDisabled]}
+                            onPress={() => handleRejectCounsellor(item)}
+                            disabled={actionId === item.id}
+                          >
+                            <Text style={s.rejectBtnText}>Reject</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[s.approveBtn, actionId === item.id && s.btnDisabled]}
+                            onPress={() => handleApproveCounsellor(item)}
+                            disabled={actionId === item.id}
+                          >
+                            {actionId === item.id
+                              ? <ActivityIndicator size="small" color="#fff" />
+                              : <Text style={s.approveBtnText}>Approve</Text>}
+                          </Pressable>
+                        </>
+                      ) : (
+                        <>
+                          <Pressable
+                            style={[s.editBtn, actionId === item.id && s.btnDisabled]}
+                            onPress={() => startEditCounsellor(item)}
+                            disabled={actionId === item.id}
+                          >
+                            <Text style={s.editBtnText}>Edit</Text>
+                          </Pressable>
+                          {item.status === 'APPROVED' && (
+                            <Pressable
+                              style={[s.suspendBtn, actionId === item.id && s.btnDisabled]}
+                              onPress={() => handleSuspendCounsellor(item)}
+                              disabled={actionId === item.id}
+                            >
+                              {actionId === item.id
+                                ? <ActivityIndicator size="small" color={colors.coral} />
+                                : <Text style={s.suspendBtnText}>Suspend</Text>}
+                            </Pressable>
+                          )}
+                          {item.status === 'SUSPENDED' && (
+                            <Pressable
+                              style={[s.reinstateBtn, actionId === item.id && s.btnDisabled]}
+                              onPress={() => handleReinstateCounsellor(item)}
+                              disabled={actionId === item.id}
+                            >
+                              {actionId === item.id
+                                ? <ActivityIndicator size="small" color="#fff" />
+                                : <Text style={s.reinstateBtnText}>Reinstate</Text>}
+                            </Pressable>
+                          )}
+                        </>
                       )}
                     </View>
                   </>
                 )}
-              </View>
+              </FadeInItem>
             );
           })
         ) : mentors.length === 0 ? (
@@ -277,10 +368,10 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
             <Ionicons name="leaf-outline" size={40} color={colors.inkFaint} />
             <Text style={s.emptyBody}>No peer mentors on the roster yet.</Text>
           </View>
-        ) : mentors.map((item) => {
+        ) : mentors.map((item, idx) => {
           const badge = mentorBadge(item);
           return (
-            <View key={item.id} style={s.card}>
+            <FadeInItem key={item.id} index={idx} style={s.card}>
               <View style={s.cardHeader}>
                 <View style={[s.avatarCircle, { backgroundColor: '#2D6A4F' }]}>
                   <Text style={s.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
@@ -295,9 +386,29 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
               </View>
               <Text style={s.cardSpecialties}>
                 {item.status === 'PENDING'
-                  ? '📝 Application under review'
+                  ? '📝 New application - approve to grant MENTOR access.'
                   : item.userId ? '🔗 Account linked' : '⬜ No account linked yet'}
               </Text>
+              {item.status === 'PENDING' && (
+                <View style={s.actionRow}>
+                  <Pressable
+                    style={[s.rejectBtn, actionId === item.id && s.btnDisabled]}
+                    onPress={() => handleRejectMentor(item)}
+                    disabled={actionId === item.id}
+                  >
+                    <Text style={s.rejectBtnText}>Reject</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[s.approveBtn, actionId === item.id && s.btnDisabled]}
+                    onPress={() => handleApproveMentor(item)}
+                    disabled={actionId === item.id}
+                  >
+                    {actionId === item.id
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={s.approveBtnText}>Approve</Text>}
+                  </Pressable>
+                </View>
+              )}
               {item.status === 'APPROVED' && (
                 item.available ? (
                   <Pressable
@@ -321,7 +432,7 @@ export function AdminCounsellorMentorManagementScreen({ navigation }: Props) {
                   </Pressable>
                 )
               )}
-            </View>
+            </FadeInItem>
           );
         })}
       </ScrollView>
@@ -391,6 +502,19 @@ const s = StyleSheet.create({
     borderColor: colors.lavender, alignItems: 'center', justifyContent: 'center',
   },
   editBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.lavender },
+  pendingHint: {
+    fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: '#8A6800', marginBottom: spacing.sm,
+  },
+  approveBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.sage,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  approveBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#fff' },
+  rejectBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    borderColor: colors.coral, alignItems: 'center', justifyContent: 'center',
+  },
+  rejectBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.coral },
   btnDisabled: { opacity: 0.5 },
 
   editForm: { gap: 6 },

@@ -27,7 +27,19 @@ import { ApiRequestError } from '@/api/client';
 import { colors, fonts, fontSizes, radii, spacing, shadow, gradients, glow } from '@/theme/tokens';
 import { Ionicons } from '@expo/vector-icons';
 import { InstitutionPicker } from '@/components/InstitutionPicker';
-import { loadInstitutions, type Institution, type InstitutionSource } from '@/data/institutions';
+import { loadInstitutions, OTHER_INSTITUTION_ID, type Institution, type InstitutionSource } from '@/data/institutions';
+
+// Institution Management (Milestone 2, Step 1) - Institution.id is a string everywhere in this
+// picker (it doubles as the 'other' sentinel and, for the bundled offline fallback list, a
+// hand-written slug like 'knust' - see src/data/institutions/ghana.ts). Only a live/cached
+// backend-fetched row has an id that is actually the real numeric database id (stringified) - see
+// toInstitution() in src/data/institutions/index.ts. This resolves that real numeric id, or
+// undefined for the 'other' sentinel or an offline-bundled slug, so we never send a bogus number.
+function resolveInstitutionId(institution: Institution | null): number | undefined {
+  if (!institution || institution.id === OTHER_INSTITUTION_ID) return undefined;
+  const n = Number(institution.id);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Signup'>;
 
@@ -108,6 +120,10 @@ export function SignupScreen({ navigation }: Props) {
         password,
         fullName: name.trim(),
         institution: institution?.shortName ?? undefined,
+        // Institution Management (Milestone 2, Step 1) - the real numeric backend id, when the
+        // selected institution actually came from the live/cached catalogue (see
+        // resolveInstitutionId's doc comment above for why this isn't just `institution?.id`).
+        institutionId: resolveInstitutionId(institution),
       });
       await setSession(token, refreshToken, user);
       toast('Welcome to MoodMate! 🌱');

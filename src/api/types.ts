@@ -11,6 +11,10 @@ export interface UserProfile {
   email: string;
   fullName: string;
   institution: string | null;
+  // Institution Management (Milestone 2, Step 1) - real FK to a catalogue Institution row, set at
+  // signup when the picker resolves a real institution (see SignupScreen). `institution` above
+  // stays the free-text display value; this is purely the link for future licensing/analytics.
+  institutionId: number | null;
   avatarEmoji: string;
   avatarUrl?: string | null;  // set when user has uploaded a real photo
   guest: boolean;

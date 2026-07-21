@@ -63,6 +63,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: 'guest@local',
         fullName: 'Guest',
         institution: null,
+        institutionId: null,
         avatarEmoji: '👤',
         avatarUrl: null,
         guest: true,
