@@ -491,9 +491,9 @@ export function getAuditLogs(token: string, page = 0, size = 30): Promise<PageRe
 }
 
 // ── Institution Management (Milestone) ──────────────────────────────────────
-// Same CRUD shape as Feature Flags above. See moodmate-admin's InstitutionService/Institution.java
-// for why website/logoUrl/licenseType/licenseExpiry/studentLimit exist now but aren't editable via
-// any endpoint yet - future Institution Licensing & Premium Access milestone, not built today.
+// Same CRUD shape as Feature Flags above. licenseType/licenseExpiry/studentLimit are now
+// editable via updateInstitutionLicense below (Milestone 2, Step 2) - still just a bare license
+// record on the institution, not yet connected to any Pro-check/subscription logic.
 
 export type InstitutionType = 'UNIVERSITY' | 'UNIVERSITY_COLLEGE' | 'INSTITUTE';
 
@@ -538,6 +538,24 @@ export function updateInstitution(token: string, id: number, input: InstitutionI
 
 export function setInstitutionActive(token: string, id: number, active: boolean): Promise<InstitutionView> {
   return apiPatch<InstitutionView>(`/api/admin/institutions/${id}/active`, { active }, token);
+}
+
+// Institution Management (Milestone 2, Step 2) - first write path for licenseType/licenseExpiry/
+// studentLimit (the three columns InstitutionView above already exposed but nothing ever set).
+// licenseExpiry is an ISO date string (yyyy-MM-dd), matching LocalDate's default Jackson
+// serialization on the backend.
+export interface UpdateInstitutionLicenseInput {
+  licenseType?: string;
+  licenseExpiry?: string;
+  studentLimit?: number;
+}
+
+export function updateInstitutionLicense(
+  token: string,
+  id: number,
+  input: UpdateInstitutionLicenseInput
+): Promise<InstitutionView> {
+  return apiPatch<InstitutionView>(`/api/admin/institutions/${id}/license`, input, token);
 }
 
 // ── Item 8 - Admin Revenue Dashboard ────────────────────────────────────────

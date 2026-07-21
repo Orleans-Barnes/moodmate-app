@@ -20,10 +20,20 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
 import {
   listInstitutions, createInstitution, updateInstitution, setInstitutionActive,
+  updateInstitutionLicense,
   type InstitutionView, type InstitutionInput, type InstitutionType,
 } from '@/api/support';
 import { ApiRequestError } from '@/api/client';
+import { FadeInItem } from '@/components/FadeInItem';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
+
+function formatLicenseSummary(item: InstitutionView): string {
+  if (!item.licenseType && item.studentLimit == null) return '🔓 No license';
+  const parts = [item.licenseType ?? 'Licensed'];
+  if (item.studentLimit != null) parts.push(`${item.studentLimit} seats`);
+  if (item.licenseExpiry) parts.push(`expires ${item.licenseExpiry}`);
+  return `🎓 ${parts.join(' · ')}`;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminInstitutionManagement'>;
 
@@ -53,6 +63,13 @@ export function AdminInstitutionManagementScreen({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
+
+  // Institution Management (Milestone 2, Step 2) - license editing is a separate inline form from
+  // the profile edit form above (different concern, see UpdateInstitutionLicenseRequest's doc
+  // comment on the backend), triggered by its own "License" button rather than tapping the card.
+  const [editingLicenseId, setEditingLicenseId] = useState<number | null>(null);
+  const [licenseForm, setLicenseForm] = useState({ licenseType: '', licenseExpiry: '', studentLimit: '' });
+  const [savingLicense, setSavingLicense] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,6 +138,39 @@ export function AdminInstitutionManagementScreen({ navigation }: Props) {
       Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not save this institution.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openLicenseForm = (item: InstitutionView) => {
+    setEditingLicenseId(item.id);
+    setLicenseForm({
+      licenseType: item.licenseType ?? '',
+      licenseExpiry: item.licenseExpiry ?? '',
+      studentLimit: item.studentLimit != null ? String(item.studentLimit) : '',
+    });
+  };
+
+  const closeLicenseForm = () => setEditingLicenseId(null);
+
+  const handleSaveLicense = async (id: number) => {
+    const expiry = licenseForm.licenseExpiry.trim();
+    if (expiry && !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
+      Alert.alert('Invalid date', 'Enter the license expiry as YYYY-MM-DD, e.g. 2026-12-31.');
+      return;
+    }
+    setSavingLicense(true);
+    try {
+      const updated = await updateInstitutionLicense(token, id, {
+        licenseType: licenseForm.licenseType.trim() || undefined,
+        licenseExpiry: expiry || undefined,
+        studentLimit: licenseForm.studentLimit.trim() ? Number(licenseForm.studentLimit) : undefined,
+      });
+      setInstitutions((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      setEditingLicenseId(null);
+    } catch (err) {
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not save the license.');
+    } finally {
+      setSavingLicense(false);
     }
   };
 
@@ -210,28 +260,83 @@ export function AdminInstitutionManagementScreen({ navigation }: Props) {
             <Ionicons name="school-outline" size={40} color={colors.inkFaint} />
             <Text style={s.emptyBody}>{query ? `No matches for "${query}".` : 'No institutions yet.'}</Text>
           </View>
-        ) : visible.map((item) => (
-          <Pressable key={item.id} style={s.card} onPress={() => openEditForm(item)}>
-            <View style={s.cardHeader}>
-              <View style={s.cardInfo}>
-                <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
-                <Text style={s.cardMeta}>{item.shortName} · {typeLabel(item.type)} · {item.country}</Text>
+        ) : visible.map((item, idx) => (
+          <FadeInItem key={item.id} index={idx} style={s.card}>
+            <Pressable onPress={() => openEditForm(item)}>
+              <View style={s.cardHeader}>
+                <View style={s.cardInfo}>
+                  <Text style={s.cardName} numberOfLines={2}>{item.name}</Text>
+                  <Text style={s.cardMeta}>{item.shortName} · {typeLabel(item.type)} · {item.country}</Text>
+                </View>
+                <Pressable
+                  style={[s.statusPill, item.active ? s.statusPillActive : s.statusPillInactive]}
+                  onPress={() => handleToggleActive(item)}
+                  disabled={togglingId === item.id}
+                >
+                  {togglingId === item.id ? (
+                    <ActivityIndicator size="small" color={item.active ? colors.sage : colors.inkFaint} />
+                  ) : (
+                    <Text style={[s.statusPillText, item.active ? s.statusPillTextActive : s.statusPillTextInactive]}>
+                      {item.active ? 'Active' : 'Inactive'}
+                    </Text>
+                  )}
+                </Pressable>
               </View>
-              <Pressable
-                style={[s.statusPill, item.active ? s.statusPillActive : s.statusPillInactive]}
-                onPress={() => handleToggleActive(item)}
-                disabled={togglingId === item.id}
-              >
-                {togglingId === item.id ? (
-                  <ActivityIndicator size="small" color={item.active ? colors.sage : colors.inkFaint} />
-                ) : (
-                  <Text style={[s.statusPillText, item.active ? s.statusPillTextActive : s.statusPillTextInactive]}>
-                    {item.active ? 'Active' : 'Inactive'}
-                  </Text>
-                )}
+            </Pressable>
+
+            {editingLicenseId === item.id ? (
+              <View style={s.licenseForm}>
+                <Text style={s.formLabel}>License type</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="e.g. Premium, Enterprise"
+                  placeholderTextColor={colors.inkFaint}
+                  value={licenseForm.licenseType}
+                  onChangeText={(v) => setLicenseForm((f) => ({ ...f, licenseType: v }))}
+                />
+                <View style={s.formRow}>
+                  <View style={s.inputFlex}>
+                    <Text style={s.formLabel}>Expiry (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={s.input}
+                      placeholder="2026-12-31"
+                      placeholderTextColor={colors.inkFaint}
+                      value={licenseForm.licenseExpiry}
+                      onChangeText={(v) => setLicenseForm((f) => ({ ...f, licenseExpiry: v }))}
+                    />
+                  </View>
+                  <View style={s.inputFlex}>
+                    <Text style={s.formLabel}>Student seats</Text>
+                    <TextInput
+                      style={s.input}
+                      placeholder="Unlimited"
+                      placeholderTextColor={colors.inkFaint}
+                      keyboardType="number-pad"
+                      value={licenseForm.studentLimit}
+                      onChangeText={(v) => setLicenseForm((f) => ({ ...f, studentLimit: v }))}
+                    />
+                  </View>
+                </View>
+                <View style={s.formRow}>
+                  <Pressable style={s.licenseCancelBtn} onPress={closeLicenseForm} disabled={savingLicense}>
+                    <Text style={s.licenseCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[s.licenseSaveBtn, savingLicense && s.btnDisabled]}
+                    onPress={() => handleSaveLicense(item.id)}
+                    disabled={savingLicense}
+                  >
+                    {savingLicense ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.licenseSaveText}>Save license</Text>}
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable style={s.licenseRow} onPress={() => openLicenseForm(item)}>
+                <Text style={s.licenseSummary}>{formatLicenseSummary(item)}</Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.inkFaint} />
               </Pressable>
-            </View>
-          </Pressable>
+            )}
+          </FadeInItem>
         ))}
       </ScrollView>
     </View>
@@ -306,4 +411,23 @@ const s = StyleSheet.create({
   statusPillText: { fontFamily: fonts.bodyBold, fontSize: 11 },
   statusPillTextActive: { color: colors.sage },
   statusPillTextInactive: { color: colors.inkFaint },
+
+  licenseRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line,
+  },
+  licenseSummary: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkSoft },
+  licenseForm: {
+    marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line, gap: spacing.sm,
+  },
+  licenseCancelBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    borderColor: colors.line, alignItems: 'center', justifyContent: 'center',
+  },
+  licenseCancelText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.inkSoft },
+  licenseSaveBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.lavender,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  licenseSaveText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#fff' },
 });
