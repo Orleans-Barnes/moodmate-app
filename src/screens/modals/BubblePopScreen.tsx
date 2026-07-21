@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -60,6 +61,7 @@ function makeBubble(): Bubble {
 }
 
 export function BubblePopScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [bubbles, setBubbles]   = useState<Bubble[]>([]);
   const [score, setScore]       = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -171,7 +173,7 @@ export function BubblePopScreen({ navigation }: Props) {
   // ── Locked (Premium gating breadth, Milestone item 7) ───────────────────
   if (!isPro) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: insets.bottom + spacing.lg }]}>
         <ScreenHeader title="Bubble Pop" onClose={() => navigation.goBack()} />
         <View style={styles.celebCenter}>
           <Text style={styles.celebEmoji}>🔒</Text>
@@ -190,7 +192,7 @@ export function BubblePopScreen({ navigation }: Props) {
   // ── Game over screen ──────────────────────────────────────────────────
   if (gameOver) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: insets.bottom + spacing.lg }]}>
         <ScreenHeader title="Bubble Pop" onClose={() => navigation.goBack()} />
         <ConfettiBurst ref={confettiRef} />
         <View style={styles.celebCenter}>

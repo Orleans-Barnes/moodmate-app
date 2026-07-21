@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -42,6 +43,7 @@ export function ProScreen({ navigation }: Props) {
   const token = useAuthStore((s) => s.token);
   const toast = useToast();
 
+  const insets = useSafeAreaInsets();
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -122,7 +124,7 @@ export function ProScreen({ navigation }: Props) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxxl }]}>
       <ScreenHeader title="MoodMate Pro" onClose={() => navigation.goBack()} />
 
       <View style={styles.hero}>

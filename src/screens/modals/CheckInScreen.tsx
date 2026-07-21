@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TextInput, StyleSheet,
   Pressable, Animated,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -84,6 +85,7 @@ export function CheckInScreen({ navigation }: Props) {
   const toast = useToast();
   const confettiRef = useRef<ConfettiHandle>(null);
   const btnScale = useRef(new Animated.Value(1)).current;
+  const insets = useSafeAreaInsets();
 
   const handleSave = async () => {
     if (!selected) return;
@@ -138,7 +140,7 @@ export function CheckInScreen({ navigation }: Props) {
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 48 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Quick mood row */}

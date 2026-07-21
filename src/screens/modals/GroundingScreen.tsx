@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -65,6 +66,7 @@ const STEPS = [
 const GROUNDING_XP = XP_VALUES.breathing; // same XP as a session activity
 
 export function GroundingScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [stepIndex, setStepIndex] = useState(0);
   const [checked, setChecked]     = useState<boolean[]>([]);
   const [done, setDone]           = useState(false);
@@ -113,7 +115,7 @@ export function GroundingScreen({ navigation }: Props) {
   // ── Done / celebration screen ─────────────────────────────────────────
   if (done) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: insets.bottom + spacing.lg }]}>
         <ScreenHeader title="Grounding" onClose={() => navigation.goBack()} />
         <ConfettiBurst ref={confettiRef} />
         <View style={styles.doneCenter}>

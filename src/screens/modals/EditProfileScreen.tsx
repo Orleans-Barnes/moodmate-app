@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Alert, Image, ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -146,11 +147,13 @@ export function EditProfileScreen({ navigation }: Props) {
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.flex}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxxl }]}
         keyboardShouldPersistTaps="handled"
       >
         <ScreenHeader title="Edit Profile" onClose={() => navigation.goBack()} />

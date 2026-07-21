@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Linking } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
@@ -105,6 +106,7 @@ export function ShopScreen({ navigation }: Props) {
   const isPro = usePaymentsStore((s) => s.subscription.pro);
   const loadPayments = usePaymentsStore((s) => s.load);
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const confettiRef = useRef<ConfettiHandle>(null);
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
   const [buyingBoost, setBuyingBoost] = useState<string | null>(null);
@@ -216,7 +218,7 @@ export function ShopScreen({ navigation }: Props) {
 
   return (
     <View style={styles.flex}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxxl }]}>
         <View style={styles.header}>
           <ScreenHeader title="Tree Shop" onClose={() => navigation.goBack()} />
         </View>

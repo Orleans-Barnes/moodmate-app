@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/Button';
 import { ConfettiBurst, ConfettiHandle } from '@/components/Confetti';
-import { useAppState } from '@/state/useAppState';
+import { useGamificationStore } from '@/state/useGamificationStore';
 import { useToast } from '@/state/useToast';
 import { colors, fonts, fontSizes, spacing } from '@/theme/tokens';
 
@@ -75,6 +76,7 @@ const MAX_MOVES = 30;
 const TIME_LIMIT_S = 90;
 
 export function GameScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [tiles, setTiles] = useState<Tile[]>(shuffledDeck);
   const [moves, setMoves] = useState(0);
   const [matchedPairs, setMatchedPairs] = useState(0);
@@ -84,7 +86,7 @@ export function GameScreen({ navigation }: Props) {
   const [gameOver, setGameOver] = useState(false);
   const [gameWon, setGameWon] = useState(false);
   const flippedRef = useRef<Tile[]>([]);
-  const addTreeXP = useAppState((s) => s.addTreeXP);
+  const awardXp = useGamificationStore((s) => s.awardXp);
   const toast = useToast();
   const confettiRef = useRef<ConfettiHandle>(null);
 
@@ -139,7 +141,7 @@ export function GameScreen({ navigation }: Props) {
           setMatchedPairs(next);
           confettiRef.current?.fire();
           if (next === SYMBOLS.length) {
-            addTreeXP(20);
+            awardXp(20);
             setGameWon(true);
             setLocked(true);
             setTimeout(() => toast(`All matched in ${nextMoves} moves! +20 XP 🌿`), 150);
@@ -163,7 +165,7 @@ export function GameScreen({ navigation }: Props) {
 
   return (
     <View style={styles.flex}>
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: insets.bottom + spacing.lg }]}>
         <ScreenHeader title="Calm Match" onClose={() => navigation.goBack()} />
 
         <View style={styles.statsRow}>
