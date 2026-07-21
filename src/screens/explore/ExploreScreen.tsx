@@ -378,6 +378,24 @@ export function ExploreScreen({ navigation }: Props) {
           </LinearGradient>
         </Pressable>
 
+        {/* ── Wellness Hub banner ── */}
+        {/* Bug fix (audit) - HubScreen (admin-curated articles + RSVP events, backed by the real
+            Hub API) was fully built and wired into RootNavigator but had no entry point anywhere
+            in the app, making it unreachable. This banner closes that gap. */}
+        <Pressable onPress={() => navigation.navigate('Hub')} style={s.libBanner}>
+          <LinearGradient colors={['#0F766E', '#22C55E']}
+            style={s.libGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <View style={s.libLeft}>
+              <View style={s.libIconWrap}><Ionicons name="newspaper" size={22} color="#fff" /></View>
+              <View>
+                <Text style={s.libTitle}>Wellness Hub</Text>
+                <Text style={s.libSub}>Campus articles & events</Text>
+              </View>
+            </View>
+            <Ionicons name="arrow-forward-circle" size={28} color="rgba(255,255,255,0.85)" />
+          </LinearGradient>
+        </Pressable>
+
         {/* ── Therapeutic Tools ── */}
         <Text style={s.sectionTitle}>Therapeutic tools</Text>
         <View style={s.therapyRow}>
