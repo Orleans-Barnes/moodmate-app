@@ -8,6 +8,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView, TextInput, Alert,
+  ActionSheetIOS, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,9 +16,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
-import { searchAdminUsers, suspendUser, reinstateUser, type AdminUserView } from '@/api/auth';
+import {
+  searchAdminUsers, suspendUser, reinstateUser, changeUserRole,
+  type AdminUserView, type AdminAssignableRole,
+} from '@/api/auth';
 import { ApiRequestError } from '@/api/client';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
+
+const ASSIGNABLE_ROLES: AdminAssignableRole[] = ['STUDENT', 'COUNSELLOR', 'MENTOR'];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminUserManagement'>;
 
@@ -86,6 +92,38 @@ export function AdminUserManagementScreen({ navigation }: Props) {
       Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not reinstate this account.');
     } finally {
       setActionId(null);
+    }
+  };
+
+  const applyRoleChange = async (user: AdminUserView, role: AdminAssignableRole) => {
+    if (role === user.role) return;
+    setActionId(user.id);
+    try {
+      const updated = await changeUserRole(token, user.id, role);
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, role: updated.role } : u));
+    } catch (err) {
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not change this account\'s role.');
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleChangeRole = (user: AdminUserView) => {
+    const choices = ASSIGNABLE_ROLES.filter((r) => r !== user.role);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', ...choices], cancelButtonIndex: 0 },
+        (idx) => { if (idx > 0) applyRoleChange(user, choices[idx - 1]); },
+      );
+    } else {
+      Alert.alert(
+        'Change role',
+        `Current role: ${user.role}`,
+        [
+          ...choices.map((r) => ({ text: r, onPress: () => applyRoleChange(user, r) })),
+          { text: 'Cancel', style: 'cancel' as const },
+        ],
+      );
     }
   };
 
@@ -159,6 +197,13 @@ export function AdminUserManagementScreen({ navigation }: Props) {
 
               {u.role !== 'ADMIN' && (
                 <View style={s.actionRow}>
+                  <Pressable
+                    style={[s.roleChangeBtn, actionId === u.id && s.btnDisabled]}
+                    onPress={() => handleChangeRole(u)}
+                    disabled={actionId === u.id}
+                  >
+                    <Text style={s.roleChangeBtnText}>Change role</Text>
+                  </Pressable>
                   {u.banned ? (
                     <Pressable
                       style={[s.reinstateBtn, actionId === u.id && s.btnDisabled]}
@@ -243,16 +288,21 @@ const s = StyleSheet.create({
   },
   bannedText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: '#C0392B' },
 
-  actionRow: { marginTop: spacing.md },
+  actionRow: { marginTop: spacing.md, flexDirection: 'row', gap: spacing.sm },
   suspendBtn: {
-    paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
     borderColor: colors.coral, alignItems: 'center', justifyContent: 'center',
   },
   suspendBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.coral },
   reinstateBtn: {
-    paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.sage,
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, backgroundColor: colors.sage,
     alignItems: 'center', justifyContent: 'center',
   },
   reinstateBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#fff' },
+  roleChangeBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    borderColor: colors.lavender, alignItems: 'center', justifyContent: 'center',
+  },
+  roleChangeBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.lavender },
   btnDisabled: { opacity: 0.5 },
 });

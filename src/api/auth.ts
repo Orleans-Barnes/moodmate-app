@@ -138,3 +138,12 @@ export function suspendUser(token: string, userId: number, reason: string): Prom
 export function reinstateUser(token: string, userId: number): Promise<ModerationStatusResponse> {
   return apiPatch<ModerationStatusResponse>(`/api/users/admin/${userId}/reinstate`, undefined, token);
 }
+
+// Admin narrow-gaps pass - mirrors AdminUserController#changeRole. The backend refuses to touch
+// an ADMIN account's role or grant ADMIN through this endpoint (see AuthService#adminChangeUserRole's
+// doc comment), so this is only meaningful for STUDENT/COUNSELLOR/MENTOR.
+export type AdminAssignableRole = Extract<Role, 'STUDENT' | 'COUNSELLOR' | 'MENTOR'>;
+
+export function changeUserRole(token: string, userId: number, role: AdminAssignableRole): Promise<AdminUserView> {
+  return apiPatch<AdminUserView>(`/api/users/admin/${userId}/role`, { role }, token);
+}
