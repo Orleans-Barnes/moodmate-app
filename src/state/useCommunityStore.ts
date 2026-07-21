@@ -17,6 +17,7 @@ export interface CommunityPost {
   text: string;
   reactions: Reaction[];
   isOwn: boolean;
+  commentCount: number;
 }
 
 // The backend only returns reaction types that have at least one reaction (or that the
@@ -47,6 +48,7 @@ function fromApi(post: CommunityPostView): CommunityPost {
     topic: post.topic,
     text: post.content,
     isOwn: post.isOwnPost,
+    commentCount: post.commentCount,
     reactions: ALL_REACTIONS.map(({ type, emoji }) => {
       const summary = byType.get(type);
       return { type, emoji, count: summary?.count ?? 0, on: summary?.reactedByMe ?? false };

@@ -110,6 +110,7 @@ export interface CommunityPostView {
   reactions: ReactionSummaryView[];
   totalReactions: number;
   isOwnPost: boolean;
+  commentCount: number;
 }
 
 // Phase 1H (Admin Portal - Community Moderation). Mirrors
@@ -135,6 +136,26 @@ export interface ReportView {
 export interface CommunityPostCreateRequest {
   content: string;
   topic?: string;
+}
+
+// Mirrors com.moodmate.community.dto.CommentResponse / CreateCommentRequest /
+// UpdateCommentRequest - Feature 6 (Community Comments), fully built backend-side already,
+// added here now that the frontend gained UI to call it.
+export interface CommunityCommentView {
+  id: number;
+  parentCommentId: number | null;
+  authorHandle: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  edited: boolean;
+  mine: boolean;
+  replies: CommunityCommentView[];
+}
+
+export interface CommunityCommentCreateRequest {
+  content: string;
+  parentCommentId?: number | null;
 }
 
 export interface ReactResponseView {

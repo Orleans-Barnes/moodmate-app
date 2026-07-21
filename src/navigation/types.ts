@@ -90,6 +90,7 @@ export type RootStackParamList = {
   HelpSupport: undefined;
   NotificationPreferences: undefined;
   NotificationCenter: undefined;
+  CommunityPostDetail: { postId: number; author: string; time: string; text: string; isOwn: boolean };
 };
 
 export type ProfileSetupStackParamList = {

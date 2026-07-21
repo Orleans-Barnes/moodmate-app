@@ -18,6 +18,7 @@ import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
 import { GuestGate } from '@/components/GuestGate';
 import { ApiRequestError } from '@/api/client';
+import { reportPost } from '@/api/community';
 import { hapticLight, hapticSuccess } from '@/utils/haptics';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
 
@@ -100,6 +101,30 @@ export function CommunityScreen(props: Props) {
       Alert.alert('Delete post?', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
+  const doReport = async (postId: number) => {
+    if (!token) return;
+    try {
+      await reportPost(token, postId, 'Inappropriate content');
+      toast('Reported. Our team will review it.');
+    } catch (err) {
+      toast(err instanceof ApiRequestError ? err.message : 'Could not report post.');
+    }
+  };
+
+  const handleReport = (postId: number) => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', 'Report post'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
+        (idx) => { if (idx === 1) doReport(postId); },
+      );
+    } else {
+      Alert.alert('Report this post?', 'Our moderation team will review it.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Report', style: 'destructive', onPress: () => doReport(postId) },
       ]);
     }
   };
@@ -219,15 +244,13 @@ export function CommunityScreen(props: Props) {
                       <Text style={s.postAuthor}>{post.author}</Text>
                       <Text style={s.postTime}>{post.time}</Text>
                     </View>
-                    {post.isOwn && (
-                      <Pressable
-                        style={s.deleteMenuBtn}
-                        hitSlop={10}
-                        onPress={() => handleDelete(post.id)}
-                      >
-                        <Text style={s.deleteMenuIcon}>⋯</Text>
-                      </Pressable>
-                    )}
+                    <Pressable
+                      style={s.deleteMenuBtn}
+                      hitSlop={10}
+                      onPress={() => (post.isOwn ? handleDelete(post.id) : handleReport(post.id))}
+                    >
+                      <Text style={s.deleteMenuIcon}>⋯</Text>
+                    </Pressable>
                   </View>
                   <Text style={s.postText}>{post.text}</Text>
                   <View style={s.reactRow}>
@@ -242,6 +265,20 @@ export function CommunityScreen(props: Props) {
                         </Text>
                       </Pressable>
                     ))}
+                    <Pressable
+                      style={s.reactBtn}
+                      onPress={() =>
+                        rootNavigation.navigate('CommunityPostDetail', {
+                          postId: post.id,
+                          author: post.author,
+                          time: post.time,
+                          text: post.text,
+                          isOwn: post.isOwn,
+                        })
+                      }
+                    >
+                      <Text style={s.reactTxt}>💬 {post.commentCount}</Text>
+                    </Pressable>
                   </View>
                 </View>
               ))

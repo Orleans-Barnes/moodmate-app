@@ -1,5 +1,7 @@
-import { apiDelete, apiGet, apiPost } from './client';
+import { apiDelete, apiGet, apiPost, apiPut } from './client';
 import type {
+  CommunityCommentCreateRequest,
+  CommunityCommentView,
   CommunityPostCreateRequest,
   CommunityPostView,
   PageResponse,
@@ -40,6 +42,37 @@ export function reactToPost(
 
 export function deleteCommunityPost(token: string, postId: number): Promise<void> {
   return apiDelete(`/api/community/posts/${postId}`, token);
+}
+
+// ── Comments (Feature 6) - built backend-side already, wired to the frontend here ─────────
+
+export function listComments(
+  token: string,
+  postId: number,
+  page = 0,
+  size = 20
+): Promise<PageResponse<CommunityCommentView>> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  return apiGet<PageResponse<CommunityCommentView>>(
+    `/api/community/posts/${postId}/comments?${params.toString()}`,
+    token
+  );
+}
+
+export function addComment(
+  token: string,
+  postId: number,
+  request: CommunityCommentCreateRequest
+): Promise<CommunityCommentView> {
+  return apiPost<CommunityCommentView>(`/api/community/posts/${postId}/comments`, request, token);
+}
+
+export function updateComment(token: string, commentId: number, content: string): Promise<CommunityCommentView> {
+  return apiPut<CommunityCommentView>(`/api/community/comments/${commentId}`, { content }, token);
+}
+
+export function deleteComment(token: string, commentId: number): Promise<void> {
+  return apiDelete(`/api/community/comments/${commentId}`, token);
 }
 
 // ── Phase 1H (Admin Portal - Community Moderation) ────────────────────────
