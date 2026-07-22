@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, ScrollView, Pressable, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useToast } from '@/state/useToast';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useKeyboardOffset } from '@/hooks/useKeyboardOffset';
 import { listCounsellorMessages, markCounsellorRead, sendCounsellorMessage } from '@/api/support';
 import { ApiRequestError } from '@/api/client';
 import type { MessageResponse } from '@/api/types';
@@ -50,6 +51,7 @@ export function CounsellorChatScreen({ route, navigation }: Props) {
   const [sending, setSending]   = useState(false);
   const [realtime, setRealtime] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const keyboardHeight = useKeyboardOffset();
 
   const load = useCallback(async (silent = false) => {
     if (!token) return;
@@ -123,11 +125,7 @@ export function CounsellorChatScreen({ route, navigation }: Props) {
   const groups = groupByDate(messages);
 
   return (
-    <KeyboardAvoidingView
-      style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
+    <View style={[s.root, { paddingBottom: keyboardHeight }]}>
       {/* Header */}
       <LinearGradient
         colors={['#1B4F72', '#2980B9']}
@@ -213,7 +211,7 @@ export function CounsellorChatScreen({ route, navigation }: Props) {
       )}
 
       {/* Input bar */}
-      <View style={[s.inputBar, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[s.inputBar, { paddingBottom: keyboardHeight > 0 ? 8 : insets.bottom + 8 }]}>
         <TextInput
           style={s.input}
           placeholder={`Message ${studentName}…`}
@@ -235,7 +233,7 @@ export function CounsellorChatScreen({ route, navigation }: Props) {
           }
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

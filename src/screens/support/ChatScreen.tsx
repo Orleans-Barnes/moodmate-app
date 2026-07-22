@@ -6,8 +6,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +15,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useToast } from '@/state/useToast';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useKeyboardOffset } from '@/hooks/useKeyboardOffset';
 import { listMessages, markRead, sendMessage } from '@/api/support';
 import { ApiRequestError } from '@/api/client';
 import type { MessageResponse } from '@/api/types';
@@ -40,6 +39,7 @@ export function ChatScreen({ route, navigation }: Props) {
   const scrollRef  = useRef<ScrollView>(null);
   const toast      = useToast();
   const token      = useAuthStore((s) => s.token);
+  const keyboardHeight = useKeyboardOffset();
 
   const load = useCallback(async (silent = false) => {
     if (!token) return;
@@ -109,11 +109,8 @@ export function ChatScreen({ route, navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.flex}>
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: keyboardHeight }]}>
         <ScreenHeader
           title={otherPartyName}
           onClose={() => navigation.goBack()}
@@ -163,7 +160,7 @@ export function ChatScreen({ route, navigation }: Props) {
           </ScrollView>
         )}
 
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+        <View style={[styles.composer, { paddingBottom: keyboardHeight > 0 ? spacing.sm : Math.max(insets.bottom, spacing.sm) }]}>
           <TextInput
             style={styles.input}
             placeholder="Type a message…"
@@ -186,7 +183,7 @@ export function ChatScreen({ route, navigation }: Props) {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

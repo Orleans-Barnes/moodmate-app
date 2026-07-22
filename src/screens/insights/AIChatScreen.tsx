@@ -13,7 +13,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity,
-  StyleSheet, Animated, Easing, KeyboardAvoidingView,
+  StyleSheet, Animated, Easing,
   Platform, Alert, ActivityIndicator, Dimensions, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useKeyboardOffset } from '@/hooks/useKeyboardOffset';
 import {
   sendChatMessage, getChatHistory, clearChatHistory,
   type AiChatMessageDto,
@@ -188,6 +189,7 @@ export function AIChatScreen() {
   const recPulse = useRef(new Animated.Value(1)).current;
   const voiceRef = useRef<any>(null);
   const listRef  = useRef<FlatList>(null);
+  const keyboardHeight = useKeyboardOffset();
 
   // Load history
   useEffect(() => {
@@ -382,11 +384,7 @@ export function AIChatScreen() {
           <ActivityIndicator color={colors.lavender} size="large" />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
+        <View style={{ flex: 1, paddingBottom: keyboardHeight }}>
           {/* Messages */}
           <FlatList
             ref={listRef}
@@ -412,7 +410,7 @@ export function AIChatScreen() {
           )}
 
           {/* Input bar */}
-          <View style={[s.inputBar, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={[s.inputBar, { paddingBottom: keyboardHeight > 0 ? 8 : insets.bottom + 8 }]}>
             {/* Image */}
             <TouchableOpacity onPress={pickImage} style={s.iconBtn}
               disabled={sending || limitHit}>
@@ -459,11 +457,11 @@ export function AIChatScreen() {
           </View>
 
           {/* Offline notice */}
-          <View style={[s.offlineNote, { paddingBottom: Math.max(insets.bottom, 4) }]}>
+          <View style={[s.offlineNote, { paddingBottom: keyboardHeight > 0 ? 4 : Math.max(insets.bottom, 4) }]}>
             <Ionicons name="wifi" size={9} color="rgba(255,255,255,0.22)" />
             <Text style={s.offlineTxt}>  Requires internet connection</Text>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </View>
   );
