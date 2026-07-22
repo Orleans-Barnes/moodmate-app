@@ -32,11 +32,14 @@ const NO_REFRESH_PATHS = ['/api/auth/refresh', '/api/auth/logout'];
 async function performRefresh(): Promise<string | null> {
   const currentRefreshToken = useAuthStore.getState().refreshToken;
   if (!currentRefreshToken) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(`${BACKEND_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: currentRefreshToken }),
+      signal: controller.signal,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as AuthResponse;
@@ -44,18 +47,40 @@ async function performRefresh(): Promise<string | null> {
     return data.token;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
+// No request had ever bounded how long fetch() is allowed to hang. If the backend's IP in
+// config.ts is stale (the most common cause - the dev machine's LAN IP changes between Wi-Fi
+// sessions) or the backend just isn't running, fetch() to an unreachable address doesn't reject
+// quickly - it can hang effectively forever with no error ever surfacing, which looks exactly
+// like "the spinner never stops" from the UI's point of view (the request promise never settles,
+// so the caller's own `finally { setLoading(false) }` never runs either). This timeout guarantees
+// every request eventually rejects with a clear, actionable error instead.
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function request<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     response = await fetch(`${BACKEND_BASE_URL}${path}`, {
       ...options,
       headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
+      signal: controller.signal,
     });
-  } catch {
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new ApiRequestError(
+        `Could not reach the server at ${BACKEND_BASE_URL} - check that the backend is running and that this IP is still correct in config.ts.`,
+        0,
+      );
+    }
     throw new ApiRequestError('Could not reach the server. Check your connection and try again.', 0);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   // Attempt a silent refresh-and-retry exactly once: only for a 401 on a request that actually
