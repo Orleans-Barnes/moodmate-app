@@ -410,7 +410,7 @@ export function AIChatScreen() {
           )}
 
           {/* Input bar */}
-          <View style={[s.inputBar, { paddingBottom: keyboardHeight > 0 ? 8 : insets.bottom + 8 }]}>
+          <View style={[s.inputBar, { paddingBottom: keyboardHeight > 0 ? 0 : insets.bottom + 8 }]}>
             {/* Image */}
             <TouchableOpacity onPress={pickImage} style={s.iconBtn}
               disabled={sending || limitHit}>
@@ -457,7 +457,7 @@ export function AIChatScreen() {
           </View>
 
           {/* Offline notice */}
-          <View style={[s.offlineNote, { paddingBottom: keyboardHeight > 0 ? 4 : Math.max(insets.bottom, 4) }]}>
+          <View style={[s.offlineNote, { paddingBottom: keyboardHeight > 0 ? 0 : Math.max(insets.bottom, 4) }]}>
             <Ionicons name="wifi" size={9} color="rgba(255,255,255,0.22)" />
             <Text style={s.offlineTxt}>  Requires internet connection</Text>
           </View>

@@ -160,7 +160,7 @@ export function ChatScreen({ route, navigation }: Props) {
           </ScrollView>
         )}
 
-        <View style={[styles.composer, { paddingBottom: keyboardHeight > 0 ? spacing.sm : Math.max(insets.bottom, spacing.sm) }]}>
+        <View style={[styles.composer, { paddingBottom: keyboardHeight > 0 ? 0 : Math.max(insets.bottom, spacing.sm) }]}>
           <TextInput
             style={styles.input}
             placeholder="Type a message…"

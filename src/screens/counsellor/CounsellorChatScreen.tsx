@@ -211,7 +211,7 @@ export function CounsellorChatScreen({ route, navigation }: Props) {
       )}
 
       {/* Input bar */}
-      <View style={[s.inputBar, { paddingBottom: keyboardHeight > 0 ? 8 : insets.bottom + 8 }]}>
+      <View style={[s.inputBar, { paddingBottom: keyboardHeight > 0 ? 0 : insets.bottom + 8 }]}>
         <TextInput
           style={s.input}
           placeholder={`Message ${studentName}…`}
