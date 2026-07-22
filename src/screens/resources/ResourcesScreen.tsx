@@ -4,16 +4,21 @@
  * Opens articles in the device browser via Linking.
  */
 
-import React, { useState, useMemo } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Linking, Alert, TextInput, Platform,
+  Linking, Alert, TextInput, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
+import { useAuthStore } from '@/state/useAuthStore';
+import { useBooksStore } from '@/state/useBooksStore';
+import { useToast } from '@/state/useToast';
+import { ApiRequestError } from '@/api/client';
+import type { BookView } from '@/api/types';
 
 // ── Article data ────────────────────────────────────────────────────────────
 
@@ -45,7 +50,7 @@ const ARTICLES: Article[] = [
     id: '1', title: '5-Minute Mindfulness Practices for Busy Students',
     summary: 'Quick techniques you can do between classes to reset your nervous system and reduce overwhelm.',
     category: 'Mindfulness', readTime: '4 min', featured: true,
-    url: 'https://www.headspace.com/articles/mindfulness-for-students',
+    url: 'https://www.helpguide.org/mental-health/stress/benefits-of-mindfulness',
   },
   {
     id: '2', title: 'Box Breathing: The Navy SEAL Technique for Instant Calm',
@@ -57,7 +62,7 @@ const ARTICLES: Article[] = [
     id: '3', title: 'Body Scan Meditation: How to Release Tension You Didn\'t Know You Had',
     summary: 'A progressive relaxation technique that helps you reconnect with your body and release stored stress.',
     category: 'Mindfulness', readTime: '6 min',
-    url: 'https://www.mindful.org/body-scan-meditation/',
+    url: 'https://www.mindful.org/beginners-body-scan-meditation/',
   },
 
   // Sleep
@@ -65,7 +70,7 @@ const ARTICLES: Article[] = [
     id: '4', title: 'Why University Students Are the Most Sleep-Deprived Group',
     summary: 'Research shows 60% of students get less than 7 hours of sleep. Here\'s what to do about it.',
     category: 'Sleep', readTime: '5 min', featured: true,
-    url: 'https://www.sleepfoundation.org/sleep-hygiene/college-students-and-sleep',
+    url: 'https://www.sleepfoundation.org/school-and-sleep/final-exams-and-sleep',
   },
   {
     id: '5', title: 'The 10-3-2-1-0 Rule: A Sleep Schedule That Actually Works',
@@ -77,7 +82,7 @@ const ARTICLES: Article[] = [
     id: '6', title: 'How to Fix Your Sleep Schedule Before Exams',
     summary: 'Circadian rhythm hacks to get your sleep back on track in just 3 days.',
     category: 'Sleep', readTime: '5 min',
-    url: 'https://www.health.harvard.edu/staying-healthy/improving-sleep-a-guide-to-a-good-nights-rest',
+    url: 'https://www.nhs.uk/every-mind-matters/mental-wellbeing-tips/how-to-fall-asleep-faster-and-sleep-better/',
   },
 
   // Anxiety
@@ -85,7 +90,7 @@ const ARTICLES: Article[] = [
     id: '7', title: 'Understanding Exam Anxiety: Why It Happens and How to Beat It',
     summary: 'The science behind test anxiety and evidence-based strategies to turn nerves into performance fuel.',
     category: 'Anxiety', readTime: '7 min', featured: true,
-    url: 'https://www.verywellmind.com/test-anxiety-causes-and-tips-for-coping-20621',
+    url: 'https://www.helpguide.org/mental-health/anxiety/tips-for-dealing-with-anxiety',
   },
   {
     id: '8', title: 'The 5-4-3-2-1 Grounding Technique for Panic',
@@ -97,7 +102,7 @@ const ARTICLES: Article[] = [
     id: '9', title: 'Social Anxiety at University: You\'re Not Alone',
     summary: 'Practical CBT-based strategies for navigating social situations when anxiety makes them hard.',
     category: 'Anxiety', readTime: '6 min',
-    url: 'https://www.mind.org.uk/information-support/types-of-mental-health-problems/anxiety-and-panic-attacks/self-care-for-anxiety/',
+    url: 'https://www.mind.org.uk/information-support/types-of-mental-health-problems/anxiety-problems/how-to-manage-anxiety-and-worry/',
   },
 
   // Focus
@@ -105,19 +110,19 @@ const ARTICLES: Article[] = [
     id: '10', title: 'Pomodoro 2.0: How Top Students Use Time Blocks',
     summary: 'The classic 25/5 technique upgraded with research on optimal study-to-break ratios.',
     category: 'Focus', readTime: '4 min', featured: true,
-    url: 'https://www.psychologytoday.com/us/blog/the-peak-performing-student/201609/7-ways-to-focus-better-when-studying',
+    url: 'https://guides.lib.uoguelph.ca/BetterConcentration',
   },
   {
     id: '11', title: 'Digital Minimalism for Students: Reclaim Your Attention',
     summary: 'How constant notifications fragment your focus and simple systems to protect deep work time.',
     category: 'Focus', readTime: '5 min',
-    url: 'https://www.verywellmind.com/how-to-minimize-distractions-while-studying-3144676',
+    url: 'https://learningcenter.unc.edu/tips-and-tools/decreasing-digital-distractions/',
   },
   {
     id: '12', title: 'The Science of Background Music and Studying',
     summary: 'Does music help or hurt? Research reveals which sounds boost concentration and which derail it.',
     category: 'Focus', readTime: '4 min',
-    url: 'https://www.sciencedaily.com/releases/2019/07/190708103648.htm',
+    url: 'https://www.medicalnewstoday.com/articles/does-music-help-you-focus',
   },
 
   // Self-Care
@@ -125,7 +130,7 @@ const ARTICLES: Article[] = [
     id: '13', title: 'The Student Self-Care Checklist You\'ll Actually Use',
     summary: 'A realistic, evidence-backed daily routine for when you\'re busy, broke, and overwhelmed.',
     category: 'Self-Care', readTime: '4 min',
-    url: 'https://www.verywellmind.com/self-care-strategies-overall-stress-reduction-3144729',
+    url: 'https://www.helpguide.org/mental-health/wellbeing/self-care-tips-to-prioritize-your-mental-health',
   },
   {
     id: '14', title: 'How Exercise Literally Changes Your Brain Chemistry',
@@ -137,7 +142,7 @@ const ARTICLES: Article[] = [
     id: '15', title: 'Journaling for Mental Health: The Research Behind It',
     summary: 'Studies show 20 minutes of expressive writing lowers anxiety and improves working memory.',
     category: 'Self-Care', readTime: '5 min',
-    url: 'https://www.health.harvard.edu/blog/journaling-to-cope-with-anxiety-2018052613807',
+    url: 'https://www.helpguide.org/mental-health/wellbeing/journaling-for-mental-health-and-wellness',
   },
 
   // Social
@@ -151,13 +156,13 @@ const ARTICLES: Article[] = [
     id: '17', title: 'Setting Boundaries Without Guilt',
     summary: 'How to protect your energy and mental health while maintaining meaningful relationships.',
     category: 'Social', readTime: '5 min',
-    url: 'https://www.verywellmind.com/how-to-set-healthy-boundaries-4428984',
+    url: 'https://www.helpguide.org/relationships/social-connection/setting-healthy-boundaries-in-relationships',
   },
   {
     id: '18', title: 'Toxic Friendships: Signs and How to Navigate Them',
     summary: 'Red flags that a relationship is draining rather than energising, and what to do about it.',
     category: 'Social', readTime: '5 min',
-    url: 'https://www.psychologytoday.com/us/blog/the-friendship-doctor/201012/are-you-in-a-toxic-friendship',
+    url: 'https://www.healthline.com/health/toxic-friendships',
   },
 ];
 
@@ -231,12 +236,111 @@ function ArticleCard({ article }: { article: Article }) {
   );
 }
 
+// ── Books ────────────────────────────────────────────────────────────────────
+// Wellness Library - Books. Covers are code-composed (gradient + icon + title) rather than
+// hotlinked cover images, on purpose - a dead cover-image URL would reproduce the exact "resources
+// with no info" bug this whole feature was built to fix. See Book.java's own doc comment.
+const BOOK_COVERS: { from: string; to: string }[] = [
+  { from: '#7B3CC9', to: '#C84895' },
+  { from: '#2D4BCC', to: '#5C8AE6' },
+  { from: '#5F9E7C', to: '#8FC4A4' },
+  { from: '#E8861A', to: '#FFC857' },
+  { from: '#C84895', to: '#FF6F4D' },
+  { from: '#3D6FD4', to: '#5C8AE6' },
+];
+
+function formatCedis(pesewas: number): string {
+  return `₵${(pesewas / 100).toFixed(0)}`;
+}
+
+function BookCard({ book, index, buying, onBuy }:
+  { book: BookView; index: number; buying: boolean; onBuy: () => void }) {
+  const cover = BOOK_COVERS[index % BOOK_COVERS.length];
+  return (
+    <View style={s.bookCard}>
+      <LinearGradient colors={[cover.from, cover.to]} style={s.bookCover}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <Ionicons name="book" size={22} color="rgba(255,255,255,0.85)" />
+        <Text style={s.bookCoverTitle} numberOfLines={4}>{book.title}</Text>
+      </LinearGradient>
+      <View style={s.bookBody}>
+        <Text style={s.bookTitle} numberOfLines={2}>{book.title}</Text>
+        <Text style={s.bookAuthor} numberOfLines={1}>{book.author}</Text>
+        <Text style={s.bookDesc} numberOfLines={3}>{book.description}</Text>
+        <TouchableOpacity
+          onPress={onBuy}
+          disabled={book.owned || buying}
+          activeOpacity={0.8}
+          style={[s.bookBuyBtn, book.owned && s.bookBuyBtnOwned]}
+        >
+          {buying ? (
+            <ActivityIndicator size="small" color={colors.lavender} />
+          ) : book.owned ? (
+            <>
+              <Ionicons name="checkmark-circle" size={14} color={colors.sage} />
+              <Text style={s.bookBuyTxtOwned}>Owned</Text>
+            </>
+          ) : (
+            <Text style={s.bookBuyTxt}>Buy · {formatCedis(book.pricePesewas)}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 // ── Screen ─────────────────────────────────────────────────────────────────
 export function ResourcesScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState<Category>('All');
   const [query, setQuery]   = useState('');
+
+  // Wellness Library - Books. Same "open hosted checkout, verify on focus" flow as Shop's leaf
+  // packs (see ShopScreen.tsx) - startBookCheckout/verifyPending both live on useBooksStore.
+  const token = useAuthStore((s) => s.token);
+  const books = useBooksStore((s) => s.books);
+  const loadBooks = useBooksStore((s) => s.load);
+  const startBookCheckout = useBooksStore((s) => s.startBookCheckout);
+  const verifyBookPending = useBooksStore((s) => s.verifyPending);
+  const toast = useToast();
+  const [buyingBook, setBuyingBook] = useState<string | null>(null);
+
+  const refreshBooks = useCallback(() => {
+    if (!token || token === 'guest') return;
+    (async () => {
+      try {
+        const outcome = await verifyBookPending(token);
+        if (outcome === 'success') toast('Book unlocked — enjoy the read.');
+        else if (outcome === 'failed') toast('That payment didn’t go through — you weren’t charged.');
+      } catch {
+        // verification failing shouldn't block the rest of the screen from loading
+      }
+      loadBooks(token).catch(() => {});
+    })();
+  }, [token, loadBooks, verifyBookPending, toast]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshBooks();
+    }, [refreshBooks])
+  );
+
+  const handleBuyBook = async (bookCode: string) => {
+    if (!token || token === 'guest' || buyingBook) {
+      if (token === 'guest') toast('Create an account to buy books.');
+      return;
+    }
+    setBuyingBook(bookCode);
+    try {
+      const url = await startBookCheckout(token, bookCode);
+      await Linking.openURL(url);
+    } catch (err) {
+      toast(err instanceof ApiRequestError ? err.message : 'Could not start checkout.');
+    } finally {
+      setBuyingBook(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     let list = ARTICLES;
@@ -318,10 +422,26 @@ export function ResourcesScreen() {
           )}
         </View>
 
+        {/* Books */}
+        {active === 'All' && books.length > 0 && (
+          <>
+            <Text style={s.sectionLabel}>Books</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.bookRow}>
+              {books.map((b, i) => (
+                <BookCard key={b.code} book={b} index={i}
+                  buying={buyingBook === b.code}
+                  onBuy={() => handleBuyBook(b.code)} />
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         {/* Footer note */}
         <Text style={s.footerNote}>
-          Articles open in your browser · Sources: Headspace, Verywell Mind,
-          Mind.org, Sleep Foundation, Harvard Health
+          Articles open in your browser · Sources: HelpGuide.org, Healthline,
+          Mind.org, Sleep Foundation, NHS, and university wellness centers.
+          Books are purchased securely through Paystack.
         </Text>
       </ScrollView>
     </View>
@@ -397,6 +517,33 @@ const s = StyleSheet.create({
   articleTitle:  { fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink,
                    lineHeight: 20, marginBottom: 3 },
   articleSummary:{ fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.inkSoft, lineHeight: 18 },
+
+  // Books
+  bookRow:  { paddingLeft: spacing.lg, paddingRight: spacing.lg, gap: 14 },
+  bookCard: {
+    width: 170, borderRadius: radii.xl, overflow: 'hidden', backgroundColor: '#fff',
+    shadowColor: 'rgba(43,37,48,0.12)', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1, shadowRadius: 10, elevation: 4,
+  },
+  bookCover: {
+    height: 130, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: spacing.md, gap: 8,
+  },
+  bookCoverTitle: {
+    fontFamily: fonts.displaySemibold, fontSize: fontSizes.sm, color: '#fff',
+    textAlign: 'center', lineHeight: 18,
+  },
+  bookBody:   { padding: spacing.md, gap: 3 },
+  bookTitle:  { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.ink, lineHeight: 18 },
+  bookAuthor: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.inkFaint, marginBottom: 2 },
+  bookDesc:   { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.inkSoft, lineHeight: 15, marginBottom: 8 },
+  bookBuyBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    backgroundColor: colors.lavender + '18', borderRadius: radii.pill, paddingVertical: 8,
+  },
+  bookBuyBtnOwned: { backgroundColor: colors.sage + '18' },
+  bookBuyTxt:      { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.lavender },
+  bookBuyTxtOwned: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.sage },
 
   // Empty search
   emptySearch: { alignItems: 'center', paddingVertical: 40, gap: 12 },

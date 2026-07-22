@@ -454,7 +454,17 @@ export interface CheckoutResponseView {
   reference: string;
 }
 
-export type PaymentPurposeKey = 'SUBSCRIPTION' | 'LEAF_PACK';
+// Mirrors com.moodmate.wallet.dto.BookDto (Wellness Library - Books).
+export interface BookView {
+  code: string;
+  title: string;
+  author: string;
+  description: string;
+  pricePesewas: number;
+  owned: boolean;
+}
+
+export type PaymentPurposeKey = 'SUBSCRIPTION' | 'LEAF_PACK' | 'BOOK';
 export type PaymentStatusKey = 'PENDING' | 'SUCCESS' | 'FAILED';
 
 export interface PaymentTransactionView {

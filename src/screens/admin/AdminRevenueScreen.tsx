@@ -100,6 +100,11 @@ export function AdminRevenueScreen({ navigation }: Props) {
                 <Text style={s.splitValue}>{formatCedis(summary.leafPackRevenuePesewas)}</Text>
                 <Text style={s.splitLabel}>Leaf packs</Text>
               </View>
+              <View style={s.splitCard}>
+                <Ionicons name="book" size={20} color={colors.coral} />
+                <Text style={s.splitValue}>{formatCedis(summary.bookRevenuePesewas)}</Text>
+                <Text style={s.splitLabel}>Books</Text>
+              </View>
             </View>
 
             <Text style={s.sectionTitle}>Pro subscribers</Text>

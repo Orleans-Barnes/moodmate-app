@@ -2,6 +2,30 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { UserProfile } from '@/api/types';
 import { BACKEND_BASE_URL } from '@/config';
+import { useWellnessStore } from './useWellnessStore';
+import { useDashboardStore } from './useDashboardStore';
+import { useWalletStore } from './useWalletStore';
+import { useJournalStore } from './useJournalStore';
+import { useNotificationStore } from './useNotificationStore';
+import { useBooksStore } from './useBooksStore';
+import { switchGamificationScope } from './useGamificationStore';
+
+// Data-isolation fix (student-view polish pass) - every per-user data store used to keep whatever
+// was in memory across a login/logout/guest-switch cycle, since nothing ever reset them. That let
+// one account's streak/XP/journal/wallet numbers visibly "leak" into the next session on the same
+// device (Guest showing a prior real user's data; one real account briefly showing another's data
+// before its own load() finished). This is the single place all of that gets cleared, called from
+// every place the active account changes below - never call these stores' individual reset()
+// (or switchGamificationScope()) ad hoc elsewhere, so there's exactly one code path to keep
+// correct as new per-user stores are added.
+function resetPerUserStores() {
+  useWellnessStore.getState().reset();
+  useDashboardStore.getState().reset();
+  useWalletStore.getState().reset();
+  useJournalStore.getState().reset();
+  useNotificationStore.getState().reset();
+  useBooksStore.getState().reset();
+}
 
 const TOKEN_KEY = 'moodmate_token';
 const REFRESH_TOKEN_KEY = 'moodmate_refresh_token';
@@ -32,11 +56,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   hydrated: false,
 
   setSession: async (token, refreshToken, user) => {
+    // Data-isolation fix - clear whatever the previous session (another account, or guest) left
+    // in memory before this new session's own screens start loading and rendering it.
+    resetPerUserStores();
     set({ token, refreshToken, user });
     await Promise.all([
       SecureStore.setItemAsync(TOKEN_KEY, token),
       SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken),
       SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(user)),
+      switchGamificationScope(String(user.id)),
     ]);
   },
 
@@ -54,6 +82,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loginAsGuest: () => {
+    // Data-isolation fix - clear any previous real account's data first, and switch the
+    // gamification store to the shared 'guest' scope (not awaited - loginAsGuest's callers treat
+    // it as synchronous; the rehydrate finishes a moment later, well before Home ever renders).
+    resetPerUserStores();
+    switchGamificationScope('guest').catch(() => {});
     // Synthetic guest profile — never persisted to SecureStore
     set({
       token: 'guest',
@@ -80,7 +113,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         SecureStore.getItemAsync(PROFILE_KEY),
       ]);
       if (token && profileJson) {
-        set({ token, refreshToken, user: JSON.parse(profileJson) as UserProfile });
+        const user = JSON.parse(profileJson) as UserProfile;
+        set({ token, refreshToken, user });
+        // Data-isolation fix - the gamification store's persist middleware already hydrated once
+        // under the default 'guest' scope at module-load time (before we knew who's actually
+        // signed in, since that hydration runs synchronously at import). Re-scope + rehydrate now
+        // that the real user id is known, so a cold app start restores THIS account's XP/badges,
+        // not whatever scope happened to be active last.
+        switchGamificationScope(String(user.id)).catch(() => {});
       }
     } finally {
       set({ hydrated: true });
@@ -107,11 +147,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Network unavailable or server error — proceed with local logout regardless.
       }
     }
+    // Data-isolation fix - clear every per-user store so the next session (another account, or
+    // guest) never briefly shows this account's streak/XP/journal/wallet data.
+    resetPerUserStores();
     set({ token: null, refreshToken: null, user: null });
     await Promise.all([
       SecureStore.deleteItemAsync(TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
       SecureStore.deleteItemAsync(PROFILE_KEY),
+      switchGamificationScope('guest'),
     ]);
   },
 }));

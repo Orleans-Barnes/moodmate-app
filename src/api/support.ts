@@ -578,6 +578,7 @@ export function updateInstitutionLicense(
 export interface RevenueSummary {
   subscriptionRevenuePesewas: number;
   leafPackRevenuePesewas: number;
+  bookRevenuePesewas: number;
   totalRevenuePesewas: number;
   successfulTransactionCount: number;
   activeProCount: number;

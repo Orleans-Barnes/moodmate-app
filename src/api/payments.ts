@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from './client';
 import type {
+  BookView,
   CheckoutResponseView,
   LeafPackView,
   PageResponse,
@@ -34,6 +35,15 @@ export function checkoutSubscription(token: string, planCode: string): Promise<C
 
 export function checkoutLeafPack(token: string, packCode: string): Promise<CheckoutResponseView> {
   return apiPost<CheckoutResponseView>('/api/payments/leaf-packs/checkout', { packCode }, token);
+}
+
+// Wellness Library - Books. Same "hosted checkout URL + reference to verify" flow as leaf packs.
+export function getBooks(token: string): Promise<BookView[]> {
+  return apiGet<BookView[]>('/api/payments/books', token);
+}
+
+export function checkoutBook(token: string, bookCode: string): Promise<CheckoutResponseView> {
+  return apiPost<CheckoutResponseView>('/api/payments/books/checkout', { bookCode }, token);
 }
 
 export function verifyPayment(token: string, reference: string): Promise<PaymentTransactionView> {
