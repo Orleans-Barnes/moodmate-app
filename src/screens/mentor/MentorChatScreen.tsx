@@ -54,7 +54,7 @@ export function MentorChatScreen({ route, navigation }: Props) {
   const [draft, setDraft]       = useState('');
   const [sending, setSending]   = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  const keyboardHeight = useKeyboardOffset();
+  const keyboardHeight = useKeyboardOffset(insets.bottom);
 
   const load = useCallback(async (silent = false) => {
     if (!token) return;

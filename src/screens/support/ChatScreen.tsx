@@ -39,7 +39,7 @@ export function ChatScreen({ route, navigation }: Props) {
   const scrollRef  = useRef<ScrollView>(null);
   const toast      = useToast();
   const token      = useAuthStore((s) => s.token);
-  const keyboardHeight = useKeyboardOffset();
+  const keyboardHeight = useKeyboardOffset(insets.bottom);
 
   const load = useCallback(async (silent = false) => {
     if (!token) return;

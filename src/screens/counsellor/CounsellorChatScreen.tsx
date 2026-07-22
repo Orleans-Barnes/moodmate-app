@@ -51,7 +51,7 @@ export function CounsellorChatScreen({ route, navigation }: Props) {
   const [sending, setSending]   = useState(false);
   const [realtime, setRealtime] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  const keyboardHeight = useKeyboardOffset();
+  const keyboardHeight = useKeyboardOffset(insets.bottom);
 
   const load = useCallback(async (silent = false) => {
     if (!token) return;
