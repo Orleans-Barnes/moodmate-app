@@ -72,6 +72,7 @@ export type RootStackParamList = {
   MoodHistory: undefined;
   Pro: undefined;
   Shop: undefined;
+  PurchaseHistory: undefined;
   Hub: undefined;
   Game: undefined;
   BubblePop: undefined;

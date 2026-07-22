@@ -220,7 +220,21 @@ export function ShopScreen({ navigation }: Props) {
     <View style={styles.flex}>
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxxl }]}>
         <View style={styles.header}>
-          <ScreenHeader title="Tree Shop" onClose={() => navigation.goBack()} />
+          <ScreenHeader
+            title="Tree Shop"
+            onClose={() => navigation.goBack()}
+            rightSlot={
+              <Pressable
+                onPress={() => navigation.navigate('PurchaseHistory')}
+                style={styles.historyBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Purchase history"
+                hitSlop={8}
+              >
+                <Text style={styles.historyBtnTxt}>🧾</Text>
+              </Pressable>
+            }
+          />
         </View>
         <View style={styles.balanceRow}>
           <View style={styles.leafBalance}>
@@ -298,6 +312,17 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
   header: { marginBottom: -spacing.md },
   balanceRow: { alignItems: 'flex-end', marginBottom: spacing.sm },
+  historyBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyBtnTxt: { fontSize: fontSizes.base },
   leafBalance: { backgroundColor: colors.sageSoft, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radii.pill },
   leafBalanceText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.sage },
   sectionHead: { marginTop: spacing.md, marginBottom: spacing.sm },

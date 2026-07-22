@@ -133,7 +133,26 @@ export function ProScreen({ navigation }: Props) {
       <Text style={styles.heroTitle}>Go deeper with Pro</Text>
       <Text style={styles.heroSub}>Unlock the full MoodMate experience</Text>
 
-      {subscription.pro && (
+      {subscription.pro && subscription.status === 'PAST_DUE' && (
+        // Premium & Monetization (Milestone 3) - grace period. Still Pro, but flagged distinctly
+        // so a payment-failure customer knows to fix billing before the grace window closes.
+        <Card tint="sun" style={styles.statusCard}>
+          <Text style={styles.statusText}>
+            ⚠️ Your last payment didn't go through. You're still Pro until {formatDate(subscription.graceEndsAt)} —
+            renew now to avoid losing access.
+          </Text>
+        </Card>
+      )}
+
+      {subscription.pro && subscription.status === null && (
+        // Institution Management (Milestone 2, Step 3-4) - pro=true with no personal subscription
+        // row at all means this is institution-license coverage, not an individual plan.
+        <Card tint="sage" style={styles.statusCard}>
+          <Text style={styles.statusText}>🎓 You have Pro through your institution's license.</Text>
+        </Card>
+      )}
+
+      {subscription.pro && subscription.status !== 'PAST_DUE' && subscription.status !== null && (
         <Card tint="sage" style={styles.statusCard}>
           <Text style={styles.statusText}>
             {subscription.status === 'TRIALING'

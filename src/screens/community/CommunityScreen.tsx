@@ -15,6 +15,7 @@ import { useCommunityStore } from '@/state/useCommunityStore';
 import { useGamificationStore } from '@/state/useGamificationStore';
 import type { Reaction } from '@/state/useCommunityStore';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useFeatureFlagStore } from '@/state/useFeatureFlagStore';
 import { useToast } from '@/state/useToast';
 import { GuestGate } from '@/components/GuestGate';
 import { ApiRequestError } from '@/api/client';
@@ -47,6 +48,10 @@ export function CommunityScreen(props: Props) {
   const deletePost   = useCommunityStore((s) => s.deletePost);
   const token        = useAuthStore((s) => s.token);
   const isGuest       = useAuthStore((s) => s.user?.guest ?? false);
+  // Admin Platform (Milestone 1) - the first real feature-flag consumer. Fails open (defaults
+  // true) if the flag was never created or the fetch failed - see useFeatureFlagStore's doc
+  // comment. Only the composer is gated; the read-only feed always stays visible.
+  const postingEnabled = useFeatureFlagStore((s) => s.isEnabled('community_posting'));
   const toast        = useToast();
   const burstRef     = useRef<EmojiBurstHandle>(null);
   const insets       = useSafeAreaInsets();
@@ -193,30 +198,32 @@ export function CommunityScreen(props: Props) {
               ))}
             </ScrollView>
 
-            {/* Composer */}
-            <View style={s.composerCard}>
-              <View style={s.composerTop}>
-                <View style={s.anonBadge}>
-                  <Text style={s.anonBadgeTxt}>👤 Anonymous</Text>
+            {/* Composer - Admin Platform (Milestone 1), gated behind the community_posting flag */}
+            {postingEnabled && (
+              <View style={s.composerCard}>
+                <View style={s.composerTop}>
+                  <View style={s.anonBadge}>
+                    <Text style={s.anonBadgeTxt}>👤 Anonymous</Text>
+                  </View>
+                  <Text style={s.composerTopic}>{activeTopic}</Text>
                 </View>
-                <Text style={s.composerTopic}>{activeTopic}</Text>
+                <TextInput
+                  style={s.composerInput}
+                  placeholder="Share how you're feeling…"
+                  placeholderTextColor={colors.inkFaint}
+                  value={draft}
+                  onChangeText={setDraft}
+                  multiline
+                />
+                <Pressable
+                  style={[s.postBtn, !canPost && s.postBtnDisabled]}
+                  disabled={!canPost}
+                  onPress={handlePost}
+                >
+                  <Text style={s.postBtnTxt}>{posting ? 'Posting…' : 'Post anonymously →'}</Text>
+                </Pressable>
               </View>
-              <TextInput
-                style={s.composerInput}
-                placeholder="Share how you're feeling…"
-                placeholderTextColor={colors.inkFaint}
-                value={draft}
-                onChangeText={setDraft}
-                multiline
-              />
-              <Pressable
-                style={[s.postBtn, !canPost && s.postBtnDisabled]}
-                disabled={!canPost}
-                onPress={handlePost}
-              >
-                <Text style={s.postBtnTxt}>{posting ? 'Posting…' : 'Post anonymously →'}</Text>
-              </Pressable>
-            </View>
+            )}
 
             {/* Feed */}
             {loading && posts.length === 0 ? (

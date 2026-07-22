@@ -34,6 +34,7 @@ const NO_SUBSCRIPTION: SubscriptionStateView = {
   trialEndsAt: null,
   currentPeriodEnd: null,
   pro: false,
+  graceEndsAt: null,
 };
 
 /**

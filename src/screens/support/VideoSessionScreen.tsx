@@ -6,7 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuthStore } from '@/state/useAuthStore';
-import { getAppointmentMeeting, getCounsellorAppointmentMeeting } from '@/api/support';
+import { completeAppointment, getAppointmentMeeting, getCounsellorAppointmentMeeting } from '@/api/support';
 import { ApiRequestError } from '@/api/client';
 import type { MeetingWindowView } from '@/api/types';
 import { colors, fonts, fontSizes, spacing } from '@/theme/tokens';
@@ -126,6 +126,13 @@ export function VideoSessionScreen({ route, navigation }: Props) {
 
   function handleWebViewMessage(nativeEvent: { data: string }) {
     if (nativeEvent.data === 'CALL_ENDED' || nativeEvent.data === 'CALL_LOAD_ERROR') {
+      // Counsellor Platform (Milestone 4) - call-end auto-complete. Only the counsellor side
+      // triggers this (a student ending the call shouldn't unilaterally mark it complete); fire-
+      // and-forget with a swallowed error so a stale/edge-case appointment state (e.g. already
+      // COMPLETED, or was never actually CONFIRMED) never blocks navigating back.
+      if (nativeEvent.data === 'CALL_ENDED' && role === 'COUNSELLOR' && token) {
+        completeAppointment(token, appointmentId).catch(() => {});
+      }
       navigation.goBack();
     }
   }

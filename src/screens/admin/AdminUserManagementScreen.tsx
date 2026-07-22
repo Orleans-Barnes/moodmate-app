@@ -20,6 +20,7 @@ import {
   searchAdminUsers, suspendUser, reinstateUser, changeUserRole,
   type AdminUserView, type AdminAssignableRole,
 } from '@/api/auth';
+import { overrideUserSubscription } from '@/api/support';
 import { ApiRequestError } from '@/api/client';
 import { FadeInItem } from '@/components/FadeInItem';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
@@ -128,6 +129,38 @@ export function AdminUserManagementScreen({ navigation }: Props) {
     }
   };
 
+  // Premium & Monetization (Milestone 3) - admin override, bypassing Paystack entirely. No
+  // per-row Pro status is fetched here (would mean an extra cross-service call per user in the
+  // list) - the confirm dialog states the action plainly instead.
+  const applySubscriptionOverride = async (user: AdminUserView, status: 'ACTIVE' | 'EXPIRED') => {
+    setActionId(user.id);
+    try {
+      await overrideUserSubscription(token, user.id, status, status === 'ACTIVE' ? 30 : undefined);
+      Alert.alert('Done', status === 'ACTIVE'
+        ? `${user.fullName} now has Pro for 30 days.`
+        : `${user.fullName}'s Pro access has been revoked.`);
+    } catch (err) {
+      Alert.alert('Error', err instanceof ApiRequestError ? err.message : 'Could not update this account\'s subscription.');
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleManagePro = (user: AdminUserView) => {
+    const options = [
+      { text: 'Grant Pro (30 days)', onPress: () => applySubscriptionOverride(user, 'ACTIVE') },
+      { text: 'Revoke Pro', style: 'destructive' as const, onPress: () => applySubscriptionOverride(user, 'EXPIRED') },
+    ];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', ...options.map((o) => o.text)], cancelButtonIndex: 0, destructiveButtonIndex: 2 },
+        (idx) => { if (idx > 0) options[idx - 1].onPress(); },
+      );
+    } else {
+      Alert.alert('Manage Pro status', `${user.fullName}`, [...options, { text: 'Cancel', style: 'cancel' as const }]);
+    }
+  };
+
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <LinearGradient colors={['#2C1654', '#5B2FA0', '#2980B9']} style={s.header}
@@ -204,6 +237,13 @@ export function AdminUserManagementScreen({ navigation }: Props) {
                     disabled={actionId === u.id}
                   >
                     <Text style={s.roleChangeBtnText}>Change role</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[s.proBtn, actionId === u.id && s.btnDisabled]}
+                    onPress={() => handleManagePro(u)}
+                    disabled={actionId === u.id}
+                  >
+                    <Text style={s.proBtnText}>Pro</Text>
                   </Pressable>
                   {u.banned ? (
                     <Pressable
@@ -305,5 +345,10 @@ const s = StyleSheet.create({
     borderColor: colors.lavender, alignItems: 'center', justifyContent: 'center',
   },
   roleChangeBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.lavender },
+  proBtn: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1.5,
+    borderColor: '#E67E22', alignItems: 'center', justifyContent: 'center',
+  },
+  proBtnText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#E67E22' },
   btnDisabled: { opacity: 0.5 },
 });

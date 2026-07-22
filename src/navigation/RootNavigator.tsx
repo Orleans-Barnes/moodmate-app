@@ -24,6 +24,7 @@ import { EditProfileScreen } from '@/screens/modals/EditProfileScreen';
 import { MoodHistoryScreen } from '@/screens/modals/MoodHistoryScreen';
 import { ProScreen } from '@/screens/modals/ProScreen';
 import { ShopScreen } from '@/screens/modals/ShopScreen';
+import { PurchaseHistoryScreen } from '@/screens/modals/PurchaseHistoryScreen';
 import { HubScreen } from '@/screens/modals/HubScreen';
 import { GameScreen } from '@/screens/modals/GameScreen';
 import { BubblePopScreen } from '@/screens/modals/BubblePopScreen';
@@ -105,6 +106,7 @@ export function RootNavigator() {
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Pro" component={ProScreen} />
         <Stack.Screen name="Shop" component={ShopScreen} />
+        <Stack.Screen name="PurchaseHistory" component={PurchaseHistoryScreen} />
         <Stack.Screen name="Hub" component={HubScreen} />
         <Stack.Screen name="Game" component={GameScreen} />
         <Stack.Screen name="BubblePop" component={BubblePopScreen} />

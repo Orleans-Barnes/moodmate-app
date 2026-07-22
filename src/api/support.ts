@@ -97,6 +97,13 @@ export function setCounsellorAvailabilityStatus(
   );
 }
 
+// Counsellor Platform (Milestone 4) - "get my own status" endpoint. Closes the documented gap
+// where the dashboard always defaulted to ONLINE on first render instead of restoring the
+// last-saved value.
+export function getMyAvailabilityStatus(token: string): Promise<CounsellorAvailabilityStatus> {
+  return apiGet<CounsellorAvailabilityStatus>('/api/support/counsellor/me/status', token);
+}
+
 // Phase 1F-A - backs the counsellor dashboard's analytics cards.
 export function getCounsellorAnalytics(token: string): Promise<CounsellorAnalyticsView> {
   return apiGet<CounsellorAnalyticsView>('/api/support/counsellor/analytics', token);
@@ -459,6 +466,12 @@ export function deleteFeatureFlag(token: string, id: number): Promise<void> {
   return apiDelete(`/api/admin/feature-flags/${id}`, token);
 }
 
+// Admin Platform (Milestone 1) - the first real feature-flag consumer read. flagKey -> enabled,
+// for any authenticated screen to check before gating a code path.
+export function getPublicFeatureFlags(token: string): Promise<Record<string, boolean>> {
+  return apiGet<Record<string, boolean>>('/api/admin/feature-flags/public', token);
+}
+
 // ── Phase 1H (Admin Portal - System Settings: Admin Announcement broadcast) ─
 
 export type AnnouncementAudience = 'ALL' | 'STUDENT' | 'COUNSELLOR' | 'MENTOR' | 'ADMIN';
@@ -573,6 +586,26 @@ export interface RevenueSummary {
 
 export function getRevenueSummary(token: string): Promise<RevenueSummary> {
   return apiGet<RevenueSummary>('/api/admin/revenue', token);
+}
+
+// Premium & Monetization (Milestone 3) - admin override of a specific user's Pro status,
+// bypassing Paystack entirely. Mirrors com.moodmate.admin.dto.SubscriptionOverrideView.
+export interface SubscriptionOverrideView {
+  planCode: string | null;
+  status: string | null;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  pro: boolean;
+  graceEndsAt: string | null;
+}
+
+export function overrideUserSubscription(
+  token: string,
+  userId: number,
+  status: 'ACTIVE' | 'EXPIRED',
+  extendDays?: number
+): Promise<SubscriptionOverrideView> {
+  return apiPatch<SubscriptionOverrideView>(`/api/admin/users/${userId}/subscription`, { status, extendDays }, token);
 }
 
 // Unauthenticated - backs the signup institution picker (see src/data/institutions/index.ts's

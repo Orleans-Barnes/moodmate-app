@@ -14,6 +14,7 @@ import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
 import {
   getCounsellorAnalytics,
+  getMyAvailabilityStatus,
   listCounsellorAppointments,
   listCounsellorConversations,
   setCounsellorAvailabilityStatus,
@@ -58,10 +59,8 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
   const user    = useAuthStore((s) => s.user);
   const toast   = useToast();
 
-  // Phase 1F-A - this toggle is now persisted server-side (POST .../availability-status), read
-  // back via GET /api/support/counsellors' availabilityStatus field. There is no "get my own
-  // counsellor row" endpoint yet, so the very first render still defaults to ONLINE rather than
-  // restoring whatever was last saved - a known, documented gap, not an oversight.
+  // Counsellor Platform (Milestone 4) - restored via GET /counsellor/me/status on load() below,
+  // closing the gap this screen used to document (first render always defaulted to ONLINE).
   const [status, setStatus]       = useState<StatusKey>('ONLINE');
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
@@ -74,16 +73,18 @@ export function CounsellorDashboardScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const [appts, msgs, crisisData, analyticsData] = await Promise.all([
+      const [appts, msgs, crisisData, analyticsData, myStatus] = await Promise.all([
         listCounsellorAppointments(token),
         listCounsellorConversations(token),
         listOpenAlerts(token),
         getCounsellorAnalytics(token),
+        getMyAvailabilityStatus(token),
       ]);
       setAppointments(appts);
       setConvos(msgs);
       setCrisisAlerts(crisisData);
       setAnalytics(analyticsData);
+      setStatus(myStatus);
     } catch {
       toast('Could not load dashboard');
     } finally {

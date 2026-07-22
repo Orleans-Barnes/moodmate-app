@@ -429,6 +429,8 @@ export interface SubscriptionStateView {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   pro: boolean;
+  // Premium & Monetization (Milestone 3) - set only while status === 'PAST_DUE' (grace period).
+  graceEndsAt: string | null;
 }
 
 // Mirrors com.moodmate.gamification.entity.UserAchievement (Task #25 - gamification wiring).

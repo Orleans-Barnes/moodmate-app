@@ -2,6 +2,7 @@ import { apiGet, apiPost } from './client';
 import type {
   CheckoutResponseView,
   LeafPackView,
+  PageResponse,
   PaymentTransactionView,
   SubscriptionPlanView,
   SubscriptionStateView,
@@ -37,4 +38,17 @@ export function checkoutLeafPack(token: string, packCode: string): Promise<Check
 
 export function verifyPayment(token: string, reference: string): Promise<PaymentTransactionView> {
   return apiGet<PaymentTransactionView>(`/api/payments/verify/${reference}`, token);
+}
+
+// Wellness Marketplace (Milestone 7) - purchase history. The backend endpoint already existed
+// (listMyTransactions); this was the missing frontend wiring.
+export function listMyTransactions(
+  token: string,
+  page = 0,
+  size = 20
+): Promise<PageResponse<PaymentTransactionView>> {
+  return apiGet<PageResponse<PaymentTransactionView>>(
+    `/api/payments/transactions?page=${page}&size=${size}`,
+    token
+  );
 }

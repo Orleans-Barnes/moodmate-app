@@ -16,6 +16,7 @@ import { colors } from '@/theme/tokens';
 import { resetInactivityReminder, getExpoPushToken } from '@/utils/notifications';
 import { registerPushToken, removePushToken } from '@/api/push';
 import { useAuthStore } from '@/state/useAuthStore';
+import { useFeatureFlagStore } from '@/state/useFeatureFlagStore';
 import type { RootStackParamList } from '@/navigation/types';
 
 export default function App() {
@@ -31,6 +32,13 @@ export default function App() {
     });
     return () => sub.remove();
   }, []);
+
+  // ── Feature flags: fetch once per login, read from anywhere via useFeatureFlagStore ─────────
+  useEffect(() => {
+    if (authToken && authToken !== 'guest') {
+      useFeatureFlagStore.getState().load(authToken).catch(() => {});
+    }
+  }, [authToken]);
 
   // ── Push token: register on login, remove on logout ────────────────────────
   useEffect(() => {
@@ -52,10 +60,19 @@ export default function App() {
   useEffect(() => {
     const sub = addNotificationResponseReceivedListener((response: NotificationResponse) => {
       const data = response.notification.request.content.data as
-        | { screen?: string }
+        | { screen?: string; params?: string }
         | undefined;
       const screen = data?.screen;
       if (!screen) return;
+
+      // Milestone 9 (Notifications) - push payload destinationParams. Previously only the
+      // destination screen made it through; this mirrors NotificationCenterScreen.handleTap's
+      // JSON.parse(item.destinationParams) so a push tap can land on the specific record it was
+      // about (e.g. a specific appointment), not just the general screen.
+      let params: Record<string, unknown> | undefined;
+      if (data?.params) {
+        try { params = JSON.parse(data.params); } catch { params = undefined; }
+      }
 
       // Screens that live inside MainTabParamList (nested under the root's 'Main' screen), not
       // directly on RootStackParamList - same distinction NotificationCenterScreen's handleTap
@@ -75,10 +92,10 @@ export default function App() {
       const tryNavigate = () => {
         if (navigationRef.current?.isReady()) {
           if (NESTED_TAB_SCREENS.has(screen)) {
-            navigationRef.current.navigate('Main' as any, { screen } as any);
+            navigationRef.current.navigate('Main' as any, { screen, params } as any);
           } else {
             const route = ROOT_ALIASES[screen] ?? 'Main';
-            navigationRef.current.navigate(route as any);
+            navigationRef.current.navigate(route as any, params as any);
           }
         } else {
           setTimeout(tryNavigate, 300);
