@@ -7,8 +7,8 @@
  * destinationScreen, deep-links there - same "navigate then fall back to a safe screen on error"
  * pattern as HomeScreen's handleRecommendationAction.
  */
-import React, { useCallback, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, RefreshControl, FlatList } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, View, Text, Pressable, StyleSheet, ActivityIndicator, RefreshControl, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +38,14 @@ const TYPE_ICON: Record<NotificationTypeKey, keyof typeof Ionicons.glyphMap> = {
   MENTOR_REQUEST: 'people-outline',
   MENTOR_ACCEPTED: 'people-outline',
   MENTOR_DECLINED: 'people-outline',
+  COUNSELLOR_APPROVED: 'checkmark-done-outline',
+  COUNSELLOR_REJECTED: 'close-circle-outline',
+  COUNSELLOR_SUSPENDED: 'pause-circle-outline',
+  COUNSELLOR_REINSTATED: 'checkmark-done-outline',
+  MENTOR_APPROVED: 'checkmark-done-outline',
+  MENTOR_REJECTED: 'close-circle-outline',
+  MENTOR_DEACTIVATED: 'pause-circle-outline',
+  MENTOR_REACTIVATED: 'checkmark-done-outline',
   CRISIS_ALERT: 'alert-circle-outline',
   ARTICLE_PUBLISHED: 'newspaper-outline',
   EVENT_REMINDER: 'megaphone-outline',
@@ -58,20 +66,50 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-function NotificationRow({ item, onPress }: { item: NotificationView; onPress: () => void }) {
+function NotificationRow({
+  item,
+  index,
+  onPress,
+}: {
+  item: NotificationView;
+  index: number;
+  onPress: () => void;
+}) {
   const unread = !item.readAt;
+
+  // Notification-flow fix - the list previously appeared all at once with no motion, so a
+  // populated inbox and a "stuck" screen looked identical for a beat. A short, staggered
+  // fade+rise per row (capped so a long inbox doesn't feel sluggish) makes it obvious the screen
+  // is alive and actually rendering fetched data.
+  const enter = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 260,
+      delay: Math.min(index, 8) * 35,
+      useNativeDriver: true,
+    }).start();
+  }, [enter, index]);
+
   return (
-    <Pressable style={[s.row, unread && s.rowUnread]} onPress={onPress}>
-      <View style={[s.rowIcon, unread && s.rowIconUnread]}>
-        <Ionicons name={TYPE_ICON[item.type] ?? 'notifications-outline'} size={18} color={unread ? '#FFFFFF' : colors.lavender} />
-      </View>
-      <View style={s.rowText}>
-        <Text style={s.rowTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={s.rowBody} numberOfLines={2}>{item.body}</Text>
-        <Text style={s.rowTime}>{timeAgo(item.createdAt)}</Text>
-      </View>
-      {unread && <View style={s.unreadDot} />}
-    </Pressable>
+    <Animated.View
+      style={{
+        opacity: enter,
+        transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+      }}
+    >
+      <Pressable style={[s.row, unread && s.rowUnread]} onPress={onPress}>
+        <View style={[s.rowIcon, unread && s.rowIconUnread]}>
+          <Ionicons name={TYPE_ICON[item.type] ?? 'notifications-outline'} size={18} color={unread ? '#FFFFFF' : colors.lavender} />
+        </View>
+        <View style={s.rowText}>
+          <Text style={s.rowTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={s.rowBody} numberOfLines={2}>{item.body}</Text>
+          <Text style={s.rowTime}>{timeAgo(item.createdAt)}</Text>
+        </View>
+        {unread && <View style={s.unreadDot} />}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -82,11 +120,22 @@ export function NotificationCenterScreen({ navigation }: Props) {
   const notifications = useNotificationStore((s) => s.notifications);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const loading = useNotificationStore((s) => s.loading);
+  const error = useNotificationStore((s) => s.error);
   const load = useNotificationStore((s) => s.load);
   const markRead = useNotificationStore((s) => s.markRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
 
   const [refreshing, setRefreshing] = useState(false);
+
+  // Notification-flow fix - the screen's body used to fade in identically whether it ended up
+  // showing real notifications, an empty inbox, or a silent failure, so a load failure (bad
+  // connection, backend hiccup) looked exactly like "you have no notifications" - the screen
+  // "showing nothing" the user reported. Fading the whole body in on mount also makes opening the
+  // screen itself feel intentional rather than an instant, jarring swap.
+  const bodyFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(bodyFade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }, [bodyFade]);
 
   useFocusEffect(useCallback(() => { load(token); }, [load, token]));
 
@@ -131,26 +180,44 @@ export function NotificationCenterScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
-      {loading && notifications.length === 0 ? (
-        <View style={s.centerFill}><ActivityIndicator color={colors.lavender} /></View>
-      ) : !token || token === 'guest' ? (
-        <View style={s.centerFill}>
-          <Text style={s.emptyText}>Sign in to see your notifications.</Text>
-        </View>
-      ) : notifications.length === 0 ? (
-        <View style={s.centerFill}>
-          <Ionicons name="notifications-off-outline" size={36} color={colors.inkFaint} />
-          <Text style={s.emptyText}>Nothing here yet - you're all caught up.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 40 }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.lavender} />}
-          renderItem={({ item }) => <NotificationRow item={item} onPress={() => handleTap(item)} />}
-        />
-      )}
+      <Animated.View style={{ flex: 1, opacity: bodyFade }}>
+        {loading && notifications.length === 0 ? (
+          <View style={s.centerFill}><ActivityIndicator color={colors.lavender} /></View>
+        ) : !token || token === 'guest' ? (
+          <View style={s.centerFill}>
+            <Ionicons name="log-in-outline" size={36} color={colors.inkFaint} />
+            <Text style={s.emptyText}>Sign in to see your notifications.</Text>
+          </View>
+        ) : error && notifications.length === 0 ? (
+          // Notification-flow fix - this branch is new. Previously a failed load (allFailed in
+          // useNotificationStore.load) fell through to the exact same UI as a genuinely empty
+          // inbox, so a backend hiccup silently looked like "the notification tab shows nothing" -
+          // now it says so explicitly and offers a retry instead of leaving the user guessing.
+          <View style={s.centerFill}>
+            <Ionicons name="cloud-offline-outline" size={36} color={colors.inkFaint} />
+            <Text style={s.emptyText}>{error}</Text>
+            <Pressable style={s.retryBtn} onPress={() => load(token)} hitSlop={10}>
+              <Ionicons name="refresh" size={16} color={colors.lavender} />
+              <Text style={s.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : notifications.length === 0 ? (
+          <View style={s.centerFill}>
+            <Ionicons name="notifications-off-outline" size={36} color={colors.inkFaint} />
+            <Text style={s.emptyText}>Nothing here yet - you're all caught up.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 40 }]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.lavender} />}
+            renderItem={({ item, index }) => (
+              <NotificationRow item={item} index={index} onPress={() => handleTap(item)} />
+            )}
+          />
+        )}
+      </Animated.View>
     </View>
   );
 }
@@ -169,6 +236,12 @@ const s = StyleSheet.create({
   markAllTextDisabled: { color: colors.inkFaint },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
   emptyText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.inkFaint, textAlign: 'center' },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: spacing.xs, paddingVertical: spacing.xs, paddingHorizontal: spacing.md,
+    borderRadius: radii.pill, backgroundColor: 'rgba(167,139,250,0.12)',
+  },
+  retryText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.lavender },
 
   list: { padding: spacing.lg, gap: spacing.sm },
   row: {
