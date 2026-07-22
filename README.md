@@ -8,7 +8,8 @@ Built with **React Native**, **Expo SDK 54**, **TypeScript**, and **Spring Boot*
 ## Contributors
 - [Orleans-Barnes](https://github.com/Orleans-Barnes)
 - [kwakuOhene](https://github.com/kwakuOhene)
-
+- [Isaac-kusi]
+- (https://github.com/Isa123at)
 ---
 
 ## Prerequisites
