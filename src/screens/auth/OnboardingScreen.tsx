@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { fonts, fontSizes, spacing, radii, gradients, glow } from '@/theme/tokens';
@@ -29,7 +30,7 @@ const SLIDES = [
   {
     key: '1',
     gradient: gradients.onboard1,
-    emoji: '🌿',
+    icon: 'leaf' as const,
     title: 'Track your mood\ndaily',
     body: 'A 10-second check-in each day helps you spot patterns in how you feel — and what drives them.',
     orbColor1: 'rgba(95,158,124,0.18)',
@@ -38,7 +39,7 @@ const SLIDES = [
   {
     key: '2',
     gradient: gradients.onboard2,
-    emoji: '🧘',
+    icon: 'flower' as const,
     title: 'Breathe, reflect\n& grow',
     body: 'Guided sessions, a personal journal, and stress-relief tools — all in one place, just for you.',
     orbColor1: 'rgba(142,123,192,0.20)',
@@ -47,7 +48,7 @@ const SLIDES = [
   {
     key: '3',
     gradient: gradients.onboard3,
-    emoji: '🤝',
+    icon: 'people' as const,
     title: 'Never face it\nalone',
     body: 'Connect with trained counsellors and peer mentors who understand campus life.',
     orbColor1: 'rgba(92,138,230,0.16)',
@@ -202,7 +203,7 @@ export function OnboardingScreen({ navigation }: Props) {
           s.illustrationWrap,
           { opacity: emojiOp, transform: [{ scale: emojiScale }] },
         ]}>
-          <Text style={s.illustrationEmoji}>{slide.emoji}</Text>
+          <Ionicons name={slide.icon} size={72} color="#FFFFFF" />
         </Animated.View>
 
         {/* Title */}
@@ -241,7 +242,7 @@ export function OnboardingScreen({ navigation }: Props) {
                 end={{ x: 1, y: 0 }}
                 style={s.nextGrad}
               >
-                <Text style={s.nextTxt}>Let's begin 🌱</Text>
+                <Text style={s.nextTxt}>Let's begin</Text>
               </LinearGradient>
             ) : (
               <LinearGradient

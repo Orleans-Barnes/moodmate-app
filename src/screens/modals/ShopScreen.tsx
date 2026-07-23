@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Linking } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card } from '@/components/Card';
-import { Button } from '@/components/Button';
 import { ConfettiBurst, ConfettiHandle } from '@/components/Confetti';
 import { useWalletStore } from '@/state/useWalletStore';
 import { useWellnessStore } from '@/state/useWellnessStore';
@@ -20,12 +20,37 @@ import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
 type Props = NativeStackScreenProps<RootStackParamList, 'Shop'>;
 
 const BOOSTS = [
-  { key: 'streakFreeze' as const, icon: '🧊', name: 'Streak Freeze', sub: 'Protects your streak for one missed day', cost: 50 },
-  { key: 'doubleXp' as const, icon: '⚡', name: 'Double XP (24h)', sub: 'Earn 2× tree XP from every habit today', cost: 40 },
+  {
+    key: 'streakFreeze' as const,
+    icon: 'snow-outline' as const,
+    tint: '#E0F2FE',
+    iconColor: '#0284C7',
+    name: 'Streak Freeze',
+    sub: 'Protects your streak for one missed day',
+    cost: 50,
+  },
+  {
+    key: 'doubleXp' as const,
+    icon: 'flash' as const,
+    tint: '#FEF3C7',
+    iconColor: '#D97706',
+    name: 'Double XP (24h)',
+    sub: 'Earn 2× tree XP from every habit today',
+    cost: 40,
+  },
 ];
 
 function formatPesewas(pesewas: number): string {
   return `₵${Math.round(pesewas / 100)}`;
+}
+
+function LeafCost({ cost, tone }: { cost: number; tone?: 'active' }) {
+  return (
+    <View style={styles.leafCostRow}>
+      <Ionicons name="leaf" size={12} color={tone === 'active' ? colors.sage : colors.inkFaint} />
+      <Text style={[styles.leafCostText, tone === 'active' && styles.leafCostTextActive]}>{cost}</Text>
+    </View>
+  );
 }
 
 function SkinTile({
@@ -61,28 +86,47 @@ function SkinTile({
   };
 
   return (
-    <Animated.View
-      style={{
-        flex: 1,
-        transform: [{ translateX: shake.interpolate({ inputRange: [-1, 1], outputRange: [-4, 4] }) }],
-      }}
-    >
-      <Pressable
-        onPress={handlePress}
-        style={[styles.skinTile, skin.equipped && styles.skinTileActive, locked && styles.skinTileLocked]}
-      >
-        {locked && (
-          <View style={styles.skinLockBadge}>
-            <Text style={styles.skinLockBadgeTxt}>PRO</Text>
+    // Layout note: the percentage width lives on THIS wrapper, not on the Pressable inside it -
+    // combining `flex: 1` with a child `width: '31%'` (the previous version's bug) made Yoga
+    // compute that percentage against a flex-shrunk, content-sized box instead of the grid's real
+    // column width, which is what produced the illegibly narrow, letter-wrapped tiles.
+    <View style={styles.skinTileWrap}>
+      <Animated.View style={{ transform: [{ translateX: shake.interpolate({ inputRange: [-1, 1], outputRange: [-4, 4] }) }] }}>
+        <Pressable
+          onPress={handlePress}
+          style={[styles.skinTile, skin.equipped && styles.skinTileActive, locked && styles.skinTileLocked]}
+        >
+          {locked && (
+            <View style={styles.skinLockBadge}>
+              <Ionicons name="lock-closed" size={9} color={colors.surface} />
+              <Text style={styles.skinLockBadgeTxt}>PRO</Text>
+            </View>
+          )}
+          {skin.equipped && (
+            <View style={styles.skinEquippedBadge}>
+              <Ionicons name="checkmark" size={11} color={colors.surface} />
+            </View>
+          )}
+          <View style={[styles.skinPreview, skin.equipped && styles.skinPreviewActive, locked && styles.skinPreviewLocked]}>
+            <Text style={styles.skinEmoji}>{skin.emoji}</Text>
           </View>
-        )}
-        <Text style={[styles.skinEmoji, locked && styles.skinEmojiLocked]}>{skin.emoji}</Text>
-        <Text style={styles.skinName}>{skin.name}</Text>
-        <Text style={[styles.skinPrice, skin.equipped && styles.skinPriceActive]}>
-          {locked ? 'Pro only' : skin.equipped ? 'Equipped' : skin.cost > 0 ? (skin.owned ? 'Owned' : `🌱 ${skin.cost}`) : 'Free'}
-        </Text>
-      </Pressable>
-    </Animated.View>
+          <Text style={styles.skinName} numberOfLines={2}>{skin.name}</Text>
+          {locked ? (
+            <Text style={styles.skinStatusLocked}>Pro only</Text>
+          ) : skin.equipped ? (
+            <Text style={styles.skinStatusActive}>Equipped</Text>
+          ) : skin.cost > 0 ? (
+            skin.owned ? (
+              <Text style={styles.skinStatusOwned}>Owned</Text>
+            ) : (
+              <LeafCost cost={skin.cost} />
+            )
+          ) : (
+            <Text style={styles.skinStatusOwned}>Free</Text>
+          )}
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -128,7 +172,7 @@ export function ShopScreen({ navigation }: Props) {
         const outcome = await verifyPending(token);
         if (outcome === 'success') {
           confettiRef.current?.fire();
-          toast('Leaves added 🌱');
+          toast('Leaves added');
         } else if (outcome === 'failed') {
           toast('That payment didn’t go through — no leaves were charged.');
         }
@@ -152,7 +196,7 @@ export function ShopScreen({ navigation }: Props) {
     try {
       await equip(token, code);
       confettiRef.current?.fire();
-      toast('Tree skin updated 🌿');
+      toast('Tree skin updated');
       return true;
     } catch (err) {
       toast(err instanceof ApiRequestError ? err.message : 'Could not equip that skin.');
@@ -179,10 +223,10 @@ export function ShopScreen({ navigation }: Props) {
     try {
       if (key === 'streakFreeze') {
         await buyStreakShield(token);
-        toast('Streak Freeze activated 🥶');
+        toast('Streak Freeze activated');
       } else {
         await buyDoubleXpBoost(token);
-        toast('Double XP activated for 24h ⚡');
+        toast('Double XP activated for 24h');
       }
       confettiRef.current?.fire();
       await load(token);
@@ -231,19 +275,22 @@ export function ShopScreen({ navigation }: Props) {
                 accessibilityLabel="Purchase history"
                 hitSlop={8}
               >
-                <Text style={styles.historyBtnTxt}>🧾</Text>
+                <Ionicons name="receipt-outline" size={18} color={colors.ink} />
               </Pressable>
             }
           />
         </View>
+
         <View style={styles.balanceRow}>
           <View style={styles.leafBalance}>
-            <Text style={styles.leafBalanceText}>🌱 {leafBalance}</Text>
+            <Ionicons name="leaf" size={15} color={colors.sage} />
+            <Text style={styles.leafBalanceText}>{leafBalance} leaves</Text>
           </View>
         </View>
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Tree skins</Text>
+          <Text style={styles.sectionSub}>Change how your wellness tree looks</Text>
         </View>
         <View style={styles.skinGrid}>
           {skins.map((skin) => (
@@ -260,29 +307,48 @@ export function ShopScreen({ navigation }: Props) {
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Boosts</Text>
+          <Text style={styles.sectionSub}>Temporary power-ups for your streak and XP</Text>
         </View>
         {BOOSTS.map((boost) => {
           const isActive = boost.key === 'streakFreeze' ? hasStreakShield : doubleXpActive;
           const isBuying = buyingBoost === boost.key;
           return (
             <Card key={boost.key} style={styles.boostCard}>
-              <Text style={styles.boostIcon}>{boost.icon}</Text>
+              <View style={[styles.boostIconWrap, { backgroundColor: boost.tint }]}>
+                <Ionicons name={boost.icon} size={20} color={boost.iconColor} />
+              </View>
               <View style={styles.flex}>
                 <Text style={styles.boostName}>{boost.name}</Text>
                 <Text style={styles.boostSub}>{boost.sub}</Text>
               </View>
-              <Button
-                label={isActive ? 'Active' : isBuying ? 'Activating…' : `🌱 ${boost.cost}`}
-                variant="primary"
-                disabled={isActive || buyingBoost !== null}
-                onPress={() => handleBuyBoost(boost.key)}
-              />
+              {isActive ? (
+                <View style={styles.boostActivePill}>
+                  <Ionicons name="checkmark-circle" size={14} color={colors.sage} />
+                  <Text style={styles.boostActiveTxt}>Active</Text>
+                </View>
+              ) : (
+                <Pressable
+                  style={[styles.boostBuyBtn, buyingBoost !== null && styles.boostBuyBtnDisabled]}
+                  disabled={buyingBoost !== null}
+                  onPress={() => handleBuyBoost(boost.key)}
+                >
+                  {isBuying ? (
+                    <Text style={styles.boostBuyBtnTxt}>Activating…</Text>
+                  ) : (
+                    <>
+                      <Ionicons name="leaf" size={13} color="#FFFFFF" />
+                      <Text style={styles.boostBuyBtnTxt}>{boost.cost}</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
             </Card>
           );
         })}
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Get more leaves</Text>
+          <Text style={styles.sectionSub}>Top up your leaf balance</Text>
         </View>
         <View style={styles.leafGrid}>
           {leafPacks.map((pack) => (
@@ -292,7 +358,8 @@ export function ShopScreen({ navigation }: Props) {
               onPress={() => handleBuyLeaves(pack.code)}
               disabled={buyingPack !== null}
             >
-              <Text style={styles.leafAmt}>🌱 {pack.leaves}</Text>
+              <Ionicons name="leaf" size={22} color={colors.sage} style={styles.leafPackIcon} />
+              <Text style={styles.leafAmt}>{pack.leaves}</Text>
               <Text style={styles.leafCost}>
                 {buyingPack === pack.code ? 'Opening…' : formatPesewas(pack.pricePesewas)}
               </Text>
@@ -322,19 +389,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  historyBtnTxt: { fontSize: fontSizes.base },
-  leafBalance: { backgroundColor: colors.sageSoft, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radii.pill },
+  leafBalance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.sageSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+  },
   leafBalanceText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.sage },
-  sectionHead: { marginTop: spacing.md, marginBottom: spacing.sm },
+  sectionHead: { marginTop: spacing.lg, marginBottom: spacing.sm },
   sectionTitle: { fontFamily: fonts.bodyBold, fontSize: fontSizes.base + 2, color: colors.ink },
+  sectionSub: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkFaint, marginTop: 2 },
+
+  // Skin grid - two columns, generous card size (see SkinTile's comment for the layout bug this
+  // wrapper structure fixes).
   skinGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  skinTileWrap: { width: '48%' },
   skinTile: {
-    width: '31%',
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.line,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     position: 'relative',
   },
@@ -342,24 +421,68 @@ const styles = StyleSheet.create({
   skinTileLocked: { backgroundColor: colors.sunSoft, borderColor: colors.sunSoft },
   skinLockBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
     backgroundColor: colors.sun,
     borderRadius: radii.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   skinLockBadgeTxt: { fontFamily: fonts.bodyBold, fontSize: 8, color: colors.surface },
-  skinEmoji: { fontSize: 24, marginBottom: 5 },
-  skinEmojiLocked: { opacity: 0.5 },
-  skinName: { fontFamily: fonts.bodyBold, fontSize: 10.5, color: colors.ink },
-  skinPrice: { fontFamily: fonts.bodyBold, fontSize: 9, color: colors.inkFaint, marginTop: 3 },
-  skinPriceActive: { color: colors.sage },
+  skinEquippedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.sage,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skinPreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  skinPreviewActive: { backgroundColor: colors.surface },
+  skinPreviewLocked: { opacity: 0.6 },
+  skinEmoji: { fontSize: 32 },
+  skinName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.ink, textAlign: 'center' },
+  skinStatusActive: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.sage, marginTop: 5 },
+  skinStatusLocked: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.sunText, marginTop: 5 },
+  skinStatusOwned: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkFaint, marginTop: 5 },
+  leafCostRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
+  leafCostText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkFaint },
+  leafCostTextActive: { color: colors.sage },
+
   emptyText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.inkSoft },
+
   boostCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  boostIcon: { fontSize: 22 },
+  boostIconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   boostName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.ink },
   boostSub: { fontFamily: fonts.bodyMedium, fontSize: 10.5, color: colors.inkSoft, marginTop: 2 },
+  boostActivePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.sageSoft, borderRadius: radii.pill,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  boostActiveTxt: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.sage },
+  boostBuyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: colors.coral, borderRadius: radii.pill,
+    paddingHorizontal: 16, paddingVertical: 11,
+  },
+  boostBuyBtnDisabled: { opacity: 0.45 },
+  boostBuyBtnTxt: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: '#FFFFFF' },
+
   leafGrid: { flexDirection: 'row', gap: spacing.sm },
   leafPack: {
     flex: 1,
@@ -370,6 +493,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
+  leafPackIcon: { marginBottom: 4 },
   leafAmt: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.sage },
   leafCost: { fontFamily: fonts.bodyBold, fontSize: 10.5, color: colors.inkSoft, marginTop: 3 },
 });

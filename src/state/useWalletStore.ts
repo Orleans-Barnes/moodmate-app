@@ -10,6 +10,8 @@ interface WalletState {
   leafPacks: LeafPackView[];
   loading: boolean;
   pendingReference: string | null;
+  /** Data-isolation fix - see useWellnessStore.reset's doc comment for the full rationale. */
+  reset: () => void;
   load: (token: string) => Promise<void>;
   /** Returns true if the skin was already owned (no leaves spent). Throws ApiRequestError on insufficient balance. */
   equip: (token: string, code: string) => Promise<boolean>;
@@ -24,16 +26,24 @@ interface WalletState {
  * the backend's live catalog rather than hardcoded, so pricing always matches what checkout will
  * actually charge.
  */
-export const useWalletStore = create<WalletState>((set, get) => ({
+const INITIAL_STATE = {
   leafBalance: 0,
-  skins: [],
-  leafPacks: [],
+  skins: [] as SkinView[],
+  leafPacks: [] as LeafPackView[],
   loading: false,
-  pendingReference: null,
+  pendingReference: null as string | null,
+};
+
+export const useWalletStore = create<WalletState>((set, get) => ({
+  ...INITIAL_STATE,
+  reset: () => set({ ...INITIAL_STATE }),
   load: async (token) => {
     // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
     // setting loading:true so a guest doesn't get stuck on a loading state forever.
-    if (token === 'guest') return;
+    if (token === 'guest') {
+      set({ ...INITIAL_STATE });
+      return;
+    }
 
     set({ loading: true });
     try {

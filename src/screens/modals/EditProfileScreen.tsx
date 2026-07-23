@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView,
+  Animated, View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -15,7 +16,7 @@ import { useToast } from '@/state/useToast';
 import { deleteAvatar, updateMyProfile, uploadAvatar } from '@/api/auth';
 import { ApiRequestError } from '@/api/client';
 import { BACKEND_BASE_URL } from '@/config';
-import { hapticSuccess } from '@/utils/haptics';
+import { hapticSuccess, hapticSelection } from '@/utils/haptics';
 import { colors, fonts, fontSizes, radii, spacing, shadow } from '@/theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
@@ -34,6 +35,31 @@ const INSTITUTION_SUGGESTIONS = [
   'Other',
 ];
 
+// Student-view polish pass - a small reusable section header (icon + label, optional muted
+// sub-label) so every field on this screen shares one visual language instead of the previous
+// plain bold-text labels. Mirrors the section-header pattern already used on the redesigned
+// ShopScreen ("Tree skins" / "Boosts" / "Get more leaves").
+function SectionLabel({
+  icon,
+  text,
+  sub,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+  sub?: string;
+}) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      <View style={styles.sectionLabelIcon}>
+        <Ionicons name={icon} size={13} color={colors.blue} />
+      </View>
+      <Text style={styles.label}>
+        {text} {sub ? <Text style={styles.labelSub}>{sub}</Text> : null}
+      </Text>
+    </View>
+  );
+}
+
 export function EditProfileScreen({ navigation }: Props) {
   const user     = useAuthStore((s) => s.user);
   const token    = useAuthStore((s) => s.token);
@@ -49,6 +75,29 @@ export function EditProfileScreen({ navigation }: Props) {
   const [uploading, setUploading]       = useState(false);
   const [removingPhoto, setRemovingPhoto] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Student-view polish pass - the whole screen used to appear instantly with no motion, which
+  // read as flat next to the rest of the redesigned student flow (Shop, Profile). A single fade
+  // + gentle rise on mount is enough to make opening the screen feel intentional without being
+  // showy on a form the student will use often.
+  const contentFade = useRef(new Animated.Value(0)).current;
+  const contentRise = useRef(new Animated.Value(14)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(contentFade, { toValue: 1, duration: 320, useNativeDriver: true }),
+      Animated.spring(contentRise, { toValue: 0, friction: 9, tension: 60, useNativeDriver: true }),
+    ]).start();
+  }, [contentFade, contentRise]);
+
+  // Suggestions dropdown fade - was an instant show/hide, now eases in/out with the field.
+  const suggestFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(suggestFade, {
+      toValue: showSuggestions ? 1 : 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [showSuggestions, suggestFade]);
 
   // The URL to display — local pick preview takes priority, then server URL, then nothing
   const displayPhotoUri = localPhotoUri
@@ -152,7 +201,7 @@ export function EditProfileScreen({ navigation }: Props) {
 
       hapticSuccess();
       confettiRef.current?.fire();
-      toast('Profile updated ✨');
+      toast('Profile updated');
       navigation.goBack();
     } catch (err) {
       setUploading(false);
@@ -173,93 +222,108 @@ export function EditProfileScreen({ navigation }: Props) {
       >
         <ScreenHeader title="Edit Profile" onClose={() => navigation.goBack()} />
 
-        {/* ── Photo avatar ── */}
-        <View style={styles.photoSection}>
-          <Pressable style={styles.photoWrap} onPress={handlePhotoPress} disabled={removingPhoto || uploading}>
-            {displayPhotoUri ? (
-              <Image source={{ uri: displayPhotoUri }} style={styles.photo} />
-            ) : (
-              <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoEmoji}>{avatarEmoji}</Text>
+        <Animated.View style={{ opacity: contentFade, transform: [{ translateY: contentRise }] }}>
+          {/* ── Photo avatar ── */}
+          <View style={styles.photoSection}>
+            <Pressable style={styles.photoWrap} onPress={handlePhotoPress} disabled={removingPhoto || uploading}>
+              {displayPhotoUri ? (
+                <Image source={{ uri: displayPhotoUri }} style={styles.photo} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.photoEmoji}>{avatarEmoji}</Text>
+                </View>
+              )}
+              {/* Camera badge */}
+              <View style={styles.cameraBadge}>
+                <Ionicons name="camera" size={14} color="#FFFFFF" />
               </View>
-            )}
-            {/* Camera badge */}
-            <View style={styles.cameraBadge}>
-              <Text style={styles.cameraBadgeIcon}>📷</Text>
-            </View>
-            {(saving && uploading) || removingPhoto ? (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator color="#fff" />
-              </View>
-            ) : null}
-          </Pressable>
-          <Text style={styles.photoHint}>Tap to change photo</Text>
-        </View>
-
-        {/* ── Emoji avatar (fallback) ── */}
-        <Text style={styles.label}>Emoji avatar <Text style={styles.labelSub}>(shown when no photo)</Text></Text>
-        <View style={styles.avatarGrid}>
-          {AVATAR_OPTIONS.map((emoji) => (
-            <Pressable
-              key={emoji}
-              style={[styles.avatarOption, avatarEmoji === emoji && styles.avatarOptionActive]}
-              onPress={() => setAvatarEmoji(emoji)}
-            >
-              <Text style={styles.avatarEmoji}>{emoji}</Text>
+              {(saving && uploading) || removingPhoto ? (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              ) : null}
             </Pressable>
-          ))}
-        </View>
-
-        {/* ── Name ── */}
-        <Text style={styles.label}>Full name</Text>
-        <TextInput
-          style={styles.input}
-          value={fullName}
-          onChangeText={setFullName}
-          placeholder="Your name"
-          placeholderTextColor={colors.inkFaint}
-          autoCapitalize="words"
-        />
-
-        {/* ── Institution ── */}
-        <Text style={styles.label}>
-          Institution <Text style={styles.labelSub}>(optional)</Text>
-        </Text>
-        <TextInput
-          style={styles.input}
-          value={institution}
-          onChangeText={(t) => { setInstitution(t); setShowSuggestions(t.length > 0); }}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          placeholder="Your university or college"
-          placeholderTextColor={colors.inkFaint}
-          autoCapitalize="words"
-        />
-        {showSuggestions && (
-          <View style={styles.suggestions}>
-            {INSTITUTION_SUGGESTIONS
-              .filter((s) => s.toLowerCase().includes(institution.toLowerCase()))
-              .slice(0, 4)
-              .map((s) => (
-                <Pressable
-                  key={s}
-                  style={styles.suggestionRow}
-                  onPress={() => { setInstitution(s); setShowSuggestions(false); }}
-                >
-                  <Text style={styles.suggestionText}>{s}</Text>
-                </Pressable>
-              ))}
+            <Text style={styles.photoHint}>Tap to change photo</Text>
           </View>
-        )}
 
-        <Button
-          label={saving ? (uploading ? 'Uploading photo…' : 'Saving…') : 'Save changes'}
-          variant="primary"
-          fullWidth
-          disabled={!canSave}
-          onPress={handleSave}
-          style={styles.saveBtn}
-        />
+          {/* ── Emoji avatar (fallback) ── */}
+          <View style={styles.card}>
+            <SectionLabel icon="happy-outline" text="Emoji avatar" sub="(shown when no photo)" />
+            <View style={styles.avatarGrid}>
+              {AVATAR_OPTIONS.map((emoji) => {
+                const active = avatarEmoji === emoji;
+                return (
+                  <Pressable
+                    key={emoji}
+                    style={[styles.avatarOption, active && styles.avatarOptionActive]}
+                    onPress={() => { setAvatarEmoji(emoji); hapticSelection(); }}
+                  >
+                    <Text style={styles.avatarEmoji}>{emoji}</Text>
+                    {active && (
+                      <View style={styles.avatarCheckBadge}>
+                        <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* ── Name ── */}
+          <View style={styles.card}>
+            <SectionLabel icon="person-outline" text="Full name" />
+            <TextInput
+              style={styles.input}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Your name"
+              placeholderTextColor={colors.inkFaint}
+              autoCapitalize="words"
+            />
+          </View>
+
+          {/* ── Institution ── */}
+          <View style={styles.card}>
+            <SectionLabel icon="school-outline" text="Institution" sub="(optional)" />
+            <TextInput
+              style={styles.input}
+              value={institution}
+              onChangeText={(t) => { setInstitution(t); setShowSuggestions(t.length > 0); }}
+              onFocus={() => setShowSuggestions(institution.length > 0)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="Your university or college"
+              placeholderTextColor={colors.inkFaint}
+              autoCapitalize="words"
+            />
+            {showSuggestions && (
+              <Animated.View style={[styles.suggestions, { opacity: suggestFade }]}>
+                {INSTITUTION_SUGGESTIONS
+                  .filter((s) => s.toLowerCase().includes(institution.toLowerCase()))
+                  .slice(0, 4)
+                  .map((s) => (
+                    <Pressable
+                      key={s}
+                      style={styles.suggestionRow}
+                      onPress={() => { setInstitution(s); setShowSuggestions(false); }}
+                    >
+                      <Ionicons name="location-outline" size={14} color={colors.inkFaint} />
+                      <Text style={styles.suggestionText}>{s}</Text>
+                    </Pressable>
+                  ))}
+              </Animated.View>
+            )}
+          </View>
+
+          <Button
+            label={saving ? (uploading ? 'Uploading photo…' : 'Saving…') : 'Save changes'}
+            variant="primary"
+            fullWidth
+            disabled={!canSave}
+            onPress={handleSave}
+            style={styles.saveBtn}
+          />
+        </Animated.View>
       </ScrollView>
       <ConfettiBurst ref={confettiRef} />
     </View>
@@ -313,7 +377,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.bg,
   },
-  cameraBadgeIcon: { fontSize: 14 },
   uploadingOverlay: {
     position: 'absolute',
     inset: 0,
@@ -329,20 +392,44 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
 
+  // ── Section cards ─────────────────────────────────────────────
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadow.sm,
+  },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
+  sectionLabelIcon: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: colors.blueSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
   // ── Fields ────────────────────────────────────────────────────
-  label:       { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft, marginBottom: spacing.xs, marginTop: spacing.md },
+  label:       { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft },
   labelSub:    { fontFamily: fonts.bodyMedium, color: colors.inkFaint },
   avatarGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   avatarOption: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     borderWidth: 1.5, borderColor: colors.line,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarOptionActive: { borderColor: colors.blue, backgroundColor: colors.blueSoft },
   avatarEmoji: { fontSize: 20 },
+  avatarCheckBadge: {
+    position: 'absolute', top: -3, right: -3,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: colors.blue,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.surface,
+  },
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     borderWidth: 1.5,
     borderColor: colors.line,
     borderRadius: radii.md,
@@ -352,13 +439,17 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   suggestions: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     borderWidth: 1.5, borderColor: colors.line,
     borderRadius: radii.md,
-    marginTop: 4,
+    marginTop: spacing.xs,
     overflow: 'hidden',
   },
-  suggestionRow:  { paddingVertical: 11, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line },
+  suggestionRow:  {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 11, paddingHorizontal: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
   suggestionText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.ink },
-  saveBtn:        { marginTop: spacing.lg },
+  saveBtn:        { marginTop: spacing.sm },
 });

@@ -126,7 +126,7 @@ export function SignupScreen({ navigation }: Props) {
         institutionId: resolveInstitutionId(institution),
       });
       await setSession(token, refreshToken, user);
-      toast('Welcome to MoodMate! 🌱');
+      toast('Welcome to MoodMate!');
       navigation.replace('Onboarding');
     } catch (err) {
       toast(err instanceof ApiRequestError ? err.message : 'Could not create your account.');

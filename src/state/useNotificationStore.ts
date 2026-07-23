@@ -35,6 +35,9 @@ interface NotificationState {
   /** Optimistically marks every notification read locally, then confirms with the backend;
    * reverts the whole list on failure since there's no single row to isolate. */
   markAllRead: (token: string) => Promise<void>;
+
+  /** Data-isolation fix - see useWellnessStore.reset's doc comment for the full rationale. */
+  reset: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -42,6 +45,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   loading: false,
   error: null,
+  reset: () => set({ notifications: [], unreadCount: 0, loading: false, error: null }),
 
   load: async (token) => {
     // Guest users have no JWT - bail before hitting either endpoint, same pattern as

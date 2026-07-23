@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView, Platform, Animated, Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { resetPassword } from '@/api/auth';
@@ -129,7 +130,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       await resetPassword(email, otp, pw);
-      toast('Password updated! Sign in with your new password 🔐');
+      toast('Password updated! Sign in with your new password.');
       navigation.reset({ index: 0, routes: [{ name: 'RoleSelect' }] });
     } catch (err) {
       const msg = err instanceof ApiRequestError ? err.message : 'Could not reset password.';
@@ -154,7 +155,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
       <View style={s.body}>
         {/* Icon */}
         <View style={s.iconCircle}>
-          <Text style={s.iconEmoji}>{step === 'otp' ? '🔢' : '🔒'}</Text>
+          <Ionicons name={step === 'otp' ? 'keypad-outline' : 'lock-closed-outline'} size={32} color={colors.coral} />
         </View>
 
         {/* Heading */}
@@ -230,7 +231,7 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
                   onSubmitEditing={handleReset}
                 />
                 <Pressable style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                  <Text style={s.eyeIcon}>{showPw ? '🙈' : '👁️'}</Text>
+                  <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.inkFaint} />
                 </Pressable>
               </View>
               {pw.length > 0 && pw.length < 8 && (

@@ -4,16 +4,19 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { fonts, fontSizes, spacing, radii } from '@/theme/tokens';
 
 interface Props {
   message: string;
-  emoji?: string;
+  /** Student-view polish pass - replaced the old free-text `emoji` prop with a proper Ionicons
+   * glyph name, rendered in a small tinted circle rather than as raw emoji text. */
+  icon?: keyof typeof Ionicons.glyphMap;
   color?: string;
   onDismiss?: () => void;
 }
 
-export function MicroNudge({ message, emoji = '💡', color = '#5C8AE6', onDismiss }: Props) {
+export function MicroNudge({ message, icon = 'bulb-outline', color = '#5C8AE6', onDismiss }: Props) {
   const slideY  = useRef(new Animated.Value(-60)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [gone, setGone] = useState(false);
@@ -37,10 +40,12 @@ export function MicroNudge({ message, emoji = '💡', color = '#5C8AE6', onDismi
   return (
     <Animated.View style={[s.wrap, { transform: [{ translateY: slideY }], opacity }]}>
       <View style={[s.bar, { borderLeftColor: color }]}>
-        <Text style={s.emoji}>{emoji}</Text>
+        <View style={[s.iconWrap, { backgroundColor: `${color}1F` }]}>
+          <Ionicons name={icon} size={16} color={color} />
+        </View>
         <Text style={s.msg} numberOfLines={2}>{message}</Text>
         <Pressable style={s.close} onPress={dismiss} hitSlop={8}>
-          <Text style={s.closeX}>✕</Text>
+          <Ionicons name="close" size={14} color="#A7A1AC" />
         </Pressable>
       </View>
     </Animated.View>
@@ -57,8 +62,7 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  emoji: { fontSize: 20 },
+  iconWrap: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   msg:   { flex: 1, fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: '#2B2530', lineHeight: 18 },
   close: { padding: 2 },
-  closeX:{ fontFamily: fonts.bodyBold, fontSize: 12, color: '#A7A1AC' },
 });

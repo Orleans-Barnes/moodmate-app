@@ -13,13 +13,18 @@
  *   2. Immediately submits a peer mentor application (POST /api/support/mentor-applications)
  *   3. Shows a "pending approval" confirmation — same honesty level as the counsellor flow: an
  *      admin reviews and approves/rejects, no credential verification is claimed or implied.
+ *
+ * Student-view polish pass - redesigned alongside CounsellorSignupScreen: emoji icons replaced
+ * with Ionicons, added a fade+rise entrance and a per-step cross-fade so switching between
+ * Account/Profile doesn't hard-cut.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, ScrollView,
+  Animated, View, Text, Pressable, StyleSheet, ScrollView,
   TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { signup } from '@/api/auth';
@@ -30,6 +35,22 @@ import { colors, fonts, fontSizes, spacing, radii, shadow } from '@/theme/tokens
 type Props = NativeStackScreenProps<RootStackParamList, 'PeerMentorSignup'>;
 
 type Step = 'account' | 'profile' | 'done';
+
+const STEP_ICON: Record<Step, keyof typeof Ionicons.glyphMap> = {
+  account: 'leaf-outline',
+  profile: 'people-outline',
+  done: 'checkmark-circle',
+};
+
+// Fades the step content in whenever `stepKey` changes, without a full screen remount.
+function StepFade({ stepKey, children }: { stepKey: string; children: React.ReactNode }) {
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    fade.setValue(0);
+    Animated.timing(fade, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+  }, [stepKey, fade]);
+  return <Animated.View style={{ opacity: fade }}>{children}</Animated.View>;
+}
 
 export function PeerMentorSignupScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -46,6 +67,12 @@ export function PeerMentorSignupScreen({ navigation }: Props) {
 
   const [step, setStep]         = useState<Step>('account');
   const [loading, setLoading]   = useState(false);
+
+  // Screen-level entrance
+  const entrance = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(entrance, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+  }, [entrance]);
 
   // ── Step 1 validation ────────────────────────────────────────────────────
   const step1Ready =
@@ -93,7 +120,7 @@ export function PeerMentorSignupScreen({ navigation }: Props) {
           onPress={() => step === 'profile' ? setStep('account') : navigation.goBack()}
           hitSlop={12}
         >
-          <Text style={s.backIcon}>‹</Text>
+          <Ionicons name="chevron-back" size={20} color={colors.inkSoft} />
           <Text style={s.backTxt}>{step === 'profile' ? 'Back' : 'Back to login'}</Text>
         </Pressable>
       )}
@@ -103,89 +130,91 @@ export function PeerMentorSignupScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.iconCircle}>
-          <Text style={s.iconEmoji}>
-            {step === 'done' ? '✅' : step === 'profile' ? '🤝' : '💚'}
-          </Text>
-        </View>
-
-        <Text style={s.heading}>
-          {step === 'done'
-            ? 'Application submitted!'
-            : step === 'profile'
-            ? 'Your mentor profile'
-            : 'Apply as a peer mentor'}
-        </Text>
-        <Text style={s.sub}>
-          {step === 'done'
-            ? "Once an admin reviews and approves your application, you'll be able to log in as a peer mentor."
-            : step === 'profile'
-            ? "Tell students a bit about yourself. This appears on your mentor card."
-            : 'Create your account first, then tell us a bit about yourself.'}
-        </Text>
-
-        {step !== 'done' && (
-          <View style={s.pillRow}>
-            <View style={[s.pill, step === 'account' ? s.pillActive : s.pillDone]}>
-              <Text style={[s.pillTxt, step !== 'account' && s.pillTxtDone]}>1 Account</Text>
-            </View>
-            <View style={s.pillLine} />
-            <View style={[s.pill, step === 'profile' ? s.pillActive : s.pillInactive]}>
-              <Text style={[s.pillTxt, step !== 'profile' && s.pillTxtInactive]}>2 Profile</Text>
-            </View>
+        <Animated.View style={{ opacity: entrance }}>
+          <View style={s.iconCircle}>
+            <Ionicons name={STEP_ICON[step]} size={34} color={colors.sage} />
           </View>
-        )}
 
-        {step === 'account' && (
-          <>
-            <Field label="FULL NAME" value={fullName} onChangeText={setFullName}
-              placeholder="Ama Serwaa" autoCapitalize="words" />
-            <Field label="EMAIL" value={email} onChangeText={setEmail}
-              placeholder="you@example.com" autoCapitalize="none" keyboardType="email-address" />
-            <PasswordField label="PASSWORD (min 8 characters)" value={password}
-              onChangeText={setPassword} showPw={showPw} togglePw={() => setShowPw(v => !v)} />
+          <Text style={s.heading}>
+            {step === 'done'
+              ? 'Application submitted!'
+              : step === 'profile'
+              ? 'Your mentor profile'
+              : 'Apply as a peer mentor'}
+          </Text>
+          <Text style={s.sub}>
+            {step === 'done'
+              ? "Once an admin reviews and approves your application, you'll be able to log in as a peer mentor."
+              : step === 'profile'
+              ? "Tell students a bit about yourself. This appears on your mentor card."
+              : 'Create your account first, then tell us a bit about yourself.'}
+          </Text>
 
-            <Pressable
-              style={[s.btn, !step1Ready && s.btnDisabled]}
-              disabled={!step1Ready}
-              onPress={() => setStep('profile')}
-            >
-              <Text style={s.btnTxt}>Next: Your profile →</Text>
-            </Pressable>
-          </>
-        )}
-
-        {step === 'profile' && (
-          <>
-            <MultilineField label="BIO (min 20 characters)"
-              value={bio} onChangeText={setBio}
-              placeholder="Share a bit about yourself and why you want to support other students..." />
-            <Field label="FOCUS AREA (optional)"
-              value={focusArea} onChangeText={setFocusArea}
-              placeholder="e.g. First-year adjustment, exam stress" />
-
-            <Pressable
-              style={[s.btn, (!step2Ready || loading) && s.btnDisabled]}
-              disabled={!step2Ready || loading}
-              onPress={handleSubmit}
-            >
-              <Text style={s.btnTxt}>{loading ? 'Submitting…' : 'Submit application'}</Text>
-            </Pressable>
-          </>
-        )}
-
-        {step === 'done' && (
-          <>
-            <View style={s.infoBox}>
-              <Text style={s.infoText}>
-                📧 You'll receive confirmation once approved. Log in using the PEER MENTOR option on the role select screen.
-              </Text>
+          {step !== 'done' && (
+            <View style={s.pillRow}>
+              <View style={[s.pill, step === 'account' ? s.pillActive : s.pillDone]}>
+                <Text style={[s.pillTxt, step !== 'account' && s.pillTxtDone]}>1 Account</Text>
+              </View>
+              <View style={s.pillLine} />
+              <View style={[s.pill, step === 'profile' ? s.pillActive : s.pillInactive]}>
+                <Text style={[s.pillTxt, step !== 'profile' && s.pillTxtInactive]}>2 Profile</Text>
+              </View>
             </View>
-            <Pressable style={s.btn} onPress={() => navigation.replace('RoleSelect')}>
-              <Text style={s.btnTxt}>Back to login</Text>
-            </Pressable>
-          </>
-        )}
+          )}
+
+          {step === 'account' && (
+            <StepFade stepKey="account">
+              <Field label="FULL NAME" value={fullName} onChangeText={setFullName}
+                placeholder="Ama Serwaa" autoCapitalize="words" />
+              <Field label="EMAIL" value={email} onChangeText={setEmail}
+                placeholder="you@example.com" autoCapitalize="none" keyboardType="email-address" />
+              <PasswordField label="PASSWORD (min 8 characters)" value={password}
+                onChangeText={setPassword} showPw={showPw} togglePw={() => setShowPw(v => !v)} />
+
+              <Pressable
+                style={[s.btn, !step1Ready && s.btnDisabled]}
+                disabled={!step1Ready}
+                onPress={() => setStep('profile')}
+              >
+                <Text style={s.btnTxt}>Next: Your profile</Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+              </Pressable>
+            </StepFade>
+          )}
+
+          {step === 'profile' && (
+            <StepFade stepKey="profile">
+              <MultilineField label="BIO (min 20 characters)"
+                value={bio} onChangeText={setBio}
+                placeholder="Share a bit about yourself and why you want to support other students..." />
+              <Field label="FOCUS AREA (optional)"
+                value={focusArea} onChangeText={setFocusArea}
+                placeholder="e.g. First-year adjustment, exam stress" />
+
+              <Pressable
+                style={[s.btn, (!step2Ready || loading) && s.btnDisabled]}
+                disabled={!step2Ready || loading}
+                onPress={handleSubmit}
+              >
+                <Text style={s.btnTxt}>{loading ? 'Submitting…' : 'Submit application'}</Text>
+              </Pressable>
+            </StepFade>
+          )}
+
+          {step === 'done' && (
+            <StepFade stepKey="done">
+              <View style={s.infoBox}>
+                <Ionicons name="mail-outline" size={16} color="#1B4F3A" />
+                <Text style={s.infoText}>
+                  You'll receive confirmation once approved. Log in using the PEER MENTOR option on the role select screen.
+                </Text>
+              </View>
+              <Pressable style={s.btn} onPress={() => navigation.replace('RoleSelect')}>
+                <Text style={s.btnTxt}>Back to login</Text>
+              </Pressable>
+            </StepFade>
+          )}
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -233,7 +262,7 @@ function PasswordField({ label, value, onChangeText, showPw, togglePw }: {
           autoCorrect={false}
         />
         <Pressable style={s.eyeBtn} onPress={togglePw}>
-          <Text style={s.eyeIcon}>{showPw ? '🙈' : '👁️'}</Text>
+          <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.inkFaint} />
         </Pressable>
       </View>
     </View>
@@ -275,7 +304,6 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.md,
     paddingBottom: spacing.xs, alignSelf: 'flex-start',
   },
-  backIcon: { fontSize: 22, color: colors.inkSoft, lineHeight: 24 },
   backTxt:  { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.inkSoft },
 
   iconCircle: {
@@ -286,7 +314,6 @@ const s = StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadow.sm,
   },
-  iconEmoji: { fontSize: 36 },
 
   heading: {
     fontFamily: fonts.display,
@@ -341,13 +368,13 @@ const s = StyleSheet.create({
 
   pwRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   eyeBtn: { width: 44, height: 48, alignItems: 'center', justifyContent: 'center' },
-  eyeIcon: { fontSize: 18 },
 
   btn: {
+    flexDirection: 'row', gap: 6,
     backgroundColor: colors.sage,
     borderRadius: radii.pill,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center',
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
     ...shadow.sm,
@@ -359,12 +386,14 @@ const s = StyleSheet.create({
   },
 
   infoBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
     backgroundColor: colors.sageSoft,
     borderRadius: radii.md,
     padding: spacing.lg,
     marginBottom: spacing.xl,
   },
   infoText: {
+    flex: 1,
     fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm,
     color: '#1B4F3A',
     lineHeight: 22,

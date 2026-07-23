@@ -127,8 +127,15 @@ export function ProfileScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + spacing.lg }]}
       >
-        {/* Back/close */}
-        <Pressable onPress={() => navigation.goBack()} style={s.closeBtn} hitSlop={10}>
+        {/* Back/close - positioned relative to insets.top explicitly, not just the header's
+            paddingTop, since an absolutely-positioned child ignores its parent's padding and was
+            landing right under the status bar/notch (overlapping the battery icon on some
+            devices) before this fix. */}
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={[s.closeBtn, { top: insets.top + spacing.lg }]}
+          hitSlop={10}
+        >
           <Ionicons name="close" size={22} color="rgba(255,255,255,0.9)" />
         </Pressable>
 
@@ -136,8 +143,10 @@ export function ProfileScreen({ navigation }: Props) {
         <View style={s.avatarWrap}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={s.avatarImg} />
+          ) : user?.avatarEmoji ? (
+            <Text style={s.avatarEmoji}>{user.avatarEmoji}</Text>
           ) : (
-            <Text style={s.avatarEmoji}>{user?.avatarEmoji ?? '👤'}</Text>
+            <Ionicons name="person" size={44} color="rgba(255,255,255,0.85)" />
           )}
         </View>
 
@@ -331,9 +340,13 @@ const s = StyleSheet.create({
   },
   closeBtn: {
     position: 'absolute',
-    top: 0,
+    // top is set dynamically via insets.top at the call site - see the render's comment.
     right: spacing.lg,
-    paddingTop: spacing.lg,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // closeTxt removed — replaced by Ionicons close icon
   avatarWrap: {

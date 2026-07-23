@@ -4,6 +4,7 @@ import {
   TextInput, ScrollView, Dimensions, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, UserRole } from '@/navigation/types';
 import { useToast } from '@/state/useToast';
@@ -22,9 +23,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 const ROLE_THEME = {
   STUDENT: {
     bg: colors.bg,
-    heading: 'Welcome back 👋',
+    heading: 'Welcome back',
     sub: 'Your mental wellness journey continues',
-    divEmoji: '💚',
+    icon: 'leaf' as const,
     btnColor: colors.coral,
     shadowColor: '#8B5CF6',
     orbs: [
@@ -37,9 +38,9 @@ const ROLE_THEME = {
   },
   COUNSELLOR: {
     bg: '#F0F7FF',
-    heading: 'Counsellor Portal 💙',
+    heading: 'Counsellor Portal',
     sub: 'Support your students with care',
-    divEmoji: '💙',
+    icon: 'heart' as const,
     btnColor: '#1B6CA8',
     shadowColor: '#1B4F72',
     orbs: [
@@ -56,9 +57,9 @@ const ROLE_THEME = {
   // any other account, and MainRouter.tsx routes them to MentorTabs by their actual role afterward.
   MENTOR: {
     bg: '#F0FAF4',
-    heading: 'Peer Mentor 🌱',
+    heading: 'Peer Mentor',
     sub: 'Support fellow students, one conversation at a time',
-    divEmoji: '🌱',
+    icon: 'people' as const,
     btnColor: '#2D6A4F',
     shadowColor: '#1B4332',
     orbs: [
@@ -71,9 +72,9 @@ const ROLE_THEME = {
   },
   ADMIN: {
     bg: '#F5F3FF',
-    heading: 'Admin Access 🔑',
+    heading: 'Admin Access',
     sub: 'Platform management & oversight',
-    divEmoji: '🔑',
+    icon: 'key' as const,
     btnColor: '#4A1C96',
     shadowColor: '#2D1B69',
     orbs: [
@@ -85,10 +86,20 @@ const ROLE_THEME = {
     ],
   },
 } satisfies Record<UserRole, {
-  bg: string; heading: string; sub: string; divEmoji: string;
+  bg: string; heading: string; sub: string; icon: keyof typeof Ionicons.glyphMap;
   btnColor: string; shadowColor: string;
   orbs: { color: string; size: number; left: number; top: number }[];
 }>;
+
+// Student-view polish pass - was `roleEmojis` (🌿💙🌱🔑) rendered as raw text for the top logo
+// circle; now reuses each role's own themed Ionicons glyph for one consistent icon language
+// instead of a second, separate emoji map.
+const ROLE_ICON: Record<UserRole, keyof typeof Ionicons.glyphMap> = {
+  STUDENT: 'leaf',
+  COUNSELLOR: 'heart',
+  MENTOR: 'people',
+  ADMIN: 'key',
+};
 
 // ── Floating orb ─────────────────────────────────────────────────────────────
 function FloatingOrb({ color, size, left, top }: {
@@ -258,7 +269,6 @@ export function LoginScreen({ navigation, route }: Props) {
     }
   };
 
-  const roleEmojis: Record<UserRole, string> = { STUDENT: '🌿', COUNSELLOR: '💙', MENTOR: '🌱', ADMIN: '🔑' };
 
   return (
     <KeyboardAvoidingView style={[s.root, { backgroundColor: theme.bg }]}
@@ -286,7 +296,7 @@ export function LoginScreen({ navigation, route }: Props) {
         {/* Logo */}
         <Animated.View style={[s.logoWrap, slide(logoAnim, 40)]}>
           <Animated.View style={[s.logoCircle, { transform: [{ scale: breathe }] }]}>
-            <Text style={s.logoEmoji}>{roleEmojis[role]}</Text>
+            <Ionicons name={ROLE_ICON[role]} size={26} color={theme.btnColor} />
           </Animated.View>
           <Text style={s.brand}>MoodMate</Text>
           {role !== 'STUDENT' && (
@@ -305,7 +315,7 @@ export function LoginScreen({ navigation, route }: Props) {
         {/* Divider */}
         <Animated.View style={[s.divRow, slide(subAnim, 18)]}>
           <View style={s.divLine} />
-          <Text style={s.divEmoji}>{theme.divEmoji}</Text>
+          <View style={[s.divDot, { backgroundColor: theme.btnColor }]} />
           <View style={s.divLine} />
         </Animated.View>
 
@@ -328,7 +338,7 @@ export function LoginScreen({ navigation, route }: Props) {
             focusColor={theme.btnColor}
             rightSlot={
               <Pressable style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                <Text style={s.eyeIcon}>{showPw ? '🙈' : '👁️'}</Text>
+                <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.inkFaint} />
               </Pressable>
             }
           />
@@ -448,7 +458,7 @@ const s = StyleSheet.create({
     gap: spacing.sm,
   },
   divLine: { flex: 1, height: 1.5, borderRadius: 1, backgroundColor: '#E8D5C0' },
-  divEmoji: { fontSize: 20 },
+  divDot: { width: 7, height: 7, borderRadius: 3.5 },
 
   cardAnim: {
     width: SW - spacing.xl * 2,

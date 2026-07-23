@@ -34,6 +34,12 @@ interface DashboardState {
    * failed ones is preserved instead of blanking the whole dashboard (see refresh() below). */
   error: string | null;
 
+  /** Data-isolation fix - restores every field to its zeroed default, including latestMood/
+   * latestJournal/preferences which the guest-mode early-return in refresh() below never touched
+   * (it only reset loading/error), letting a previous account's dashboard data silently persist
+   * into a new guest session. */
+  reset: () => void;
+
   /**
    * Single refresh entry point - fetches all three sources in parallel, updates each field only
    * from a fulfilled promise (a failed one keeps whatever was there before), then recomputes the
@@ -48,19 +54,24 @@ interface DashboardState {
   refresh: (token: string, wellnessState?: RecommendationWellnessStateInput) => Promise<void>;
 }
 
-export const useDashboardStore = create<DashboardState>((set, get) => ({
-  latestMood: null,
-  latestJournal: null,
-  preferences: null,
+const INITIAL_STATE = {
+  latestMood: null as CheckInResponse | null,
+  latestJournal: null as JournalEntryView | null,
+  preferences: null as WellnessPreferenceResponse | null,
   recommendation: DEFAULT_RECOMMENDATION,
   loading: false,
-  error: null,
+  error: null as string | null,
+};
+
+export const useDashboardStore = create<DashboardState>((set, get) => ({
+  ...INITIAL_STATE,
+  reset: () => set({ ...INITIAL_STATE }),
 
   refresh: async (token, wellnessState) => {
     // Guest users have no JWT - bail before hitting any of these (prevents 401/403 spam), same
     // pattern as useWellnessStore.load().
     if (token === 'guest') {
-      set({ loading: false, error: null });
+      set({ ...INITIAL_STATE });
       return;
     }
 

@@ -16,7 +16,7 @@ import type { TabLayoutMode } from '@/state/useTabLayoutStore';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabs() {
-  const { mode, setMode } = useTabLayoutStore();
+  const { mode, setMode, hydrated } = useTabLayoutStore();
 
   // ── Mode picker shown on long-press of the expand/settings button ──────────
   const handleModeChange = useCallback(() => {
@@ -46,6 +46,7 @@ export function MainTabs() {
           <DynamicTabBar
             {...props}
             layoutMode={mode}
+            hydrated={hydrated}
             onRequestModeChange={handleModeChange}
           />
         )}

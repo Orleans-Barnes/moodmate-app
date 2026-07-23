@@ -4,17 +4,27 @@ import * as SecureStore from 'expo-secure-store';
 import { getMyAchievements, unlockAchievement } from '@/api/gamification';
 
 // ─── Secure storage adapter for Zustand persist ─────────────────────────────
+// Data-isolation fix (student-view polish pass) - this used to persist under one fixed key
+// ('moodmate_gamification') regardless of which account was signed in, so on a shared device
+// User A's XP/level/badges physically persisted to disk and got shown to User B (or Guest) after
+// login. Every read/write now goes through a scope-prefixed key instead; `scopeId` is switched via
+// switchGamificationScope() (exported below), called from useAuthStore on login/guest-switch/
+// logout - see that function's own doc comment for the full flow.
+let scopeId = 'guest';
+function scopedKey(name: string): string {
+  return `${scopeId}__${name}`;
+}
 const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    try { return await SecureStore.getItemAsync(name); }
+    try { return await SecureStore.getItemAsync(scopedKey(name)); }
     catch { return null; }
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    try { await SecureStore.setItemAsync(name, value); }
+    try { await SecureStore.setItemAsync(scopedKey(name), value); }
     catch { /* silent on storage full */ }
   },
   removeItem: async (name: string): Promise<void> => {
-    try { await SecureStore.deleteItemAsync(name); }
+    try { await SecureStore.deleteItemAsync(scopedKey(name)); }
     catch { /* ignore */ }
   },
 };
@@ -280,3 +290,27 @@ export const useGamificationStore = create<GamificationState>()(
     },
   ),
 );
+
+const GAMIFICATION_DEFAULTS = {
+  totalXp: 0,
+  unlockedBadges: [] as BadgeId[],
+  actionCounts: { checkins: 0, journals: 0, breathing: 0, posts: 0, gratitude: 0 } as ActionCounts,
+  moodGateLastDate: null as string | null,
+  missionCompletedDate: null as string | null,
+  newlyUnlockedBadge: null as BadgeId | null,
+  reminderEnabled: false,
+  reminderHour: 8,
+  reminderMinute: 0,
+};
+
+/** Data-isolation fix - call whenever the active account changes (real login, guest switch,
+ * logout) BEFORE anything else reads this store. Each account (and 'guest') gets its own
+ * SecureStore key via the scoped `secureStorage` adapter above, so switching scope means: reset
+ * in-memory state to defaults immediately (so no stale numbers flash on screen), then rehydrate
+ * from the new scope's own storage key - either that account's real saved XP/badges, or defaults
+ * if this is the first time this account has been used on this device. */
+export async function switchGamificationScope(newScopeId: string): Promise<void> {
+  scopeId = newScopeId;
+  useGamificationStore.setState({ ...GAMIFICATION_DEFAULTS });
+  await useGamificationStore.persist.rehydrate();
+}

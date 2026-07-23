@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileSetupStackParamList } from '@/navigation/types';
 import { colors, spacing, fonts, fontSizes } from '@/theme/tokens';
@@ -19,7 +20,9 @@ export function WelcomeScreen({ navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.xxxl, paddingBottom: insets.bottom + spacing.xl }]}>
       <View style={styles.content}>
-        <Text style={styles.emoji}>🌱</Text>
+        <View style={styles.iconWrap}>
+          <Ionicons name="leaf" size={30} color={colors.sage} />
+        </View>
         <Text style={styles.title}>Let's build your{'\n'}wellness space</Text>
         <Text style={styles.body}>
           A few quick questions help MoodMate personalize your check-ins, goals, and support —
@@ -47,8 +50,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  emoji: {
-    fontSize: 56,
+  iconWrap: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: colors.sageSoft,
+    alignItems: 'center', justifyContent: 'center',
     marginBottom: spacing.lg,
   },
   title: {

@@ -16,6 +16,7 @@ import {
   TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { signup } from '@/api/auth';
@@ -106,9 +107,11 @@ export function CounsellorSignupScreen({ navigation }: Props) {
       >
         {/* Icon */}
         <View style={s.iconCircle}>
-          <Text style={s.iconEmoji}>
-            {step === 'done' ? '✅' : step === 'profile' ? '🧠' : '💙'}
-          </Text>
+          <Ionicons
+            name={step === 'done' ? 'checkmark-circle' : step === 'profile' ? 'school-outline' : 'heart-outline'}
+            size={32}
+            color={colors.coral}
+          />
         </View>
 
         {/* Heading */}
@@ -187,8 +190,9 @@ export function CounsellorSignupScreen({ navigation }: Props) {
         {step === 'done' && (
           <>
             <View style={s.infoBox}>
+              <Ionicons name="mail-outline" size={16} color={colors.inkSoft} />
               <Text style={s.infoText}>
-                📧 You'll receive confirmation once approved. Log in using the COUNSELLOR option on the role select screen.
+                You'll receive confirmation once approved. Log in using the COUNSELLOR option on the role select screen.
               </Text>
             </View>
             <Pressable style={s.btn} onPress={() => navigation.replace('RoleSelect')}>
@@ -243,7 +247,7 @@ function PasswordField({ label, value, onChangeText, showPw, togglePw }: {
           autoCorrect={false}
         />
         <Pressable style={s.eyeBtn} onPress={togglePw}>
-          <Text style={s.eyeIcon}>{showPw ? '🙈' : '👁️'}</Text>
+          <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.inkFaint} />
         </Pressable>
       </View>
     </View>
@@ -367,12 +371,14 @@ const s = StyleSheet.create({
   },
 
   infoBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
     backgroundColor: '#E8F0FF',
     borderRadius: radii.md,
     padding: spacing.lg,
     marginBottom: spacing.xl,
   },
   infoText: {
+    flex: 1,
     fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm,
     color: '#1B4F72', lineHeight: 22,
   },

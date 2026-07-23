@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform, Animated, Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { forgotPassword } from '@/api/auth';
@@ -60,7 +61,7 @@ export function ForgotPasswordScreen({ navigation, route }: Props) {
       <View style={s.body}>
         {/* Icon */}
         <View style={s.iconCircle}>
-          <Text style={s.iconEmoji}>{sent ? '📬' : '🔐'}</Text>
+          <Ionicons name={sent ? 'mail-open-outline' : 'lock-closed-outline'} size={32} color={colors.coral} />
         </View>
 
         {/* Heading */}

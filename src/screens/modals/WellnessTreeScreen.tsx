@@ -80,7 +80,7 @@ export function WellnessTreeScreen({ navigation }: Props) {
       const streakIncremented = await toggleGoal(token, id);
       if (streakIncremented) {
         confettiRef.current?.fire();
-        toast(`Streak +1 — ${streakCount + 1} days now 🔥`);
+        toast(`Streak +1 — ${streakCount + 1} days now`);
       }
     } catch (err) {
       toast(err instanceof ApiRequestError ? err.message : 'Could not update that goal.');

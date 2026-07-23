@@ -168,9 +168,13 @@ function RoleCard({ item, onPress, delay }: {
             <Ionicons name="chevron-forward" size={18} color={item.badgeColor} />
           </View>
 
-          {/* Top: code-composed illustration — decorative, meaning is conveyed by the label/hint above */}
-          <View style={[s.illoCircle, { backgroundColor: item.iconBg }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-            <Illustration size={64} />
+          {/* Top: role photo — decorative, meaning is conveyed by the label/hint above */}
+          <View
+            style={[s.illoCircle, { backgroundColor: item.iconBg, borderColor: item.accentColor + '80' }]}
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+          >
+            <Illustration size={92} />
           </View>
 
           {/* Bottom: text block */}
@@ -383,9 +387,11 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   illoCircle: {
-    width: 92, height: 92, borderRadius: 28,
+    width: 92, height: 92, borderRadius: 46,
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
+    borderWidth: 2,
+    overflow: 'hidden',
   },
   cardText: { alignItems: 'center', gap: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, flexWrap: 'wrap' },

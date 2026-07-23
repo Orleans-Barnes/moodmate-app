@@ -68,12 +68,18 @@ const TODAY_LABEL = new Date().toLocaleDateString('en-US', {
   weekday: 'long', month: 'long', day: 'numeric',
 });
 
-function getNudge(streakCount: number, doneCount: number, totalGoals: number): { msg: string; emoji: string; color: string } | null {
+// Student-view polish pass - was `{ msg, emoji: string, color }`, rendered as raw emoji text
+// inside MicroNudge. Now returns an Ionicons glyph name so the banner renders a proper icon.
+function getNudge(
+  streakCount: number,
+  doneCount: number,
+  totalGoals: number,
+): { msg: string; icon: keyof typeof Ionicons.glyphMap; color: string } | null {
   const h = new Date().getHours();
-  if (streakCount === 0) return { msg: 'Start your streak today! Complete any activity to begin.', emoji: '🔥', color: '#F59E0B' };
-  if (streakCount > 0 && doneCount === 0 && h >= 18) return { msg: `Don't lose your ${streakCount}-day streak! Do one activity before midnight.`, emoji: '⚡', color: '#EF4444' };
-  if (totalGoals > 0 && doneCount === totalGoals) return { msg: 'All goals done! You\'re crushing it today 🎉', emoji: '🏆', color: '#5C8AE6' };
-  if (h >= 6 && h < 9) return { msg: 'Morning check-in sets the tone for your whole day.', emoji: '☀️', color: '#F59E0B' };
+  if (streakCount === 0) return { msg: 'Start your streak today! Complete any activity to begin.', icon: 'flame', color: '#F59E0B' };
+  if (streakCount > 0 && doneCount === 0 && h >= 18) return { msg: `Don't lose your ${streakCount}-day streak! Do one activity before midnight.`, icon: 'flash', color: '#EF4444' };
+  if (totalGoals > 0 && doneCount === totalGoals) return { msg: "All goals done! You're crushing it today.", icon: 'trophy', color: '#5C8AE6' };
+  if (h >= 6 && h < 9) return { msg: 'Morning check-in sets the tone for your whole day.', icon: 'sunny', color: '#F59E0B' };
   return null;
 }
 
@@ -504,7 +510,7 @@ export function HomeScreen({ navigation }: Props) {
       >
         <View style={s.headerTop}>
           <View>
-            <Text style={s.greeting}>{getGreeting()}, {firstName} 👋</Text>
+            <Text style={s.greeting}>{getGreeting()}, {firstName}</Text>
             <Text style={s.date}>{TODAY_LABEL}</Text>
           </View>
           <View style={s.headerActions}>
@@ -526,7 +532,11 @@ export function HomeScreen({ navigation }: Props) {
               style={s.avatarBtn}
               onPress={() => navigation.navigate('Profile')}
             >
-              <Text style={s.avatarEmoji}>{user?.avatarEmoji ?? '🙂'}</Text>
+              {user?.avatarEmoji ? (
+                <Text style={s.avatarEmoji}>{user.avatarEmoji}</Text>
+              ) : (
+                <Ionicons name="person" size={20} color="#FFFFFF" />
+              )}
             </Pressable>
           </View>
         </View>
@@ -597,14 +607,14 @@ export function HomeScreen({ navigation }: Props) {
           <>
             {badgeToast && (
               <MicroNudge
-                message={`🎉 Badge unlocked: "${badgeToast}"!`}
-                emoji="🏅"
+                message={`Badge unlocked: "${badgeToast}"!`}
+                icon="ribbon"
                 color="#F59E0B"
                 onDismiss={() => setBadgeToast(null)}
               />
             )}
             {!badgeToast && nudge && (
-              <MicroNudge message={nudge.msg} emoji={nudge.emoji} color={nudge.color} />
+              <MicroNudge message={nudge.msg} icon={nudge.icon} color={nudge.color} />
             )}
           </>
         )}
@@ -716,7 +726,7 @@ export function HomeScreen({ navigation }: Props) {
         </View>
         <View style={s.goalsCard}>
           {goals.length === 0 ? (
-            <Text style={s.emptyText}>No goals set yet - check your wellness tree 🌱</Text>
+            <Text style={s.emptyText}>No goals set yet - check your wellness tree</Text>
           ) : (
             goals.map((goal, i) => (
               <GoalRow key={goal.id} goal={goal} onToggle={handleToggle} isLast={i === goals.length - 1} />

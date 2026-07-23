@@ -11,7 +11,7 @@
  *   (switch between Dynamic and Standard modes)
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -133,6 +133,8 @@ function TabItem({ routeName, label, focused, widthAnim, onPress }: TabItemProps
 // ── Main component ────────────────────────────────────────────────────────────
 interface DynamicTabBarProps extends BottomTabBarProps {
   layoutMode: TabLayoutMode;
+  /** True once useTabLayoutStore has finished reading the persisted mode from AsyncStorage. */
+  hydrated: boolean;
   onRequestModeChange: () => void;
 }
 
@@ -141,8 +143,21 @@ export function DynamicTabBar({
   descriptors,
   navigation,
   layoutMode,
+  hydrated,
   onRequestModeChange,
 }: DynamicTabBarProps) {
+
+  // Bug fix - belt-and-suspenders on top of the useTabLayoutStore.ts fix: if `hydrated` somehow
+  // never flips true for any reason, the bottom nav bar must not stay invisible for the rest of
+  // the session (that's a severe UX failure - see this component's earlier bug where exactly
+  // that happened). Force the real bar to show after a bounded wait regardless of `hydrated`, so
+  // the worst case is a brief mode flip on cold start rather than a vanished nav bar.
+  const [forceShow, setForceShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setForceShow(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
+  const showRealBar = hydrated || forceShow;
 
   // ── Reveal animation (0 = Insights hidden, 1 = Insights visible) ───────────
   const revealAnim  = useRef(new Animated.Value(0)).current;
@@ -180,7 +195,34 @@ export function DynamicTabBar({
   // Overall bar slight scale breath on expand
   const barScaleAnim = useRef(new Animated.Value(1)).current;
 
+  // Tab-bar fix (student-view polish pass) - `barWidth` starts at a guessed value (SCREEN_W - 24)
+  // and is corrected once onBarLayout measures the real bar, shortly after mount. coreWidthAnim /
+  // slideWidthAnim were only ever seeded from the GUESS at useRef-init time and never re-synced,
+  // so every tab silently sat at a slightly wrong width for the rest of the session (the visible
+  // "tabs shift position" symptom). Snap both to the freshly measured width whenever barWidth
+  // changes, as long as a reveal/collapse animation isn't actively mid-flight (tracked below) —
+  // that guard keeps this from fighting the user's own expand/collapse gesture.
+  const isAnimatingRef = useRef(false);
+  useEffect(() => {
+    if (isAnimatingRef.current) return;
+    coreWidthAnim.setValue(revealedRef.current ? expandedCoreW(barWidth) : coreTabW(barWidth));
+    slideWidthAnim.setValue(
+      layoutMode === 'standard' ? barWidth / 6 : revealedRef.current ? expandedSlideW(barWidth) : 0,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barWidth, layoutMode]);
+
   const springReveal = useCallback((toRevealed: boolean) => {
+    // Tab-bar fix - guard against overlapping taps starting a second Animated.parallel before the
+    // first one settles, which is what produced the plus button's "blink" (two competing rotation/
+    // scale animations racing to different end values on the same Animated.Value nodes). Stop
+    // whatever is in flight first, so every springReveal call starts from a clean, current value.
+    coreWidthAnim.stopAnimation();
+    slideWidthAnim.stopAnimation();
+    btnRotAnim.stopAnimation();
+    barScaleAnim.stopAnimation();
+    revealAnim.stopAnimation();
+
     const toValue = toRevealed ? 1 : 0;
     revealedRef.current = toRevealed;
     setRevealed(toRevealed);
@@ -189,6 +231,7 @@ export function DynamicTabBar({
     const coreTarget  = toRevealed ? expandedCoreW(barWidth)  : coreTabW(barWidth);
     const slideTarget = toRevealed ? expandedSlideW(barWidth) : 0;
 
+    isAnimatingRef.current = true;
     Animated.parallel([
       // core tabs compress/expand
       Animated.spring(coreWidthAnim, {
@@ -208,7 +251,9 @@ export function DynamicTabBar({
         Animated.spring(barScaleAnim, { toValue: 1, friction: 5, tension: 150, useNativeDriver: true }),
       ]),
       Animated.timing(revealAnim, { toValue, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
-    ]).start();
+    ]).start(() => {
+      isAnimatingRef.current = false;
+    });
   }, [barWidth, coreTabW, expandedCoreW, expandedSlideW]);
 
   // ── PanResponder — swipe left/right to toggle ──────────────────────────────
@@ -249,6 +294,33 @@ export function DynamicTabBar({
     onRequestModeChange();
   };
 
+  // ── Standard-mode per-tab widths — memoized per route, see comment at call site below ────────
+  const standardWidthAnimsRef = useRef<Map<string, Animated.Value>>(new Map());
+  const getStandardWidthAnim = useCallback((key: string, width: number): Animated.Value => {
+    let anim = standardWidthAnimsRef.current.get(key);
+    if (!anim) {
+      anim = new Animated.Value(width);
+      standardWidthAnimsRef.current.set(key, anim);
+    } else {
+      anim.setValue(width);
+    }
+    return anim;
+  }, []);
+
+  // Tab-bar fix - `layoutMode` defaults to 'dynamic' the instant this component mounts, before
+  // useTabLayoutStore has had a chance to read the user's actually-persisted choice from
+  // AsyncStorage (that read is itself async). If the persisted choice turns out to be 'standard',
+  // the bar used to render dynamic first and then visibly flip to standard a beat later — the
+  // "navigation tab just changes position" symptom. Render a plain, static placeholder of the same
+  // height until hydration completes, then mount the real (correctly-moded) bar exactly once.
+  if (!showRealBar) {
+    return (
+      <View style={styles.outerWrap}>
+        <View style={[styles.bar, { opacity: 0 }]} />
+      </View>
+    );
+  }
+
   // ── In STANDARD mode, render all 6 tabs normally ─────────────────────────
   if (layoutMode === 'standard') {
     const stdW = barWidth / state.routes.length;
@@ -259,7 +331,12 @@ export function DynamicTabBar({
           <TabBarBg />
           {state.routes.map((route) => {
             const focused = route.name === activeRoute;
-            const staticW = new Animated.Value(stdW);
+            // Tab-bar fix - this used to be `new Animated.Value(stdW)` created fresh on every
+            // render (every navigation, every focus change), which threw away React's own
+            // reconciliation of the underlying native driver node each time and is what produced
+            // the visible "tabs shift" jump in standard mode. Reuse one memoized Animated.Value per
+            // route (created once via the ref map below) and just update it in place instead.
+            const staticW = getStandardWidthAnim(route.key, stdW);
             return (
               <TabItem
                 key={route.key}

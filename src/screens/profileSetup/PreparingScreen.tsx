@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileSetupStackParamList, RootStackParamList } from '@/navigation/types';
 import { colors, spacing, fonts, fontSizes } from '@/theme/tokens';
@@ -66,14 +67,16 @@ export function PreparingScreen({ navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.xxxl, paddingBottom: insets.bottom + spacing.xl }]}>
       <Animated.View style={[styles.content, { opacity: fade }]}>
-        <Text style={styles.emoji}>✨</Text>
+        <View style={styles.iconWrap}>
+          <Ionicons name="sparkles" size={30} color={colors.sage} />
+        </View>
         <Text style={styles.title}>Your wellness space is ready</Text>
         <View style={styles.stepsWrap}>
           {STEPS.map((label, i) => (
             <View key={label} style={styles.stepRow}>
-              <Text style={[styles.check, i <= doneStep && styles.checkDone]}>
-                {i <= doneStep ? '✓' : '·'}
-              </Text>
+              <View style={[styles.checkDot, i <= doneStep && styles.checkDotDone]}>
+                {i <= doneStep && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
+              </View>
               <Text style={[styles.stepLabel, i <= doneStep && styles.stepLabelDone]}>{label}</Text>
             </View>
           ))}
@@ -99,8 +102,10 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
   },
-  emoji: {
-    fontSize: 56,
+  iconWrap: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: colors.sageSoft,
+    alignItems: 'center', justifyContent: 'center',
     marginBottom: spacing.lg,
   },
   title: {
@@ -118,14 +123,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  check: {
-    width: 24,
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSizes.lg,
-    color: colors.inkFaint,
+  checkDot: {
+    width: 20, height: 20, borderRadius: 10, marginRight: 4,
+    borderWidth: 1.5, borderColor: colors.line,
+    alignItems: 'center', justifyContent: 'center',
   },
-  checkDone: {
-    color: colors.sage,
+  checkDotDone: {
+    backgroundColor: colors.sage,
+    borderColor: colors.sage,
   },
   stepLabel: {
     fontFamily: fonts.body,

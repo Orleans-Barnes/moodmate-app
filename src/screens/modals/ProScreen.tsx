@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -11,17 +13,20 @@ import { usePaymentsStore } from '@/state/usePaymentsStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useToast } from '@/state/useToast';
 import { ApiRequestError } from '@/api/client';
-import { colors, fonts, fontSizes, radii, spacing } from '@/theme/tokens';
+import { colors, fonts, fontSizes, gradients, radii, spacing } from '@/theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Pro'>;
 
-const FEATURES = [
-  { icon: '✨', text: 'Unlimited AI Coach conversations' },
-  { icon: '🧘', text: 'Full meditation & soundscape library' },
-  { icon: '📊', text: 'Deep wellness history & analytics' },
-  { icon: '🩺', text: 'Priority counsellor booking' },
-  { icon: '🎨', text: 'Exclusive tree skins' },
-  { icon: '🎮', text: 'Exclusive calming games' },
+// Student-view polish pass - was a raw emoji per row (✨🧘📊🩺🎨🎮), rendered as plain text at a
+// tiny 14px. Replaced with Ionicons in tinted circles, matching the icon-badge pattern used on
+// the redesigned Shop/EditProfile screens.
+const FEATURES: { icon: keyof typeof Ionicons.glyphMap; text: string }[] = [
+  { icon: 'sparkles',           text: 'Unlimited AI Coach conversations' },
+  { icon: 'flower-outline',     text: 'Full meditation & soundscape library' },
+  { icon: 'stats-chart',        text: 'Deep wellness history & analytics' },
+  { icon: 'medkit-outline',     text: 'Priority counsellor booking' },
+  { icon: 'color-palette-outline', text: 'Exclusive tree skins' },
+  { icon: 'game-controller-outline', text: 'Exclusive calming games' },
 ];
 
 function formatPrice(pesewas: number): string {
@@ -56,7 +61,7 @@ export function ProScreen({ navigation }: Props) {
       try {
         const outcome = await verifyPending(token);
         if (outcome === 'success') {
-          toast('You’re Pro — welcome aboard ✨');
+          toast('You’re Pro — welcome aboard');
         } else if (outcome === 'failed') {
           toast('That payment didn’t go through — you weren’t charged.');
         }
@@ -96,7 +101,7 @@ export function ProScreen({ navigation }: Props) {
     setStarting(true);
     try {
       await startTrial(token, activeCode);
-      toast('Free trial started — enjoy Pro for 7 days ✨');
+      toast('Free trial started — enjoy Pro for 7 days');
       navigation.goBack();
     } catch (err) {
       toast(err instanceof ApiRequestError ? err.message : 'Could not start your trial.');
@@ -127,9 +132,9 @@ export function ProScreen({ navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxxl }]}>
       <ScreenHeader title="MoodMate Pro" onClose={() => navigation.goBack()} />
 
-      <View style={styles.hero}>
-        <Text style={styles.heroEmoji}>⭐</Text>
-      </View>
+      <LinearGradient colors={gradients.sun} style={styles.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <Ionicons name="star" size={34} color="#FFFFFF" />
+      </LinearGradient>
       <Text style={styles.heroTitle}>Go deeper with Pro</Text>
       <Text style={styles.heroSub}>Unlock the full MoodMate experience</Text>
 
@@ -137,10 +142,13 @@ export function ProScreen({ navigation }: Props) {
         // Premium & Monetization (Milestone 3) - grace period. Still Pro, but flagged distinctly
         // so a payment-failure customer knows to fix billing before the grace window closes.
         <Card tint="sun" style={styles.statusCard}>
-          <Text style={styles.statusText}>
-            ⚠️ Your last payment didn't go through. You're still Pro until {formatDate(subscription.graceEndsAt)} —
-            renew now to avoid losing access.
-          </Text>
+          <View style={styles.statusRow}>
+            <Ionicons name="warning" size={16} color={colors.sunText} />
+            <Text style={styles.statusText}>
+              Your last payment didn't go through. You're still Pro until {formatDate(subscription.graceEndsAt)} —
+              renew now to avoid losing access.
+            </Text>
+          </View>
         </Card>
       )}
 
@@ -148,17 +156,23 @@ export function ProScreen({ navigation }: Props) {
         // Institution Management (Milestone 2, Step 3-4) - pro=true with no personal subscription
         // row at all means this is institution-license coverage, not an individual plan.
         <Card tint="sage" style={styles.statusCard}>
-          <Text style={styles.statusText}>🎓 You have Pro through your institution's license.</Text>
+          <View style={styles.statusRow}>
+            <Ionicons name="school" size={16} color={colors.sage} />
+            <Text style={styles.statusText}>You have Pro through your institution's license.</Text>
+          </View>
         </Card>
       )}
 
       {subscription.pro && subscription.status !== 'PAST_DUE' && subscription.status !== null && (
         <Card tint="sage" style={styles.statusCard}>
-          <Text style={styles.statusText}>
-            {subscription.status === 'TRIALING'
-              ? `✨ On your free trial — ends ${formatDate(subscription.trialEndsAt)}`
-              : `✅ You're a Pro member — renews ${formatDate(subscription.currentPeriodEnd)}`}
-          </Text>
+          <View style={styles.statusRow}>
+            <Ionicons name={subscription.status === 'TRIALING' ? 'sparkles' : 'checkmark-circle'} size={16} color={colors.sage} />
+            <Text style={styles.statusText}>
+              {subscription.status === 'TRIALING'
+                ? `On your free trial — ends ${formatDate(subscription.trialEndsAt)}`
+                : `You're a Pro member — renews ${formatDate(subscription.currentPeriodEnd)}`}
+            </Text>
+          </View>
         </Card>
       )}
 
@@ -172,7 +186,7 @@ export function ProScreen({ navigation }: Props) {
         {FEATURES.map((f, i) => (
           <View key={f.text} style={[styles.featureRow, i < FEATURES.length - 1 && styles.featureDivider]}>
             <View style={styles.featureIconWrap}>
-              <Text style={styles.featureIcon}>{f.icon}</Text>
+              <Ionicons name={f.icon} size={16} color={colors.sunText} />
             </View>
             <Text style={styles.featureText}>{f.text}</Text>
           </View>
@@ -249,43 +263,46 @@ const styles = StyleSheet.create({
     width: HERO_SIZE,
     height: HERO_SIZE,
     borderRadius: HERO_SIZE / 2,
-    backgroundColor: colors.sunSoft,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
     marginTop: spacing.xs,
+    shadowColor: colors.sun,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 6,
   },
-  heroEmoji: { fontSize: 32 },
   heroTitle: {
     fontFamily: fonts.display,
-    fontSize: fontSizes.xl,
+    fontSize: fontSizes.xxl,
     color: colors.ink,
     textAlign: 'center',
     marginTop: spacing.md,
   },
   heroSub: {
     fontFamily: fonts.bodyMedium,
-    fontSize: fontSizes.xs,
+    fontSize: fontSizes.sm,
     color: colors.inkSoft,
     textAlign: 'center',
     marginTop: 4,
     marginBottom: spacing.md,
   },
   statusCard: { marginBottom: spacing.md },
-  statusText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.ink },
+  statusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  statusText: { flex: 1, fontFamily: fonts.bodyBold, fontSize: fontSizes.base, color: colors.ink, lineHeight: 18 },
   featureCard: { paddingVertical: 4 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, paddingVertical: 9 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, paddingVertical: 11 },
   featureDivider: { borderBottomWidth: 1, borderBottomColor: colors.line },
   featureIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     backgroundColor: colors.sunSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureIcon: { fontSize: 14 },
-  featureText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, color: colors.ink, flex: 1 },
+  featureText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.md, color: colors.ink, flex: 1 },
   planRow: { flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.lg },
   planCard: {
     flex: 1,
@@ -306,14 +323,14 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radii.pill,
   },
-  planBadgeText: { fontFamily: fonts.bodyBold, fontSize: 8.5, color: colors.sunText },
-  planName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.inkSoft, marginBottom: 4 },
-  planPrice: { fontFamily: fonts.bodyBold, fontSize: fontSizes.lg, color: colors.ink },
-  planUnit: { fontFamily: fonts.bodyMedium, fontSize: 10, color: colors.inkFaint },
+  planBadgeText: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xs, color: colors.sunText },
+  planName: { fontFamily: fonts.bodyBold, fontSize: fontSizes.sm, color: colors.inkSoft, marginBottom: 4 },
+  planPrice: { fontFamily: fonts.bodyBold, fontSize: fontSizes.xl, color: colors.ink },
+  planUnit: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.xs, color: colors.inkFaint },
   trialButton: { marginTop: spacing.sm },
   fineprint: {
     fontFamily: fonts.bodyMedium,
-    fontSize: 10,
+    fontSize: fontSizes.xs,
     color: colors.inkFaint,
     textAlign: 'center',
     marginTop: spacing.sm,

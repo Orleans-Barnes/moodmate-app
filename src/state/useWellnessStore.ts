@@ -34,6 +34,10 @@ interface WellnessState {
   lastCompletedDate: string | null;
   goals: WellnessGoal[];
   loading: boolean;
+  /** Data-isolation fix - restores every field to its zeroed default. Called on logout/guest-
+   * switch so a new session never briefly renders the previous account's streak/XP/tree data
+   * (previously nothing ever cleared this store between accounts on a shared device). */
+  reset: () => void;
   load: (token: string) => Promise<void>;
   /** Returns whether this toggle was the one that completed all of today's goals (streak +1). */
   toggleGoal: (token: string, key: string) => Promise<boolean>;
@@ -63,18 +67,23 @@ function applyState(set: (partial: Partial<WellnessState>) => void, state: Welln
  * goals/treeXp/streak/treeSkin/leafBalance slice of the old local-only useAppState mock; Home,
  * Profile, WellnessTree, and Shop all read from here now so they show one consistent number.
  */
-export const useWellnessStore = create<WellnessState>((set) => ({
+const INITIAL_STATE = {
   treeXp: 0,
   treeXpMax: 1,
-  treeStage: 'Roots',
+  treeStage: 'Roots' as TreeStageLabel,
   treeSkinEmoji: '🌳',
   leafBalance: 0,
   streakCount: 0,
   hasStreakShield: false,
   doubleXpActiveUntil: null,
   lastCompletedDate: null,
-  goals: [],
+  goals: [] as WellnessGoal[],
   loading: false,
+};
+
+export const useWellnessStore = create<WellnessState>((set) => ({
+  ...INITIAL_STATE,
+  reset: () => set({ ...INITIAL_STATE }),
   load: async (token) => {
     // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
     // setting loading:true so a guest doesn't get stuck on a loading state forever (the old order

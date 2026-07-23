@@ -32,6 +32,8 @@ function fromApi(entry: JournalEntryView): JournalEntry {
 interface JournalState {
   entries: JournalEntry[];
   loading: boolean;
+  /** Data-isolation fix - see useWellnessStore.reset's doc comment for the full rationale. */
+  reset: () => void;
   load: (token: string) => Promise<void>;
   addEntry: (token: string, title: string, body: string, moodEmoji?: string) => Promise<void>;
   updateEntry: (token: string, id: string, title: string, body: string) => Promise<void>;
@@ -41,12 +43,16 @@ interface JournalState {
 export const useJournalStore = create<JournalState>((set, get) => ({
   entries: [],
   loading: false,
+  reset: () => set({ entries: [], loading: false }),
 
   load: async (token) => {
     // Guest users have no JWT — bail before hitting the real API (prevents 403). Checked before
     // setting loading:true so a guest's Journal tab doesn't get stuck on the skeleton forever (see
     // the identical fix applied to useSupportStore.load - this was the same copy-pasted bug).
-    if (token === 'guest') return;
+    if (token === 'guest') {
+      set({ entries: [], loading: false });
+      return;
+    }
 
     set({ loading: true });
     try {
