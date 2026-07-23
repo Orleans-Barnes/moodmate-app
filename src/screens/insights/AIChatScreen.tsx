@@ -189,7 +189,7 @@ export function AIChatScreen() {
   const recPulse = useRef(new Animated.Value(1)).current;
   const voiceRef = useRef<any>(null);
   const listRef  = useRef<FlatList>(null);
-  const keyboardHeight = useKeyboardOffset(insets.bottom);
+  const keyboardHeight = useKeyboardOffset();
 
   // Load history
   useEffect(() => {

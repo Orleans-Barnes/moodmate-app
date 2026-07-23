@@ -1,36 +1,34 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, KeyboardEvent, Platform } from 'react-native';
+import { Dimensions, Keyboard, KeyboardEvent, Platform } from 'react-native';
 
 /**
- * Live on-screen-keyboard height, driven directly by the OS keyboard show/hide events rather than
- * KeyboardAvoidingView's 'height'/'padding' 'behavior' prop.
+ * Live on-screen-keyboard overlap height, driven directly by the OS keyboard show/hide events
+ * rather than KeyboardAvoidingView's 'height'/'padding' 'behavior' prop.
  *
- * Why this exists: the three chat screens (ChatScreen, CounsellorChatScreen, AIChatScreen) each
- * had their composer stuck behind the keyboard instead of rising above it. The root cause is that
- * this app relies on Expo Go for local testing (see run_expo.bat / `npx expo start`), and Android's
- * `windowSoftInputMode="adjustResize"` - which app.json requests via
+ * Why this exists: the chat screens (ChatScreen, CounsellorChatScreen, MentorChatScreen,
+ * AIChatScreen) each had their composer stuck behind the keyboard instead of rising above it. The
+ * root cause is that this app relies on Expo Go for local testing (see run_expo.bat / `npx expo
+ * start`), and Android's `windowSoftInputMode="adjustResize"` - which app.json requests via
  * `expo.android.softwareKeyboardLayoutMode: "resize"` - is a native AndroidManifest setting that
  * ONLY takes effect in a custom dev/EAS build. Expo Go ships its own fixed manifest, so that
- * setting is silently ignored there, meaning nothing resizes the window on Android and
- * `behavior={undefined}` (what two of these screens used) does nothing. `behavior="height"` (what
- * the third screen used) is closer, but still depends on KeyboardAvoidingView correctly measuring
- * its own on-screen layout, which is fragile once a translucent status bar or nested flex
- * containers are involved.
+ * setting is silently ignored there, meaning nothing resizes the window on Android.
  *
- * Reading the raw Keyboard events and applying the height as explicit padding sidesteps all of
- * that - it works identically on iOS and Android, in Expo Go and in a native build, regardless of
- * status bar mode.
+ * First attempt here used `e.endCoordinates.height` directly, then tried subtracting
+ * `useSafeAreaInsets().bottom` to compensate for Expo SDK 54's mandatory Android edge-to-edge mode
+ * - both left a visible gap (in one direction or the other) between the composer and the
+ * keyboard's real top edge, because guessing at how much of the reported height overlaps the nav
+ * bar is fragile and device-dependent.
  *
- * @param androidNavBarInset On Android, this app runs under Expo SDK 54's mandatory edge-to-edge
- * mode, so content is drawn behind the system navigation bar and `useSafeAreaInsets().bottom`
- * reports its height. The keyboard's own reported height (`endCoordinates.height`) spans all the
- * way to the true bottom of the display - but the keyboard itself doesn't actually overlap the
- * nav bar, it sits just above it. Without subtracting the nav bar's height back out, the reserved
- * space above the keyboard ends up too tall, leaving a visible gap between the composer and the
- * keyboard's real top edge instead of sitting flush against it. Pass `insets.bottom` from the
- * caller; ignored on iOS, where the reported height is already exact.
+ * This version instead computes the overlap geometrically: `endCoordinates.screenY` is the
+ * keyboard's top edge, reported in "screen" coordinates - `Dimensions.get('screen')`, NOT
+ * `Dimensions.get('window')`. Those two differ on Android (window can exclude system chrome even
+ * in edge-to-edge mode); comparing screenY against 'window' silently under-counted the overlap,
+ * which is what let the keyboard actually cover the bottom of the composer on an Android phone.
+ * Matching the coordinate space gives the *exact* covered height with no guessing involved,
+ * regardless of nav bar height, edge-to-edge mode, or status bar translucency - if the keyboard
+ * visually starts at y=1400 and the screen is 2400px tall, it covers exactly 1000px, full stop.
  */
-export function useKeyboardOffset(androidNavBarInset: number = 0): number {
+export function useKeyboardOffset(): number {
   const [height, setHeight] = useState(0);
 
   useEffect(() => {
@@ -38,9 +36,15 @@ export function useKeyboardOffset(androidNavBarInset: number = 0): number {
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
-      const raw = e.endCoordinates?.height ?? 0;
-      const corrected = Platform.OS === 'android' ? Math.max(0, raw - androidNavBarInset) : raw;
-      setHeight(corrected);
+      const screenY = e.endCoordinates?.screenY;
+      if (typeof screenY === 'number') {
+        const screenHeight = Dimensions.get('screen').height;
+        setHeight(Math.max(0, screenHeight - screenY));
+      } else {
+        // Defensive fallback - screenY should always be present, but if some device/RN version
+        // ever omits it, fall back to the (less reliable) reported height rather than 0.
+        setHeight(e.endCoordinates?.height ?? 0);
+      }
     });
     const hideSub = Keyboard.addListener(hideEvent, () => setHeight(0));
 
@@ -48,7 +52,7 @@ export function useKeyboardOffset(androidNavBarInset: number = 0): number {
       showSub.remove();
       hideSub.remove();
     };
-  }, [androidNavBarInset]);
+  }, []);
 
   return height;
 }
