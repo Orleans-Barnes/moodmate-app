@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
   },
   chatBtnText: {
     flex: 1,
-    fontFamily: 'Baloo2-SemiBold',
+    fontFamily: fonts.displaySemibold,
     fontSize: 16,
     color: '#fff',
     letterSpacing: 0.2,

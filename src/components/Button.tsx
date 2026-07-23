@@ -11,7 +11,7 @@ import {
 import { colors, radii, fontSizes, fonts, spacing } from '@/theme/tokens';
 import { hapticLight } from '@/utils/haptics';
 
-type Variant = 'primary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost';
 
 interface ButtonProps {
   label: string;
@@ -56,13 +56,20 @@ export function Button({
         disabled={disabled}
         style={[
           styles.base,
-          variant === 'primary' ? styles.primary : styles.ghost,
+          variant === 'primary' ? styles.primary : variant === 'secondary' ? styles.secondary : styles.ghost,
           fullWidth && styles.fullWidth,
           style,
         ]}
       >
         <Text
-          style={[styles.label, variant === 'primary' ? styles.labelPrimary : styles.labelGhost]}
+          style={[
+            styles.label,
+            variant === 'primary'
+              ? styles.labelPrimary
+              : variant === 'secondary'
+              ? styles.labelSecondary
+              : styles.labelGhost,
+          ]}
         >
           {label}
         </Text>
@@ -77,7 +84,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 13,
     paddingHorizontal: 20,
-    borderRadius: radii.pill,
+    borderRadius: radii.md,
   },
   fullWidth: {
     width: '100%',
@@ -93,6 +100,9 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 4,
   },
+  secondary: {
+    backgroundColor: colors.sageSoft,
+  },
   ghost: {
     backgroundColor: colors.surface,
     borderWidth: 1.5,
@@ -104,6 +114,9 @@ const styles = StyleSheet.create({
   },
   labelPrimary: {
     color: '#FFFFFF',
+  },
+  labelSecondary: {
+    color: colors.ink,
   },
   labelGhost: {
     color: colors.ink,

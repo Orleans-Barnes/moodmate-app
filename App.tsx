@@ -4,8 +4,12 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
-import { Baloo2_700Bold, Baloo2_600SemiBold } from '@expo-google-fonts/baloo-2';
-import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 // Direct build imports — expo-notifications barrel re-exports don't resolve under
 // moduleResolution:bundler in TS 5.7; importing from the specific file works correctly.
 import { addNotificationResponseReceivedListener } from 'expo-notifications/build/NotificationsEmitter';
@@ -107,11 +111,10 @@ export default function App() {
   }, []);
 
   const [fontsLoaded] = useFonts({
-    'Baloo2-Bold':     Baloo2_700Bold,
-    'Baloo2-SemiBold': Baloo2_600SemiBold,
-    'DMSans-Regular':  DMSans_400Regular,
-    'DMSans-Medium':   DMSans_500Medium,
-    'DMSans-Bold':     DMSans_700Bold,
+    'PlusJakartaSans-Regular':  PlusJakartaSans_400Regular,
+    'PlusJakartaSans-Medium':   PlusJakartaSans_500Medium,
+    'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
+    'PlusJakartaSans-Bold':     PlusJakartaSans_700Bold,
   });
 
   if (!fontsLoaded) {

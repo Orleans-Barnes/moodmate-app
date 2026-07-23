@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
+import { radii, glass } from '@/theme/tokens';
 
 // Dynamic require so TypeScript doesn't error before expo-blur is installed.
 // Once you run `npx expo install expo-blur`, this will activate automatically.
@@ -34,9 +35,9 @@ interface GlassViewProps {
 export function GlassView({
   intensity = 55,
   tint = 'light',
-  overlayColor = 'rgba(255,255,255,0.14)',
-  borderColor = 'rgba(255,255,255,0.22)',
-  borderRadius = 18,
+  overlayColor = glass.lightFill,
+  borderColor = glass.lightBorder,
+  borderRadius = radii.xl,
   style,
   children,
 }: GlassViewProps) {
@@ -70,9 +71,9 @@ export function GlassView({
  */
 export function DarkGlassView({
   intensity = 40,
-  overlayColor = 'rgba(255,255,255,0.09)',
-  borderColor = 'rgba(255,255,255,0.18)',
-  borderRadius = 16,
+  overlayColor = glass.darkFill,
+  borderColor = glass.darkBorder,
+  borderRadius = radii.lg,
   style,
   children,
 }: Omit<GlassViewProps, 'tint'>) {

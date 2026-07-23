@@ -51,7 +51,7 @@ export function Card({ children, tint = 'none', onPress, style }: CardProps) {
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radii.md,
+    borderRadius: radii.xl,
     padding: spacing.lg,
     marginBottom: spacing.md,
   },
