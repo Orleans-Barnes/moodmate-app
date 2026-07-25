@@ -166,7 +166,7 @@ export function SupportScreen({ navigation }: Props) {
   return (
     <View style={styles.rootWrap}>
       <LinearGradient
-        colors={['#5C3D8F', '#8E7BC0', '#B8A8D8']}
+        colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.gradHeader, { paddingTop: insets.top + 12 }]}

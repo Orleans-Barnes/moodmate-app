@@ -295,7 +295,7 @@ export function CommunityScreen(_props: Props) {
     <View style={s.root}>
       {/* ── Header ── */}
       <LinearGradient
-        colors={['#1A0A2E', '#2D1478', '#3D1E8F']}
+        colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + spacing.md }]}

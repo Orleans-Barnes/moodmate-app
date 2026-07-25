@@ -27,9 +27,9 @@ type Props = CompositeScreenProps<
 >;
 
 const SESSIONS = [
-  { icon: 'body-outline',    name: 'Body scan',         time: '8 min', from: '#8E7BC0', to: '#ADA1D8', duration: 480 },
-  { icon: 'leaf-outline',    name: 'Anxiety release',  time: '6 min', from: '#5C8AE6', to: '#7BAEF5', duration: 360 },
-  { icon: 'sunny-outline',   name: 'Morning intention', time: '5 min', from: '#FFC857', to: '#FFD98C', duration: 300 },
+  { icon: 'body-outline',    name: 'Body scan',         time: '8 min', from: '#2A5C45', to: '#3D7A5C', duration: 480 },
+  { icon: 'leaf-outline',    name: 'Anxiety release',  time: '6 min', from: '#3D7A5C', to: '#5F9E7C', duration: 360 },
+  { icon: 'sunny-outline',   name: 'Morning intention', time: '5 min', from: '#D4A017', to: '#B8860B', duration: 300 },
 ];
 
 const GAMES = [
