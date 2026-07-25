@@ -1,122 +1,136 @@
 /**
- * Design tokens — MoodMate Premium Design System
- * Extended with: gradients, glassmorphism, glow shadows, animation constants
+ * Design tokens — MoodMate UI Polish
+ * Direction: clean white cards, deep forest green brand, elegant typography
+ * Inspired by reference UI + new two-tone sage/forest green "M" logo
  */
 
 export const colors = {
   // ── Backgrounds ──────────────────────────────────────────────────────────
-  bg: '#FAF7F2',            // warm cream (unified — was #FBF5EC / #F4F6F9)
+  bg: '#F4F7F5',
+  bgAlt: '#FFFFFF',
   surface: '#FFFFFF',
-  ink: '#2B2530',
-  inkSoft: '#6B6470',
-  inkFaint: '#A7A1AC',
+  surfaceAlt: '#F0F5F2',
 
-  // ── Brand palette ─────────────────────────────────────────────────────────
-  coral: '#FF6F4D',
-  coralDeep: '#E85A39',
-  coralSoft: '#FFE4DA',
-  coralLight: '#FFF0EC',
+  // ── Text ─────────────────────────────────────────────────────────────────
+  ink: '#1A2E25',
+  inkSoft: '#4A6355',
+  inkFaint: '#8FA99A',
+  inkInverse: '#FFFFFF',
 
-  blue: '#5C8AE6',
-  blueSoft: '#E3ECFC',
+  // ── Brand — forest green (matches new logo) ───────────────────────────────
+  primary: '#2A5C45',
+  primaryMid: '#3D7A5C',
+  primaryLight: '#5F9E7C',
+  primarySoft: '#E4EFE9',
+  primaryFaint: '#F0F7F3',
 
+  // ── Backwards compat aliases ──────────────────────────────────────────────
+  coral: '#2A5C45',
+  coralDeep: '#1E4433',
+  coralSoft: '#E4EFE9',
+  coralLight: '#F0F7F3',
   sage: '#5F9E7C',
-  sageSoft: '#E1F0E5',
+  sageSoft: '#E4EFE9',
+  lavender: '#2A5C45',
+  lavenderSoft: '#E4EFE9',
+  lavenderDeep: '#1E4433',
+  blue: '#1B8C6E',
+  blueSoft: '#D6EFE8',
+  sun: '#D4A017',
+  sunSoft: '#FEF3C7',
+  sunText: '#1A2E25',
 
-  lavender: '#8E7BC0',
-  lavenderSoft: '#EFE9F8',
-  lavenderDeep: '#6B5BA0',
+  // ── Accent ────────────────────────────────────────────────────────────────
+  accent: '#1B8C6E',
+  accentSoft: '#D6EFE8',
 
-  sun: '#FFC857',
-  sunSoft: '#FFF3D9',
-  sunText: '#5A4300',
+  // ── Status ────────────────────────────────────────────────────────────────
+  success: '#2A5C45',
+  warning: '#D4A017',
+  warningSoft: '#FEF3C7',
+  error: '#C0392B',
+  errorSoft: '#FDECEA',
 
-  line: 'rgba(43,37,48,0.10)',
-  shadow: 'rgba(43,37,48,0.12)',
+  // ── Neutrals ──────────────────────────────────────────────────────────────
+  border: 'rgba(42,92,69,0.12)',
+  borderStrong: 'rgba(42,92,69,0.22)',
+  divider: 'rgba(42,92,69,0.08)',
+  line: 'rgba(42,92,69,0.10)',
+  shadow: 'rgba(26,46,37,0.14)',
+  overlay: 'rgba(26,46,37,0.45)',
 } as const;
 
 // ── Gradient presets ────────────────────────────────────────────────────────
 export const gradients = {
-  // Auth backgrounds — dark but rich, not pitch black
-  dark:     ['#0D0D1A', '#0F1F2E', '#0D1B0F'] as const,
-  darkRich: ['#16103A', '#1E1050', '#0F1B30'] as const,
+  primary:    ['#2A5C45', '#3D7A5C'] as const,
+  primaryBtn: ['#2A5C45', '#1E4433'] as const,
+  header:     ['#1E3D2F', '#2A5C45', '#3D7A5C'] as const,
+  dark:       ['#0D1B12', '#1B3A2B', '#2A5C45'] as const,
+  darkRich:   ['#0A1F15', '#152E22', '#1B3A2B'] as const,
+  signup:     ['#2A5C45', '#3D7A5C', '#F4F7F5'] as const,
+  onboard1:   ['#0D1B12', '#1B3A2B', '#2A5C45'] as const,
+  onboard2:   ['#152E22', '#2A5C45', '#3D7A5C'] as const,
+  onboard3:   ['#0A1F15', '#1A3D2A', '#2E6B4F'] as const,
+  sage:       ['#5F9E7C', '#3D7A5C'] as const,
+  teal:       ['#1B8C6E', '#156B55'] as const,
+  warm:       ['#D4A017', '#B8860B'] as const,
 
-  // Home header — vibrant coral→purple brand gradient (warm, premium)
-  header:   ['#FF6F4D', '#C84895', '#7B3CC9'] as const,
-
-  // Brand CTAs
-  coral:    ['#FF6F4D', '#FF8F6F'] as const,
-  coralBtn: ['#FF6F4D', '#FF5C35'] as const,
-
-  // Card accents
-  sage:     ['#5F9E7C', '#3E8060'] as const,
-  lavender: ['#8E7BC0', '#6B5BA0'] as const,
-  sun:      ['#FFC857', '#FFB020'] as const,
-  blue:     ['#5C8AE6', '#3D6FD4'] as const,
-
-  // Signup header
-  signup:   ['#FF6F4D', '#FF9A7A', '#FFF5F2'] as const,
-
-  // Onboarding slides — rich but not pitch-black
-  onboard1: ['#0D1B12', '#1B3A2B', '#2D6A4F'] as const,  // warm forest green
-  onboard2: ['#16103A', '#2D1B69', '#6B3FA0'] as const,  // rich purple (not black)
-  onboard3: ['#0A1830', '#163060', '#1E4A8A'] as const,  // deep ocean blue
+  // Backwards compat
+  coral:      ['#2A5C45', '#3D7A5C'] as const,
+  coralBtn:   ['#2A5C45', '#1E4433'] as const,
+  lavender:   ['#5F9E7C', '#3D7A5C'] as const,
+  blue:       ['#1B8C6E', '#156B55'] as const,
+  sun:        ['#D4A017', '#B8860B'] as const,
 } as const;
 
 // ── Glassmorphism ───────────────────────────────────────────────────────────
 export const glass = {
-  // Light surfaces (on white/cream backgrounds)
-  lightFill:   'rgba(255,255,255,0.88)',
-  lightBorder: 'rgba(255,255,255,0.6)',
-
-  // Dark surfaces (on gradient/dark backgrounds)
-  darkFill:   'rgba(255,255,255,0.09)',
-  darkBorder: 'rgba(255,255,255,0.18)',
-
-  // Stat pills on dark header
-  statFill:   'rgba(255,255,255,0.12)',
-  statBorder: 'rgba(255,255,255,0.20)',
-
-  // Card overlay on light
-  cardFill:   'rgba(255,255,255,0.72)',
-  cardBorder: 'rgba(255,255,255,0.50)',
+  lightFill:   'rgba(255,255,255,0.90)',
+  lightBorder: 'rgba(255,255,255,0.65)',
+  darkFill:    'rgba(42,92,69,0.12)',
+  darkBorder:  'rgba(255,255,255,0.18)',
+  statFill:    'rgba(255,255,255,0.14)',
+  statBorder:  'rgba(255,255,255,0.22)',
+  cardFill:    'rgba(255,255,255,0.80)',
+  cardBorder:  'rgba(255,255,255,0.55)',
 } as const;
 
 // ── Glow / colored shadows ───────────────────────────────────────────────────
 export const glow = {
-  coral:    'rgba(255,111,77,0.28)',
+  primary:  'rgba(42,92,69,0.28)',
   sage:     'rgba(95,158,124,0.25)',
-  lavender: 'rgba(142,123,192,0.28)',
-  blue:     'rgba(92,138,230,0.28)',
-  sun:      'rgba(255,200,87,0.30)',
-  dark:     'rgba(8,8,15,0.45)',
+  teal:     'rgba(27,140,110,0.28)',
+  warm:     'rgba(212,160,23,0.30)',
+  dark:     'rgba(10,20,15,0.45)',
+
+  // Backwards compat
+  coral:    'rgba(42,92,69,0.28)',
+  lavender: 'rgba(95,158,124,0.25)',
+  blue:     'rgba(27,140,110,0.28)',
+  sun:      'rgba(212,160,23,0.30)',
 } as const;
 
 // ── Animation spring presets ─────────────────────────────────────────────────
 export const springs = {
-  // Snappy response (buttons, presses)
   fast:   { friction: 7,  tension: 180 } as const,
-  // Bouncy entry (cards, modals)
   bounce: { friction: 5,  tension: 120 } as const,
-  // Gentle float (background orbs)
   gentle: { friction: 12, tension: 60  } as const,
-  // Standard navigation
   nav:    { friction: 8,  tension: 150 } as const,
 } as const;
 
 // ── Timing (ms) ──────────────────────────────────────────────────────────────
 export const timing = {
-  shimmer:  700,
-  stagger:  40,    // per-letter stagger
-  cardEntry: 80,   // stagger between cards
-  orbCycle: 4000,  // float orb loop
+  shimmer:   700,
+  stagger:   40,
+  cardEntry: 80,
+  orbCycle:  4000,
 } as const;
 
 export const radii = {
-  sm: 12,
-  md: 18,
-  lg: 26,
-  xl: 30,
+  sm: 10,
+  md: 16,
+  lg: 22,
+  xl: 28,
   pill: 999,
 } as const;
 
@@ -130,63 +144,69 @@ export const spacing = {
   xxxl: 32,
 } as const;
 
-// NOTE: load 'Baloo2-Bold'/'Baloo2-SemiBold' and 'DMSans-Regular'/'DMSans-Medium'/'DMSans-Bold'
-// via expo-font (see App.tsx).
 export const fonts = {
-  display: 'Baloo2-Bold',
+  display:         'Baloo2-Bold',
   displaySemibold: 'Baloo2-SemiBold',
-  body: 'DMSans-Regular',
-  bodyMedium: 'DMSans-Medium',
-  bodyBold: 'DMSans-Bold',
+  body:            'DMSans-Regular',
+  bodyMedium:      'DMSans-Medium',
+  bodyBold:        'DMSans-Bold',
 } as const;
 
 export const fontSizes = {
-  xs: 10.5,
-  sm: 12,
-  base: 13,
-  md: 14,
-  lg: 16,
-  xl: 19,
-  xxl: 22,
+  xs:      10.5,
+  sm:      12,
+  base:    13,
+  md:      14,
+  lg:      16,
+  xl:      19,
+  xxl:     22,
   display: 26,
 } as const;
 
 export const shadow = {
   sm: {
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 4,   // Android — stronger than 2 to match iOS look
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.40,
+    shadowRadius: 6,
+    elevation: 3,
   },
   md: {
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.48,
-    shadowRadius: 16,
-    elevation: 10,  // Android
-  },
-  // Colored glow variants
-  coralGlow: {
-    shadowColor: glow.coral,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.44,
+    shadowRadius: 14,
     elevation: 8,
   },
-  lavenderGlow: {
-    shadowColor: glow.lavender,
-    shadowOffset: { width: 0, height: 8 },
+  primaryGlow: {
+    shadowColor: glow.primary,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowRadius: 18,
+    elevation: 7,
   },
   sageGlow: {
     shadowColor: glow.sage,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+
+  // Backwards compat
+  coralGlow: {
+    shadowColor: glow.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 7,
+  },
+  lavenderGlow: {
+    shadowColor: glow.sage,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 7,
   },
 } as const;
 
