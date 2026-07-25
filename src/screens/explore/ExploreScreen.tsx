@@ -181,7 +181,7 @@ export function ExploreScreen({ navigation }: Props) {
     <View style={s.root}>
       {/* ── Header ── */}
       <LinearGradient
-        colors={['#FF6F4D', '#C84895', '#7B3CC9']}
+        colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[s.header, { paddingTop: insets.top + spacing.md }]}
@@ -340,7 +340,7 @@ export function ExploreScreen({ navigation }: Props) {
 
         {/* ── Wellness Library banner ── */}
         <Pressable onPress={() => navigation.navigate('Resources')} style={s.libBanner}>
-          <LinearGradient colors={['#5B2FA0', '#C84895']}
+          <LinearGradient colors={['#2A5C45', '#3D7A5C']}
             style={s.libGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <View style={s.libLeft}>
               <View style={s.libIconWrap}><Ionicons name="library" size={22} color="#fff" /></View>

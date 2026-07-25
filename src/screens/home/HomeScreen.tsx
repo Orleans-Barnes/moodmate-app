@@ -42,10 +42,10 @@ type Props = CompositeScreenProps<
 >;
 
 const QUICK_ACTIONS = [
-  { key: 'breathe', icon: 'leaf-outline',    label: 'Breathe',  from: '#5C8AE6', to: '#7BAEF5', shadowColor: glow.blue },
-  { key: 'journal', icon: 'book-outline',    label: 'Journal',  from: '#5F9E7C', to: '#7DC4A0', shadowColor: glow.sage },
-  { key: 'explore', icon: 'compass-outline', label: 'Explore',  from: '#8E7BC0', to: '#ADA1D8', shadowColor: glow.lavender },
-  { key: 'checkin', icon: 'heart-outline',   label: 'Check in', from: '#FF6F4D', to: '#FF9A80', shadowColor: glow.coral },
+  { key: 'breathe', icon: 'leaf-outline',    label: 'Breathe',  from: '#2A5C45', to: '#3D7A5C', shadowColor: glow.blue },
+  { key: 'journal', icon: 'book-outline',    label: 'Journal',  from: '#3D7A5C', to: '#5F9E7C', shadowColor: glow.sage },
+  { key: 'explore', icon: 'compass-outline', label: 'Explore',  from: '#1B8C6E', to: '#2A5C45', shadowColor: glow.lavender },
+  { key: 'checkin', icon: 'heart-outline',   label: 'Check in', from: '#5F9E7C', to: '#3D7A5C', shadowColor: glow.coral },
 ] as const;
 
 const JOURNEY_STAGES = ['Roots', 'Sprout', 'Bloom', 'Canopy'];

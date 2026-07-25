@@ -218,7 +218,7 @@ export function InsightsScreen() {
   if (!token || token === 'guest') {
     return (
       <View style={[styles.container, styles.centered]}>
-        <LinearGradient colors={['#4B2D8A', '#7B3CC9', '#C84895']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['#1E3D2F', '#2A5C45', '#3D7A5C']} style={StyleSheet.absoluteFill} />
         <View style={styles.guestCard}>
           <Ionicons name="sparkles" size={48} color={colors.lavender} />
           <Text style={styles.guestTitle}>AI Insights</Text>
@@ -237,7 +237,7 @@ export function InsightsScreen() {
     <View style={styles.container}>
       {/* ── Gradient header ── */}
       <LinearGradient
-        colors={['#3B1F7A', '#6B2FA0', '#C84895']}
+        colors={['#1E3D2F', '#2A5C45', '#3D7A5C']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 16 }]}
@@ -388,7 +388,7 @@ export function InsightsScreen() {
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={["#7B3CC9", "#C84895"]}
+                colors={["#2A5C45", "#3D7A5C"]}
                 style={styles.chatBtnGrad}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               >

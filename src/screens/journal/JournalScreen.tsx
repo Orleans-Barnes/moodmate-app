@@ -39,14 +39,14 @@ const TEMPLATES = [
   {
     icon: 'clipboard-outline', name: 'Daily reflection',
     sub: 'Reflect on your day',
-    from: '#4A7FD4', to: '#6BAAF5',
+    from: '#2A5C45', to: '#3D7A5C',
     glowColor: 'rgba(92,138,230,0.45)',
     accent: '#D9E8FF',
   },
   {
     icon: 'school-outline', name: 'Exam stress',
     sub: 'Write through pressure',
-    from: '#E85A30', to: '#FF8A65',
+    from: '#3D7A5C', to: '#5F9E7C',
     glowColor: 'rgba(255,111,77,0.45)',
     accent: '#FFE4DC',
   },
