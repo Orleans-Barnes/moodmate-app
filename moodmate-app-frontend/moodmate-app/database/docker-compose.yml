@@ -1,0 +1,41 @@
+# MoodMate — local Postgres for development.
+#
+# Every backend microservice owns its own schema inside ONE shared "moodmate" database (see each
+# service's application.yml, e.g. `currentSchema=journal`, `currentSchema=support`, etc.), and each
+# service creates its own schema automatically on first boot via Flyway (`create-schemas: true`,
+# `baseline-on-migrate: true`) — nobody needs to hand-run any SQL. This file's only job is to give
+# every teammate the exact same Postgres instance (version, port, user, password, database name) so
+# nobody's local schema drifts from what the code expects, and so nobody has to install/configure
+# Postgres by hand.
+#
+# Usage:
+#   cd database
+#   docker compose up -d        # starts Postgres in the background
+#   docker compose down         # stops it (data persists in the named volume below)
+#   docker compose down -v      # stops it AND wipes all data (fresh start)
+#
+# Postgres 17 is used deliberately, not 18 — Flyway's own startup log already warns
+# "PostgreSQL 18.4 is newer than this version of Flyway and support has not been tested" against a
+# host-installed Postgres 18. Pinning the team's Docker Postgres to 17 avoids that mismatch for
+# everyone, even if an individual's own machine happens to have a newer Postgres installed globally.
+services:
+  postgres:
+    image: postgres:17
+    container_name: moodmate-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: moodmate
+      POSTGRES_USER: moodmate
+      POSTGRES_PASSWORD: moodmate
+    ports:
+      - "5432:5432"
+    volumes:
+      - moodmate_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moodmate -d moodmate"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  moodmate_pg_data:

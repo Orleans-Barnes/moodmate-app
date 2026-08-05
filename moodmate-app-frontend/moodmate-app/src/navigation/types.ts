@@ -1,0 +1,134 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+// Phase 1G - added MENTOR alongside COUNSELLOR/ADMIN, routed to MentorTabs by MainRouter.tsx.
+export type UserRole = 'STUDENT' | 'COUNSELLOR' | 'MENTOR' | 'ADMIN';
+
+export type MainTabParamList = {
+  Home: undefined;
+  Journal: undefined;
+  Explore: undefined;
+  Community: undefined;
+  Insights: undefined;
+  Support: undefined;
+};
+
+export type CounsellorTabParamList = {
+  Dashboard: undefined;
+  Appointments: undefined;
+  Conversations: undefined;
+  CounsellorProfile: undefined;
+};
+
+// Phase 1G - no Appointments tab: peer mentors don't do bookings, only requests + messaging.
+export type MentorTabParamList = {
+  Dashboard: undefined;
+  Conversations: undefined;
+  CounsellorProfile: undefined;
+};
+
+export type RootStackParamList = {
+  Splash: undefined;
+  RoleSelect: undefined;
+  Login: { role: UserRole };
+  Signup: undefined;
+  PrivacyPolicy: undefined;
+  Onboarding: undefined;
+  ProfileSetup: undefined;
+  Main: undefined | NavigatorScreenParams<MainTabParamList>;
+  AdminSetup: undefined;
+  CounsellorSignup: undefined;
+  CounsellorOrMentor: undefined;
+  PeerMentorSignup: undefined;
+  ForgotPassword: { email?: string };
+  ResetPassword: { email: string };
+  AdminDashboard: undefined;
+  AdminUserManagement: undefined;
+  AdminCounsellorMentorManagement: undefined;
+  AdminWellnessContent: undefined;
+  AdminModeration: undefined;
+  AdminSystemSettings: undefined;
+  AdminAuditLog: undefined;
+  AdminInstitutionManagement: undefined;
+  AdminRevenue: undefined;
+  AdminReports: undefined;
+  CollaborationHub: undefined;
+  EscalateCase: undefined;
+
+  CounsellorChat: { conversationId: number; studentName: string; studentUserId?: number };
+  MentorChat: { conversationId: number; studentName: string };
+  Chat: {
+    conversationId: number;
+    otherPartyName: string;
+    otherPartyRole: 'COUNSELLOR' | 'MENTOR';
+    otherPartyId?: number;
+  };
+  CounsellorDetail: { counsellorId: number };
+
+  // Phase 1F-B - the screen itself reads the logged-in role from useAuthStore to decide whether
+  // to call the student or counsellor meeting-credentials endpoint, so no role flag is needed here.
+  VideoSession: { appointmentId: number; otherPartyName: string };
+
+  CheckIn: undefined;
+  WellnessTree: undefined;
+  GratitudeJar: undefined;
+  // "emoji" (not the Ionicons icon name used on the template card) - this is shown in the entry
+  // header and sent to the backend as moodEmoji, which is a VARCHAR(10) column, so it must stay a
+  // short real emoji, never an Ionicons identifier like "clipboard-outline" (that mismatch used to
+  // cause "value too long for type character varying(10)" / a 409 on every template-based save).
+  JournalEntry: { template: string; emoji: string };
+  JournalVoice: undefined;
+  JournalView: { id: string; title: string; body: string; moodEmoji: string | null; date: string };
+  MentalHealthArticle: undefined;
+  MentalHealthQuestionnaireIntro: undefined;
+  MentalHealthQuestionnaire: undefined;
+  CaringMentalHealthArticle: undefined;
+  CommonConcernsArticle: undefined;
+  LearningMentalHealthArticle: undefined;
+  EmotionMoodArticle: undefined;
+  BreathingSession: { session: string; duration: number };
+  SOS: undefined;
+  Profile: undefined;
+  EditProfile: undefined;
+  MoodHistory: undefined;
+  Pro: undefined;
+  Shop: undefined;
+  PurchaseHistory: undefined;
+  Hub: undefined;
+  Game: undefined;
+  BubblePop: undefined;
+  Grounding: undefined;
+  MoodGate: undefined;
+  MoodSuggest: { moodScore: number };
+  WorryBox: undefined;
+  SafePlace: undefined;
+  ProudDandelion: undefined;
+  AiChat: undefined;
+  Resources: undefined;
+  ThoughtDiary: undefined;
+  HabitTracker: undefined;
+  SleepTracker: undefined;
+  PrivacyData: undefined;
+  HelpSupport: undefined;
+  NotificationPreferences: undefined;
+  NotificationCenter: undefined;
+  CommunityPostDetail: { postId: number; author: string; time: string; text: string; isOwn: boolean };
+  Academy: { isSignupFlow?: boolean; token?: string; email?: string } | undefined;
+  StoryPacks: undefined;
+};
+
+export type ProfileSetupStackParamList = {
+  Welcome: undefined;
+  Programme: undefined;
+  YearOfStudy: undefined;
+  WellnessGoals: undefined;
+  Challenges: undefined;
+  PreferredSupport: undefined;
+  Preparing: undefined;
+};
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace ReactNavigation {
+    interface RootParamList extends RootStackParamList {}
+  }
+}

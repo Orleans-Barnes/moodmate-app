@@ -1,0 +1,130 @@
+server:
+  port: ${PORT:8093}
+
+spring:
+  # Loads the repo-root .env file as real Spring properties - see moodmate-gateway/application.yml's
+  # spring.config.import comment for the full root-cause explanation this fixes across every service.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: moodmate-support
+  datasource:
+    # Shared Postgres instance, own schema - see moodmate-auth/application.yml for the same pattern.
+    url: ${DB_URL:jdbc:postgresql://ep-icy-tree-ayz5dknj-pooler.c-5.us-east-2.aws.neon.tech/neondb?currentSchema=support&sslmode=require&connectTimeout=30&socketTimeout=30&tcpKeepAlive=true}
+    username: ${DB_USERNAME:moodmate}
+    password: ${DB_PASSWORD:moodmate}
+    # Capped for local dev - see moodmate-wellness/application.yml's datasource.hikari comment for
+    # the full "remaining connection slots" root-cause explanation this fixes across all services.
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 90000        # Neon can cold-start or briefly stall while waking compute
+      initialization-fail-timeout: -1  # don't crash app startup if pool can't fill immediately
+      validation-timeout: 10000
+      idle-timeout: 120000
+      max-lifetime: 240000             # rotate before Neon/PgBouncer can hand us stale sockets
+      keepalive-time: 30000            # keep demo/dev pools warm between API calls
+  jpa:
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway migrations, not Hibernate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_schema: support
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: support
+    default-schema: support
+    create-schemas: true
+    baseline-on-migrate: true
+    ignore-missing-migrations: true
+    ignore-migration-patterns:
+      - "*:missing"
+  jackson:
+    time-zone: UTC
+
+moodmate:
+  services:
+    # Direct (non-gateway) service-to-service address for auth-service, used to resolve requester
+    # names/avatars and student names, and to promote an approved counsellor request's user to
+    # the COUNSELLOR role.
+    # Using 127.0.0.1 explicitly, not "localhost" - on this dev machine, "localhost" resolves
+    # ambiguously between the IPv4 (127.0.0.1) and IPv6 (::1) loopback addresses. curl and the
+    # Postgres JDBC driver were resolving it fine, but Spring's RestClient (used for every
+    # service-to-service call below) was consistently getting an instant "connection refused" -
+    # classic symptom of the client resolving to the loopback address nothing is actually bound
+    # on. Forcing 127.0.0.1 removes the ambiguity. See AuthServiceClient's promoteToCounsellor/
+    # promoteToMentor - this is why counsellor/peer-mentor approval was failing with a 502 even
+    # though auth-service itself was confirmed up and healthy.
+    auth-base-url: ${AUTH_SERVICE_URL:http://127.0.0.1:8091}
+    # Phase 1H (Audit Logs) - direct (non-gateway) address for admin-service, read by
+    # AuditLogServiceClient.
+    admin-base-url: ${ADMIN_SERVICE_URL:http://127.0.0.1:8099}
+    # Premium gating breadth (Milestone item 7) - direct (non-gateway) address for wallet-service,
+    # read by PaymentsServiceClient to check Pro status before flagging a booking as priority.
+    wallet-base-url: ${WALLET_SERVICE_URL:http://127.0.0.1:8096}
+    # Peer Mentor Platform (Milestone 5) - direct (non-gateway) address for notifications-service,
+    # read by the new NotificationsServiceClient.
+    notifications-base-url: ${NOTIFICATIONS_SERVICE_URL:http://127.0.0.1:8102}
+
+# Premium gating breadth (Milestone item 7) - Circuit Breaker for PaymentsServiceClient.isPro().
+# Same settings/rationale as moodmate-journal's identical "walletService" breaker config.
+resilience4j:
+  circuitbreaker:
+    instances:
+      walletService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Feature 16 (Observability) - Part 3/5. metrics: auto-recorded JVM/process/
+        # http.server.requests/HikariCP-pool metrics, no code needed. prometheus: scrape endpoint
+        # for monitoring/prometheus/prometheus.yml (needs micrometer-registry-prometheus, added in
+        # pom.xml). See root OBSERVABILITY.md for the "unauthenticated, same as health/info
+        # already were" caveat.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      # Feature 16 (Observability) - Part 9, Performance Monitoring (P95/P99 latency). Client-side
+      # computed percentile gauges (not full histogram buckets - that's the lighter-weight of the
+      # two options Micrometer supports, and enough for the Grafana "API Monitoring" dashboard's
+      # p95/p99 panels; histogram buckets would additionally allow server-side aggregation across
+      # multiple instances of the *same* service in Prometheus, which this single-instance-per-
+      # service topology doesn't need).
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,
+    # thread, correlation ID (via CorrelationIdFilter's MDC entry, key "correlationId" - see that
+    # class's doc comment), logger class, message. CorrelationIdFilter itself logs
+    # "METHOD /uri completed STATUS in N ms" as %msg for every request, satisfying this feature's
+    # request-logging requirement without a second filter.
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] [correlationId=%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.moodmate.support: INFO

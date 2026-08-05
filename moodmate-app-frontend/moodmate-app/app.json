@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "MoodMate",
+    "slug": "moodmate",
+    "scheme": "moodmate",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#F4F5F0",
+      "image": "./assets/splash.png",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.moodmate.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "MoodMate needs camera access so you can be seen during a video counselling/mentor session.",
+        "NSMicrophoneUsageDescription": "MoodMate needs microphone access so you can be heard during a video counselling/mentor session.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.moodmate.app",
+      "permissions": [
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F4F5F0"
+      },
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-audio",
+      "expo-camera",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#3C6B54"
+        }
+      ],
+      "expo-local-authentication",
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "247f3b22-8c57-4a02-968c-f8c731ff94ab"
+      }
+    },
+    "owner": "orleans_barnes"
+  }
+}

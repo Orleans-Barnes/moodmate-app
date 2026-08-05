@@ -1,0 +1,87 @@
+server:
+  port: ${PORT:8102}
+
+spring:
+  # Loads the repo-root .env file as real Spring properties - same pattern as every other service,
+  # see moodmate-gateway/application.yml's spring.config.import comment for the full explanation.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: moodmate-notifications
+  datasource:
+    # Shared Postgres instance, own schema - see moodmate-auth/application.yml for the same pattern.
+    url: ${DB_URL:jdbc:postgresql://ep-icy-tree-ayz5dknj-pooler.c-5.us-east-2.aws.neon.tech/neondb?currentSchema=notifications&sslmode=require&connectTimeout=30&socketTimeout=30&tcpKeepAlive=true}
+    username: ${DB_USERNAME:moodmate}
+    password: ${DB_PASSWORD:moodmate}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 90000        # Neon can cold-start or briefly stall while waking compute
+      initialization-fail-timeout: -1  # don't crash app startup if pool can't fill immediately
+      validation-timeout: 10000
+      idle-timeout: 120000
+      max-lifetime: 240000             # rotate before Neon/PgBouncer can hand us stale sockets
+      keepalive-time: 30000            # keep demo/dev pools warm between API calls
+  jpa:
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway migrations, not Hibernate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        default_schema: notifications
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: notifications
+    default-schema: notifications
+    create-schemas: true
+    baseline-on-migrate: true
+    ignore-missing-migrations: true
+  jackson:
+    time-zone: UTC
+
+moodmate:
+  services:
+    # Phase 1E, Step 4 (Scheduling Rules) - direct (non-gateway) service-to-service address for
+    # MoodServiceClient's GET /internal/mood/latest-per-user, same pattern as moodmate-mood's own
+    # wellness-base-url property. journal/wellness/support-base-url are unused until their own
+    # scheduled jobs are wired (see MASTER_IMPLEMENTATION_TRACKER.md's Phase 1E Step 4 section) but
+    # defined here now so ServiceClientsProperties' record fields all resolve without needing a
+    # follow-up edit to this file.
+    mood-base-url: ${MOOD_SERVICE_URL:http://localhost:8092}
+    journal-base-url: ${JOURNAL_SERVICE_URL:http://localhost:8097}
+    wellness-base-url: ${WELLNESS_SERVICE_URL:http://localhost:8095}
+    support-base-url: ${SUPPORT_SERVICE_URL:http://localhost:8093}
+    # Phase 1E, Step 5 (Expo Push) - AuthServiceClient's notify()/getPreferences() calls.
+    auth-base-url: ${AUTH_SERVICE_URL:http://localhost:8091}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] [correlationId=%X{correlationId:-}] %logger{36} - %msg%n"
+  level:
+    com.moodmate.notifications: INFO

@@ -1,0 +1,319 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  # Loads the repo-root .env file's KEY=value lines as real Spring properties, so every ${FOO}
+  # placeholder below actually sees what's in .env - plain Spring Boot does NOT read .env files on
+  # its own; without this, .env has always been silently ignored no matter what's set in it,
+  # regardless of how mvnw is invoked (this was the real cause behind "GROQ_API_KEY is not set"
+  # even with a real key sitting in .env - discovered from moodmate-ai's own startup log).
+  # optional: so a missing .env doesn't crash startup (each var already has its own safe
+  # fallback/degraded-mode behavior - see each property's own comment). Two paths covers both
+  # invocation styles: cwd = repo root (mvnw -pl X spring-boot:run from root, this project's normal
+  # pattern) or cwd = the module's own directory.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: moodmate-gateway
+  cloud:
+    gateway:
+      # Nested under server.webflux since Spring Cloud 2025.0 (Northfields) - the property prefix
+      # used to be spring.cloud.gateway.* directly (matching the old spring-cloud-starter-gateway
+      # artifact name). Both the artifact and this prefix moved together; see moodmate-gateway's
+      # pom.xml comment and the 2025.0 release notes for the full rename.
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOriginPatterns: "*"
+                allowedMethods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"]
+                allowedHeaders: "*"
+                allowCredentials: false
+                maxAge: 3600
+          routes:
+            # ── Auth Service (public + protected) ──────────────────────────────
+            # RateLimitFilter added for Feature 5 - covers signup/login/forgot-password/
+            # reset-password/guest/refresh/logout/admin-setup together (they all share this one
+            # route). Keyed by client IP (see RateLimitFilter's doc comment) since none of these
+            # calls carry a JWT yet. 10 requests/60s per IP is generous for a real user retrying a
+            # typo'd password a few times, tight enough to blunt brute-force/credential-stuffing.
+            - id: auth-public
+              uri: http://localhost:8091
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - name: RemoveRequestHeader
+                  args:
+                    name: X-User-Id
+                - name: RateLimitFilter
+                  args:
+                    key: auth
+                    limit: 10
+                    windowSeconds: 60
+
+            - id: user-profile
+              uri: http://localhost:8091
+              predicates:
+                - Path=/api/users/**
+              filters:
+                - JwtAuthFilter
+
+            # Serves uploaded avatar image files back out (see moodmate-auth's
+            # StaticResourceConfig / AvatarStorageService). Deliberately public/unauthenticated -
+            # these are just profile photos and an <Image> tag can't attach a bearer token anyway.
+            - id: avatar-media
+              uri: http://localhost:8091
+              predicates:
+                - Path=/media/**
+              filters:
+                - name: RemoveRequestHeader
+                  args:
+                    name: X-User-Id
+
+            # Push token registration (src/api/push.ts) - lives in moodmate-auth (PushController),
+            # authenticated like every other per-user endpoint.
+            - id: push-tokens
+              uri: http://localhost:8091
+              predicates:
+                - Path=/api/push/**
+              filters:
+                - JwtAuthFilter
+
+            # Emergency Contacts (Feature 10) - lives in moodmate-auth (EmergencyContactController),
+            # same per-user-scoped, X-User-Id-only shape as push-tokens above.
+            - id: emergency-contacts
+              uri: http://localhost:8091
+              predicates:
+                - Path=/api/emergency-contacts/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Mood/CheckIn Service ────────────────────────────────────────────
+            # Path fixed to /api/checkins/** (plural) - the monolith's CheckInController is mapped
+            # at /api/checkins, but this route originally said /api/checkin (singular), which
+            # would never have matched real requests at all. /api/mood/** is left in case a client
+            # calls that alias, though nothing in this service is actually mapped under it today.
+            - id: mood-service
+              uri: http://localhost:8092
+              predicates:
+                - Path=/api/checkins/**,/api/mood/**
+              filters:
+                - JwtAuthFilter
+
+            # SOS / crisis resources - deliberately public/unauthenticated (see SosController's doc
+            # comment and this project's CLAUDE.md: "Don't touch SOS, crisis resources... to put
+            # them behind Pro" / "must always stay free"). MUST be listed before support-service
+            # below and must NOT carry JwtAuthFilter - it previously shared support-service's route
+            # (Path=/api/support/**,/api/sos/**) with JwtAuthFilter applied to both, which meant a
+            # logged-out/guest request to GET /api/sos/resources was rejected with 401 by the
+            # gateway itself, even though SosController never required X-User-Id at all. Found
+            # during the final route audit - src/api/sos.ts's own comment says this call is
+            # "deliberately called without a token."
+            - id: sos-public
+              uri: http://localhost:8093
+              predicates:
+                - Path=/api/sos/**
+              filters:
+                - name: RemoveRequestHeader
+                  args:
+                    name: X-User-Id
+
+            # ── Support Service ─────────────────────────────────────────────────
+            - id: support-service
+              uri: http://localhost:8093
+              predicates:
+                - Path=/api/support/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Community Service ───────────────────────────────────────────────
+            - id: community-service
+              uri: http://localhost:8094
+              predicates:
+                - Path=/api/community/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Wellness Service (hub, goals, events, habits, sleep) ────────────
+            # /api/habits/** and /api/sleep/** added for the Habit Management and Sleep Tracking
+            # features - both live in moodmate-wellness rather than a new service.
+            - id: wellness-service
+              uri: http://localhost:8095
+              predicates:
+                - Path=/api/wellness/**,/api/hub/**,/api/habits/**,/api/sleep/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Wallet Service: Paystack webhook (public) ───────────────────────
+            # MUST be listed before wallet-service below - Spring Cloud Gateway matches routes in
+            # order and picks the first match, so this narrower, unauthenticated path has to win
+            # against the broader /api/payments/** route. Paystack can't supply a JWT on its
+            # server-to-server webhook call - authenticity there comes from the
+            # X-Paystack-Signature HMAC header instead, verified inside the service. Without this
+            # route, JwtAuthFilter would reject every webhook call with 401 and payments could
+            # only ever be confirmed via the client's manual GET /verify/{reference} call, never
+            # the webhook.
+            - id: wallet-webhook-public
+              uri: http://localhost:8096
+              predicates:
+                - Path=/api/payments/webhook
+              filters:
+                - name: RemoveRequestHeader
+                  args:
+                    name: X-User-Id
+
+            # ── Wallet Service (leaves, skins, payments) ────────────────────────
+            # RateLimitFilter added for Feature 5, keyed by X-User-Id (JwtAuthFilter runs first in
+            # this list, so the header is already set when RateLimitFilter reads it) - protects
+            # checkout/leaf-pack/skin-purchase endpoints from rapid-fire abuse. The Paystack
+            # webhook has its own separate route above and is deliberately NOT covered by this -
+            # rate-limiting Paystack's own server-to-server confirmations could delay real
+            # payment fulfillment, and that route is already protected by signature verification.
+            - id: wallet-service
+              uri: http://localhost:8096
+              predicates:
+                - Path=/api/wallet/**,/api/payments/**
+              filters:
+                - JwtAuthFilter
+                - name: RateLimitFilter
+                  args:
+                    key: payments
+                    limit: 15
+                    windowSeconds: 60
+
+            # ── Journal Service ─────────────────────────────────────────────────
+            - id: journal-service
+              uri: http://localhost:8097
+              predicates:
+                - Path=/api/journal/**,/api/gratitude/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Gamification Service ────────────────────────────────────────────
+            - id: gamification-service
+              uri: http://localhost:8098
+              predicates:
+                - Path=/api/gamification/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Admin Service: public institution catalogue ─────────────────────
+            # Institution Management (Milestone). MUST be listed before admin-service below - same
+            # "narrower unauthenticated path has to win against a broader authenticated route"
+            # ordering reason as sos-public/wallet-webhook-public above. PublicInstitutionController
+            # lives in moodmate-admin but is intentionally NOT under /api/admin/**, since that whole
+            # path carries JwtAuthFilter and signup needs this list before the user has a token.
+            - id: institutions-public
+              uri: http://localhost:8099
+              predicates:
+                - Path=/api/public/institutions/**
+              filters:
+                - name: RemoveRequestHeader
+                  args:
+                    name: X-User-Id
+
+            # ── Admin Service ───────────────────────────────────────────────────
+            - id: admin-service
+              uri: http://localhost:8099
+              predicates:
+                - Path=/api/admin/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Crisis Service (counsellor/admin alert triage) ─────────────────
+            # /internal/crisis/** is NOT routed here on purpose - see moodmate-crisis's
+            # InternalCrisisAlertController doc comment, same pattern as wallet-service's
+            # /internal/wallet/**.
+            - id: crisis-service
+              uri: http://localhost:8100
+              predicates:
+                - Path=/api/crisis/**
+              filters:
+                - JwtAuthFilter
+
+            # ── AI Service (chat + insights) ────────────────────────────────────
+            # RateLimitFilter added for Feature 5, keyed by X-User-Id - a per-minute burst/abuse
+            # guard that sits alongside (not instead of) moodmate-ai's own server-side daily
+            # free-tier message cap from Feature 3 (Premium Enforcement): this stops rapid-fire
+            # spamming within a single minute, the daily cap stops overall free-tier cost abuse.
+            - id: ai-chat-service
+              uri: http://localhost:8101
+              predicates:
+                - Path=/api/ai/**
+              filters:
+                - JwtAuthFilter
+                - name: RateLimitFilter
+                  args:
+                    key: ai-chat
+                    limit: 20
+                    windowSeconds: 60
+
+            - id: insights-service
+              uri: http://localhost:8101
+              predicates:
+                - Path=/api/insights/**
+              filters:
+                - JwtAuthFilter
+
+            # ── Notifications Service (Phase 1E Step 2) ─────────────────────────
+            # /internal/notifications is NOT routed here on purpose - see moodmate-notifications's
+            # InternalNotificationController doc comment, same pattern as crisis-service's
+            # /internal/crisis/** and wallet-service's /internal/wallet/** above.
+            - id: notifications-service
+              uri: http://localhost:8102
+              predicates:
+                - Path=/api/notifications/**
+              filters:
+                - JwtAuthFilter
+
+moodmate:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-before-deploy-32chars-min}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Feature 16 (Observability) - Part 3/5. metrics: browsable /actuator/metrics/* (JVM,
+        # process, http.server.requests etc. - all auto-recorded by Micrometer once it's on the
+        # classpath, no code needed here). prometheus: /actuator/prometheus, the Prometheus
+        # scrape endpoint the monitoring stack (monitoring/prometheus/prometheus.yml) reads from -
+        # requires micrometer-registry-prometheus (added in pom.xml). See OBSERVABILITY.md for the
+        # "these are unauthenticated, same as health/info already were" caveat and how to lock
+        # this down for a real production deployment.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    distribution:
+      # Feature 16 (Observability) - Part 9, Performance Monitoring. Spring Cloud Gateway records
+      # per-route timings under the "spring.cloud.gateway.requests" meter (tags: routeId, outcome,
+      # httpStatusCode, httpMethod) rather than "http.server.requests" - this is a reactive
+      # WebFlux gateway app with no @RestController endpoints of its own to time, so the servlet-
+      # stack meter name the 11 other services use doesn't apply here.
+      percentiles:
+        spring.cloud.gateway.requests: 0.5, 0.95, 0.99
+
+logging:
+  pattern:
+    # Feature 16 (Observability) - Part 2, Structured Logging. Timestamp, level, service name,
+    # thread, correlation ID (message-embedded here rather than MDC - see
+    # CorrelationIdGlobalFilter's doc comment for why this reactive app doesn't use MDC), logger,
+    # message. CorrelationIdGlobalFilter's own log lines already put "[correlationId] --> METHOD
+    # /path" in %msg, so this pattern doesn't add a separate MDC-based correlationId slot the way
+    # the 11 servlet-based services' pattern does.
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [${spring.application.name}] [%thread] %logger{36} - %msg%n"
+  level:
+    com.moodmate.gateway: INFO
+    org.springframework.cloud.gateway: WARN

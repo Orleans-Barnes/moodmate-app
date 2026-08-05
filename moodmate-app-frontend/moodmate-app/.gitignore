@@ -1,0 +1,44 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.DS_Store
+.env
+
+# ── backend/ (Java/Maven microservices) ─────────────────────────────────────
+backend/**/target/
+backend/**/*.class
+backend/**/*.log
+backend/.idea/
+backend/**/*.iml
+backend/.vscode/
+backend/**/HELP.md
+# Carries real per-developer secrets (Groq key, Gmail app password, etc.) - never commit this, see
+# backend/README.md and this file's own history for why this line exists.
+backend/**/start.bat
+
+# Real uploaded user photos from local testing - never commit actual user images to the repo.
+# Keep the folder itself (.gitkeep) so the app still has somewhere to write into.
+backend/uploads/avatars/*
+!backend/uploads/avatars/.gitkeep
+
+# Personal-machine helper scripts that hardcode Orleans' own folder paths (a Downloads copy outside
+# this repo) - not portable, would silently fail or do nothing useful for any other teammate.
+backend/deploy_frontend.bat
+backend/update_ip.bat
+backend/run_expo.bat
+backend/restart_expo.bat
+backend/start_expo.bat
+backend/current_ip.txt
+
+# Stray zero-byte artifacts from local testing, not part of the app.
+backend/save
+backend/\[Help
+backend/moodmate-auth/testwrite.tmp

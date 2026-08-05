@@ -1,0 +1,125 @@
+// ─── MoodMate curated music tracks ──────────────────────────────────────────
+// Replaces old ambient soundscapes with Quabble-style curated music.
+import { accents } from '@/theme/tokens';
+
+export interface MusicTrack {
+  id: string;
+  name: string;
+  emoji: string;
+  genre: string;
+  description: string;
+  color: string;
+  asset: number;
+  // Premium gating breadth (Milestone item 7) - backs ProScreen's "Full meditation & soundscape
+  // library" line: free users get a starter subset (one per broad category - sleep, focus, nature,
+  // noise), the rest require Pro. Checked client-side only in ExploreScreen/useMusicStore - there's
+  // no server write to protect here (tracks are bundled local assets via require(), not fetched).
+  proOnly: boolean;
+}
+
+export const MUSIC_TRACKS: MusicTrack[] = [
+  {
+    id: 'moonlight',
+    name: 'Moonlight',
+    emoji: '🌙',
+    genre: 'Sleep · Piano',
+    description: 'Gentle piano arpeggios — great for winding down before sleep',
+    color: accents.sleep.accent,
+    asset: require('../../assets/music/moonlight.mp3'),
+    proOnly: false,
+  },
+  {
+    id: 'serenity',
+    name: 'Serenity',
+    emoji: '☁️',
+    genre: 'Focus · Lo-fi',
+    description: 'Soft lo-fi beats to keep you calm and focused',
+    color: accents.focus.accent,
+    asset: require('../../assets/music/serenity.mp3'),
+    proOnly: false,
+  },
+  {
+    id: 'binaural_calm',
+    name: 'Binaural Calm',
+    emoji: '🌊',
+    genre: 'Calm · Theta 7Hz',
+    description: 'Binaural beats at 7Hz theta — reduces anxiety, promotes calm',
+    color: accents.calm.accent,
+    asset: require('../../assets/music/binaural_calm.mp3'),
+    proOnly: true,
+  },
+  {
+    id: 'morning_bloom',
+    name: 'Morning Bloom',
+    emoji: '🌅',
+    genre: 'Morning · Acoustic',
+    description: 'Uplifting acoustic strings to start your day with intention',
+    color: accents.energy.accent,
+    asset: require('../../assets/music/morning_bloom.mp3'),
+    proOnly: true,
+  },
+  {
+    id: 'deep_space',
+    name: 'Deep Space',
+    emoji: '🔮',
+    genre: 'Meditation · Drone',
+    description: 'Ambient harmonic drone — perfect for deep meditation sessions',
+    color: accents.creativity.accent,
+    asset: require('../../assets/music/deep_space.mp3'),
+    proOnly: true,
+  },
+  {
+    id: 'lullaby',
+    name: 'Lullaby',
+    emoji: '🎀',
+    genre: 'Sleep · Music Box',
+    description: 'Gentle music-box melody on a pentatonic scale for restful sleep',
+    color: accents.gratitude.accent,
+    asset: require('../../assets/music/lullaby.mp3'),
+    proOnly: true,
+  },
+  {
+    id: 'brown_noise',
+    name: 'Brown Noise',
+    emoji: '🟤',
+    genre: 'Focus · Noise',
+    description: 'Deep brown noise for studying, blocking distractions and ADHD focus',
+    color: accents.learning.accent,
+    asset: require('../../assets/music/brown_noise.mp3'),
+    proOnly: true,
+  },
+  {
+    id: 'adhd_focus',
+    name: 'Focus 40Hz',
+    emoji: '🧠',
+    genre: 'ADHD · Gamma',
+    description: '40 Hz gamma binaural beats — clinically studied for concentration and cognitive clarity',
+    color: accents.wellness.accent,
+    asset: require('../../assets/music/adhd_focus.mp3'),
+    proOnly: true,
+  },
+  {
+    id: 'rain_focus',
+    name: 'Rain Ambience',
+    emoji: '🌧️',
+    genre: 'Focus · Nature',
+    description: 'Gentle rainfall with low rumble — perfect for calm focus sessions',
+    color: accents.social.accent,
+    asset: require('../../assets/music/rain_focus.mp3'),
+    proOnly: false,
+  },
+  {
+    id: 'white_noise',
+    name: 'White Noise',
+    emoji: '⬜',
+    genre: 'Sleep · Noise',
+    description: 'Pure white noise to mask background sounds and improve sleep quality',
+    color: accents.anxiety.accent,
+    asset: require('../../assets/music/white_noise.mp3'),
+    proOnly: false,
+  },
+];
+
+export function getTrack(id: string): MusicTrack | undefined {
+  return MUSIC_TRACKS.find((t) => t.id === id);
+}
